@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.54-ai-owned-section-prose"
+CONTRACT_VERSION = "clinical-documents-v2.55-clinical-prose-focus"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -432,7 +432,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "financial-injury": "State source-supported compensation, costs, insurance, and injury-handling terms in protocol voice. Participant-facing instructions and consent-form signing language belong only in the ICF. When the source leaves a term unspecified, do not supply a policy or promise for it.",
         "ethics.confidentiality": "Keep this ethics subsection to a concise cross-reference to Section 16. If the approved ethics.confidentiality field supplies a distinct oversight rule, state that rule briefly. Section 16 owns the operational privacy procedures; do not restate them here.",
         "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
-        "risks-benefits.benefits": "Describe only source-supported potential benefits or absence of direct benefit. Payment and reimbursement belong in Section 17.",
+        "risks-benefits.benefits": "Write one concise paragraph summarizing source-supported potential benefits and the applicable absence or uncertainty of direct benefit. Preserve each distinct benefit and its qualifications; background literature, lens design explanations and earlier study results belong in Introduction. Use that evidence to understand the potential benefit rather than retelling it here. Payment and reimbursement belong in Section 17.",
         "study-procedure.discontinued": "Preserve the approved operational handling for discontinued subjects, including any supplied safety follow-up.",
         "quality-safety": (
             "For each approved safety.roles record, write a separate direct active-voice sentence beginning "
@@ -450,7 +450,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence. When the source places consent and device initiation at the same visit, state consent before device initiation and other study-specific activities. If the approved source provides continuous adverse-event or device-deficiency reporting, tell participants that problems can be reported between scheduled visits and state the approved collection period.",
         "icf.duration": "State expected enrollment once using the approved count and unit, then describe approved participant timing and the final follow-up anchor; leave the visit itinerary in Procedures.",
         "icf.risks": "Disclose every approved risk or discomfort and every approved risk-mitigation instruction without minimizing, inventing, or hiding safeguards.",
-        "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement.",
+        "icf.benefits": "Write one concise paragraph in participant-facing language stating the approved potential benefits and explicitly preserving any no-direct-benefit statement and uncertainty. Keep every distinct benefit and qualification; background literature, lens design explanations and earlier study results belong in the applicable purpose/background section rather than this benefits summary.",
         "icf.payment": "State the approved payment or reimbursement terms exactly enough for participant use.",
         "icf.privacy": "Explain the approved privacy and confidentiality handling in participant-facing language.",
         "icf.withdrawal": "Draft the complete withdrawal section: include the applicable authorized voluntary-participation and prior-data-use paragraph once, followed by supplied withdrawal instructions, optional follow-up, investigator discontinuation and earned-payment conditions. Preserve every condition in participant-facing language. If only the fixed paragraph applies, return that exact paragraph as fixed_boilerplate. Assembly inserts your response verbatim and adds no withdrawal prose.",
@@ -1877,7 +1877,10 @@ def benefit_context_contract(reference: Mapping[str, Any], section_id: str) -> d
                 "Preserve each applicable qualified possibility in this section, with uncertainty and no "
                 "guarantee of personal benefit. Historical evidence about other studies or treatments is "
                 "context, not proof of this study's benefit; never turn a hypothetical advantage into an "
-                "established result. Retrospective record review must not promise treatment benefit. "
+                "established result. In the authored benefits summary, state the qualified potential benefit "
+                "briefly; keep the literature history in Introduction or ICF Background. Exact background "
+                "quotations belong in benefit_interpretation evidence pairs, not as a repeated literature "
+                "review in the paragraph. Retrospective record review must not promise treatment benefit. "
                 "If no applicable benefit is stated, return an empty list and explain why; use authorized "
                 "fallback wording without inventing a benefit or requesting optional input.")}
 
@@ -2382,7 +2385,10 @@ def assessment_presentation_contract(reference: Mapping[str, Any]) -> dict[str, 
             "never move an actual assessment or staff task, delete a fact or change visit assignments. "
             "Use standalone clinical wording, preserving clinical facts, units, qualifications and visit associations. "
             "Remove internal synopsis/source references from display labels and notes. Omit a note with empty "
-            "display_text only when all its material information is already represented. Keep unique safety, "
+            "display_text only when all its material clinical information is already represented or it contains "
+            "only internal source/provenance or unresolved-marker commentary. Preserve an ambiguous form "
+            "identifier as supplied; keep the explanation of its ambiguity in the edit rationale, not in a "
+            "displayed table note. Keep unique safety, "
             "timing and footnote explanations in adjacent prose. Keep genuine numbered forms, instrument names, "
             "citations and explained footnotes. Remove a numeral only when source context confirms an orphan "
             "footnote marker; uncertainty means retain it. Code does not strip numbers or judge equivalence. "

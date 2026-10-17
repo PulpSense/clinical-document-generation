@@ -1,0 +1,1550 @@
+[
+  {
+    "case": "break-sterling",
+    "study_type": "Prospective",
+    "family": "Sterling",
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "source_sha256": "8f254bade90427d5ced2ca69d5eafd12bc1e879228034010d30cedc5a8411eea",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "2ad8ecb063b6dfdd9e87a9da2efb1871d51cf52852b635661accbd18c2bdccbf",
+        "response": {
+          "request_id": "focus-break-sterling.draft.protocol-operations.generation-only.a1.27b3119a",
+          "request_sha256": "2ad8ecb063b6dfdd9e87a9da2efb1871d51cf52852b635661accbd18c2bdccbf",
+          "revision_id": "focus-break-sterling",
+          "task": "section_drafting",
+          "batch_id": "protocol-operations",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "evaluation-procedures",
+              "paragraphs": [
+                {
+                  "text": "The scheduled study activities are shown in Table 15.1.",
+                  "evidence_refs": [
+                    "procedures.assessments"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "assessment_presentation": {
+                "qualifiers": [
+                  {
+                    "source_text": "Higher is worse",
+                    "display_text": "For the seven-day average eye-discomfort rating obtained at Day 0, Day 14, Day 28 and Day 56, higher scores indicate worse discomfort.",
+                    "rationale": "Score direction qualifies the eye-discomfort rating; it is not a separate assessment. Its four assigned contacts are preserved."
+                  },
+                  {
+                    "source_text": "Higher is better",
+                    "display_text": "For the near-task satisfaction rating obtained at Day 0, Day 28 and Day 56, higher scores indicate greater satisfaction.",
+                    "rationale": "Score direction qualifies satisfaction rather than defining a staff task; its three assigned clinic contacts are preserved."
+                  }
+                ],
+                "notes": [
+                  {
+                    "source_text": "No visual acuity test, satisfaction rating, new training or specimen collection occurs by telephone.",
+                    "display_text": "No visual acuity test, satisfaction rating, new training or specimen collection occurs by telephone.",
+                    "rationale": "The telephone contact’s exclusions are not all explicit in unchecked cells; retain the prohibition on new training and specimen collection as well as the testing limits."
+                  },
+                  {
+                    "source_text": "No extra exit form or separate closeout contact is required.",
+                    "display_text": "No extra exit form or separate closeout contact is required.",
+                    "rationale": "The absence of a separate exit form or closeout contact is a unique procedural limit, not merely the absence of an extra table column."
+                  },
+                  {
+                    "source_text": "Both groups complete one paper diary entry each evening from the day after randomization (Day 1) through Day 56 inclusive, about two minutes per day. Each entry records total screen-use hours and whether screen use occurred. Scheduled-break participants additionally record the number of eligible 30-minute intervals and the number followed by a completed two-minute break. Usual-habits participants record the number of breaks they naturally took; they are not given adherence targets. An evening entry is not a clinic visit. Day 0 has no home-diary entry. Clinic visits are not multiplied by diary days. Do not invent daily symptom ratings: the diary does not collect symptom scores.",
+                    "display_text": "Home activity, separate from clinic visits: both groups complete one paper-diary entry each evening on Days 1–56 inclusive, beginning the day after randomization, for about two minutes daily. Record total screen-use hours and whether screen use occurred. Scheduled-break participants also record eligible 30-minute intervals and the number followed by a completed two-minute break. Usual-habits participants record naturally taken breaks without adherence targets. There is no Day 0 home entry, and the diary collects no symptom scores.",
+                    "rationale": "The matrix has no daily-home-contact columns. Preserve the unique diary timing, duration, group-specific content and exclusions while removing internal drafting language."
+                  },
+                  {
+                    "source_text": "There are no research blood draws, saliva, genetic testing, banking, imaging, dilation, home devices, study medicines or surgical procedures.",
+                    "display_text": "There are no research blood draws, saliva, genetic testing, banking, imaging, dilation, home devices, study medicines or surgical procedures.",
+                    "rationale": "The absence of these procedures is not fully conveyed by the listed positive assessments; retain all exclusions."
+                  },
+                  {
+                    "source_text": "No other or exploratory outcomes are authorized. Day 14/28 symptoms support descriptive trajectory summaries, without creating additional registry outcomes.",
+                    "display_text": "No additional or exploratory outcomes are collected. Day 14 and Day 28 symptom ratings are used for descriptive trajectory summaries only.",
+                    "rationale": "Preserve the outcome limitation and the unique descriptive purpose without registry-authoring language."
+                  },
+                  {
+                    "source_text": "Four scheduled contacts, three in person and one by telephone. Daily diaries are a separate activity, not extra visits; Day 0 has no home entry, and diaries collect no symptom scores. Training explanation is included in Day 0 total duration.",
+                    "display_text": "The ten-minute Day 0 break explanation is included in the approximately 65-minute total visit duration.",
+                    "rationale": "Four contacts and their modes are in the matrix; diary separation, no Day 0 entry and no diary symptom scores are retained in the home-activity note. Preserve the training-duration inclusion explicitly."
+                  },
+                  {
+                    "source_text": "Participants may pause or stop testing. Persistent or worsening symptoms go to the study doctor and clinical concerns to ordinary care.",
+                    "display_text": "",
+                    "rationale": "This general pause/stop and symptom-referral policy is fully represented in related_source safety.monitoring and the risks section; no distinct assessment-specific condition or timing remains."
+                  },
+                  {
+                    "source_text": "For possible research injury or persistent discomfort, contact the enrolling site's coordinator to reach its study doctor. The clinic arranges evaluation. Use ordinary emergency services for emergencies. No sponsor fund for free injury treatment or additional injury compensation is established. Ordinary treatment may be billed to the participant or insurer; legal rights are not waived. Do not promise free care or automatic injury payments.",
+                    "display_text": "",
+                    "rationale": "The complete injury-contact, evaluation, emergency-services and cost/legal policy is represented in related_source safety.adverse_events. It adds no assessment-specific timing, threshold or procedure and belongs in the safety and injury sections."
+                  }
+                ]
+              },
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "bbe61fd4bbdc2170f1f588c54af5a9d5ffb96b4b19c1ac893a7fe99e091a193a",
+        "response": {
+          "request_id": "focus-break-sterling.draft.protocol-analysis-and-oversight.generation-only.a1.e3f4b973",
+          "request_sha256": "bbe61fd4bbdc2170f1f588c54af5a9d5ffb96b4b19c1ac893a7fe99e091a193a",
+          "revision_id": "focus-break-sterling",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "Applicable ethics review requirements and ethical and privacy protections govern study conduct.",
+                  "evidence_refs": [],
+                  "boilerplate_refs": [
+                    "ethics"
+                  ]
+                },
+                {
+                  "text": "The designated review body is Meridian Independent Research Review Board, an independent IRB unaffiliated with the sponsor and clinics. The study has not yet been submitted, and no approval, approval number or approval date has been obtained. Ethics approval will be required before research begins. Written personal informed consent will precede any research procedures. The study does not include children, adults unable to consent, proxy respondents, legally authorized representatives or witness signatures.",
+                  "evidence_refs": [
+                    "source:parties.irb",
+                    "source:ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "The sponsor requires public trial registration before enrollment and the standard ClinicalTrials.gov consent disclosure. These are planned requirements, not a statement that registration has occurred. Participant-rights questions and research concerns may be directed to Meridian Independent Research Review Board, 440 Review Street, Suite 300, Philadelphia, PA 19106, United States; telephone +1 202-555-0185; email participant.rights.meridian@example.org.",
+                  "evidence_refs": [
+                    "source:ethics",
+                    "source:parties.irb"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            },
+            {
+              "section_id": "risks-benefits.benefits",
+              "paragraphs": [
+                {
+                  "text": "Direct benefit is uncertain and is not promised. The study may help inform the design of future studies of screen-break routines.",
+                  "evidence_refs": [
+                    "source:risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "81aaf4f635a09575d08a231895ac5f18df66cb8ec34a7785c0b375611e309c41",
+        "response": {
+          "request_id": "focus-break-sterling.draft.icf-narrative.generation-only.a1.45c731a4",
+          "request_sha256": "81aaf4f635a09575d08a231895ac5f18df66cb8ec34a7785c0b375611e309c41",
+          "revision_id": "focus-break-sterling",
+          "task": "section_drafting",
+          "batch_id": "icf-narrative",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "icf.benefits",
+              "outcome": "drafted",
+              "paragraphs": [
+                {
+                  "text": "You may or may not feel better with the break routine. Any benefit is uncertain, and no direct benefit is promised. The results may help researchers design future studies of screen-break routines.",
+                  "evidence_refs": [
+                    "source:risks_benefits.benefits",
+                    "source:study.background"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": []
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  },
+  {
+    "case": "caps-retrospective",
+    "study_type": "Retrospective",
+    "family": null,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight"
+    ],
+    "source_sha256": "1e9b6845a7159e4ce6da4223781d5f92adfbde70eb4b980d9c37c13c15866629",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "40e1bfd4c7e90718d2c1b6547c46ef203d13416d42943ba1828958630e76ee81",
+        "response": {
+          "request_id": "focus-caps-retrospective.draft.protocol-analysis-and-oversight.generation-only.a1.792d87bd",
+          "request_sha256": "40e1bfd4c7e90718d2c1b6547c46ef203d13416d42943ba1828958630e76ee81",
+          "revision_id": "focus-caps-retrospective",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "Elmstead Independent Research Review Board, independent of sponsor and clinic, is the designated reviewing body. The study has not been submitted and no approval, approval number or date exists. Consent and privacy-authorization waivers will be requested, not presumed granted. Required decisions and site permission precede access. Permission withdrawal and resumption are handled as specified in Informed Consent / Subject Enrollment, without patient recontact."
+                },
+                {
+                  "text": "There is no direct benefit, participant payment, reimbursement or new clinical charge. The sponsor funds staff work and analysis; no new injury-treatment or insurance promise is established. No child records are included. Research contacts are the site coordinator, Quinn Harper, at +1 202-555-0121, office +1 202-555-0122, quinn.harper@example.org, Elmstead Ophthalmology Clinic, 920 Clinic Way, Suite 100, Madison, WI 53704. Coordinator hours are Monday–Friday, 9 a.m.–5 p.m., not an emergency service. Rights and oversight questions use Elmstead Independent Research Review Board, 610 Review Street, Suite 300, Madison, WI 53705; +1 202-555-0123; research.rights.elmstead@example.org."
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  },
+  {
+    "case": "comfort-advarra",
+    "study_type": "Ambispective",
+    "family": "Advarra",
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "source_sha256": "85500c44ce2480b5195d95b19a9d249108a8a21f87790f14621b23c7194310f5",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "d1ac2ea66a9bc91eda6a2d9d7e0c7e90d70bcf9162db47db0e9b34544c5a266c",
+        "response": {
+          "request_id": "focus-comfort-advarra.draft.protocol-operations.generation-only.a1.c31af576",
+          "request_sha256": "d1ac2ea66a9bc91eda6a2d9d7e0c7e90d70bcf9162db47db0e9b34544c5a266c",
+          "revision_id": "focus-comfort-advarra",
+          "task": "section_drafting",
+          "batch_id": "protocol-operations",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "evaluation-procedures",
+              "paragraphs": [
+                {
+                  "text": "The scheduled study activities are shown in Table 15.1.",
+                  "evidence_refs": [
+                    "procedures.assessments"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "assessment_presentation": {
+                "activity_labels": [],
+                "qualifiers": [],
+                "notes": [
+                  {
+                    "source_text": "Historical data are whatever was recorded in routine care. There is no assumed historical questionnaire, saliva collection, consent visit or standardized research assessment. An absent historical value is recorded as missing. The record-abstraction task is performed by staff after Day 0; it is not an extra participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic.",
+                    "display_text": "Historical information is limited to observations recorded during routine care; missing values remain missing. No historical questionnaire, saliva collection, consent visit or standardized research assessment is assumed. Staff abstract records after Day 0 consent; this is not a participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic.",
+                    "rationale": "Retains historical-data limits, missing-value handling, consent timing and clinic source-record custody; the matrix supplies the individual abstraction tasks."
+                  },
+                  {
+                    "source_text": "No visual acuity test or saliva collection takes place by telephone.",
+                    "display_text": "",
+                    "rationale": "The telephone column contains neither visual acuity testing nor saliva collection; these appear only in the assigned in-person columns."
+                  },
+                  {
+                    "source_text": "Confirm completion after these activities. No exit form, fourth visit or second saliva sample is required.",
+                    "display_text": "No exit form, fourth visit or second saliva sample is required.",
+                    "rationale": "The final-visit column already includes confirmation of research completion; the unique exclusions of an exit form, fourth visit and second sample are retained."
+                  },
+                  {
+                    "source_text": "No blood draws, pupil dilation, imaging, study medication or research surgery. The saliva specimen is mandatory for this study's eligibility; there is no optional genetic substudy or separate future-use opt-in. Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits.",
+                    "display_text": "There are no blood draws, pupil dilation, imaging, study medication or research surgery. The Day 0 saliva specimen is mandatory for eligibility; there is no optional genetic substudy or separate future-use opt-in.",
+                    "rationale": "Retains all excluded procedures and mandatory specimen status. The historical column is explicitly a staff task, not a participant visit; checked cells already restrict saliva to Day 0 and acuity to the in-person visits."
+                  },
+                  {
+                    "source_text": "Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits.",
+                    "display_text": "",
+                    "rationale": "Fully represented by the historical staff-task column label and the exclusive Day 0 saliva and in-person acuity assignments; the other notes preserve the historical-record limitations."
+                  },
+                  {
+                    "source_text": "Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care and are not new research risks.",
+                    "display_text": "Research testing may be paused or stopped on request. Contact the study doctor for persistent symptoms.",
+                    "rationale": "Retains assessment-specific pause/stop and persistent-symptom instructions. The ordinary-care status of prior surgery is already covered by the supplied safety and risks context, not an additional assessment instruction."
+                  },
+                  {
+                    "source_text": "For possible research injury or persistent discomfort, contact the enrolling site's study doctor via the coordinator; the clinic arranges evaluation. Emergency care uses ordinary emergency services. No fund for free injury treatment or additional injury compensation is established; ordinary treatment may be billed to the participant or insurer. Legal rights are not waived.",
+                    "display_text": "",
+                    "rationale": "This general injury-referral, emergency-care, treatment-cost and legal-rights policy is fully present in related_source safety.adverse_events and belongs in the safety and risks sections; it adds no unique matrix timing or assessment condition."
+                  }
+                ]
+              },
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "5f29f1f12f810bd6f3d86b275e1f1badc9b3490fb8d69cd95b601dafd0fafff6",
+        "response": {
+          "request_id": "focus-comfort-advarra.draft.protocol-analysis-and-oversight.generation-only.a1.399a44cd",
+          "request_sha256": "5f29f1f12f810bd6f3d86b275e1f1badc9b3490fb8d69cd95b601dafd0fafff6",
+          "revision_id": "focus-comfort-advarra",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "Harbor Independent Research Review Board, an independent IRB unaffiliated with the sponsor and study clinics, is the designated review body. The study has not yet been submitted; no IRB approval has been obtained and no approval identifier or date has been issued. Applicable ethics review requirements and ethical and privacy protections govern study conduct.",
+                  "evidence_refs": [
+                    "parties.irb",
+                    "ethics"
+                  ],
+                  "boilerplate_refs": [
+                    "ethics"
+                  ]
+                },
+                {
+                  "text": "Consecutive eligible clinic patients are invited during routine contact using non-probability sampling. Entry requires personal written informed consent before research activities, with authorization before historical-record access; there is no separate records-only or waiver-of-consent population. Children and adults unable to consent are not enrolled, and representative or witness signatures are not required. The consent explains research genetic-information risks, including possible implications for biological relatives if confidentiality is lost. Testing does not determine family relationships, ancestry or clinical disease risk and does not involve whole genome sequencing.",
+                  "evidence_refs": [
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Participant-rights questions and research concerns may be raised with Harbor Independent Research Review Board at 950 Review Avenue, Suite 450, Baltimore, MD 21204, United States; +1 202-555-0168; participant.rights@example.org. Selection of the Advarra consent layout does not replace the designated study-specific IRB or establish approval. This is not an FDA-regulated investigational drug or device study; there is no investigational product, randomization, masking, radiation or pregnancy testing. Mandatory ClinicalTrials.gov consent disclosure does not apply under this study plan, and generation of registry XML does not itself create that requirement.",
+                  "evidence_refs": [
+                    "parties.irb",
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            },
+            {
+              "section_id": "risks-benefits.benefits",
+              "paragraphs": [
+                {
+                  "text": "No direct participant benefit is promised. Knowledge gained may improve understanding of reported ocular comfort and documented care patterns after routine bilateral cataract surgery.",
+                  "evidence_refs": [
+                    "risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "1b544b29ab2f6bfbd47e0b9b1b4a9d631bfd38a8e9afb86ad123b46abe40586b",
+        "response": {
+          "request_id": "focus-comfort-advarra.draft.icf-narrative.generation-only.a1.80763ac0",
+          "request_sha256": "1b544b29ab2f6bfbd47e0b9b1b4a9d631bfd38a8e9afb86ad123b46abe40586b",
+          "revision_id": "focus-comfort-advarra",
+          "task": "section_drafting",
+          "batch_id": "icf-narrative",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "icf.benefits",
+              "outcome": "drafted",
+              "paragraphs": [
+                {
+                  "text": "You are not promised a direct benefit from joining. What researchers learn may help them better understand reported eye comfort and documented eye-care patterns. This research does not change your treatment.",
+                  "evidence_refs": [
+                    "source:risks_benefits.benefits",
+                    "source:study.background"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": []
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  },
+  {
+    "case": "comfort-sterling",
+    "study_type": "Ambispective",
+    "family": "Sterling",
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "source_sha256": "deafd8a4bb50267649ce3e1e9e8a9b01a092e4b4c0e1e38d16eadbdc3f005de6",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "06a29abc0c07e60e31572ae0f00c76f357966d4de06d5119019c9b5402a4ac6d",
+        "response": {
+          "request_id": "focus-comfort-sterling.draft.protocol-operations.generation-only.a1.869f5404",
+          "request_sha256": "06a29abc0c07e60e31572ae0f00c76f357966d4de06d5119019c9b5402a4ac6d",
+          "revision_id": "focus-comfort-sterling",
+          "task": "section_drafting",
+          "batch_id": "protocol-operations",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "evaluation-procedures",
+              "paragraphs": [
+                {
+                  "text": "The scheduled study activities are shown in Table 15.1.",
+                  "evidence_refs": [
+                    "procedures.assessments"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "assessment_presentation": {
+                "activity_labels": [],
+                "qualifiers": [],
+                "notes": [
+                  {
+                    "source_text": "Historical data are whatever was recorded in routine care. There is no assumed historical questionnaire, saliva collection, consent visit or standardized research assessment. An absent historical value is recorded as missing. The record-abstraction task is performed by staff after Day 0; it is not an extra participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic.",
+                    "display_text": "Historical values come only from routine-care documentation; unavailable values are recorded as missing. No historical research questionnaire, saliva collection, consent visit or standardized research assessment is assumed. No pre-consent research procedures were performed. Original surgical and care records remain at the clinic.",
+                    "rationale": "The record-review column already identifies the fixed historical period and post-consent staff abstraction rather than a participant visit. Retain the unique limits on historical data, missingness, absence of pre-consent procedures and location of source records."
+                  },
+                  {
+                    "source_text": "No visual acuity test or saliva collection takes place by telephone.",
+                    "display_text": "",
+                    "rationale": "The matrix assigns visual acuity only to Day 0 and Day 90 in-person visits and saliva only to Day 0, with neither assigned to the telephone contact."
+                  },
+                  {
+                    "source_text": "Confirm completion after these activities. No exit form, fourth visit or second saliva sample is required.",
+                    "display_text": "No exit form, fourth visit or second saliva sample is required.",
+                    "rationale": "Confirmation of research completion is already an activity at the final visit; retain the unique limits on additional forms, visits and specimens."
+                  },
+                  {
+                    "source_text": "No blood draws, pupil dilation, imaging, study medication or research surgery. The saliva specimen is mandatory for this study's eligibility; there is no optional genetic substudy or separate future-use opt-in. Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits.",
+                    "display_text": "No blood draws, pupil dilation, imaging, study medication or research surgery are performed. The Day 0 saliva sample is required for eligibility; there is no optional genetic substudy or separate future-use opt-in.",
+                    "rationale": "The column labels distinguish historical review from visits, and checked cells already restrict saliva to Day 0 and visual acuity to in-person visits. Retain the unique excluded procedures and mandatory rather than optional specimen policy."
+                  },
+                  {
+                    "source_text": "Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits.",
+                    "display_text": "",
+                    "rationale": "The historical record-review column and the Day 0-only saliva and two in-person visual-acuity assignments already represent every fact in this clarification."
+                  },
+                  {
+                    "source_text": "Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care and are not new research risks.",
+                    "display_text": "Research testing may be paused or stopped at the participant’s request.",
+                    "rationale": "Retain the assessment-specific pause/stop instruction. Persistent-symptom contact instructions and the distinction between prior ordinary-care surgery and research risk are covered by the supplied safety and risks sections."
+                  },
+                  {
+                    "source_text": "For possible research injury or persistent discomfort, contact the enrolling site's study doctor via the coordinator; the clinic arranges evaluation. Emergency care uses ordinary emergency services. No fund for free injury treatment or additional injury compensation is established; ordinary treatment may be billed to the participant or insurer. Legal rights are not waived.",
+                    "display_text": "",
+                    "rationale": "This note duplicates the supplied safety.adverse_events policy in full, including referral for possible injury or persistent discomfort, emergency services, injury-treatment costs and preservation of legal rights. It adds no assessment-specific timing, threshold or procedure and belongs in the safety and financial/injury sections."
+                  }
+                ]
+              },
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "9a3ceff7dd81b336083ac363af3ea2af182773a6a51b2e2b1b09cfb2f4160102",
+        "response": {
+          "request_id": "focus-comfort-sterling.draft.protocol-analysis-and-oversight.generation-only.a1.ef0538e1",
+          "request_sha256": "9a3ceff7dd81b336083ac363af3ea2af182773a6a51b2e2b1b09cfb2f4160102",
+          "revision_id": "focus-comfort-sterling",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "Harbor Independent Research Review Board is the designated reviewing IRB and is independent of the sponsor and study clinics. The study has not yet been submitted, no IRB approval has been obtained, and no approval identifier or date has been issued. Selection of the Sterling consent layout does not change the designated reviewing IRB or establish approval.",
+                  "evidence_refs": [
+                    "parties.irb",
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Consecutive eligible clinic patients are invited during routine contact using non-probability sampling. Entry requires personal written informed consent before research activities, with authorization before historical records are accessed. There is no separate records-only cohort or waiver-of-consent population. Children and adults unable to consent are not enrolled; no representative or witness signature is required under this study plan.",
+                  "evidence_refs": [
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "The study collects genetic information, which may reveal information about participants or biological relatives if confidentiality is lost. It does not determine family relationships, ancestry or clinical disease risk or perform whole genome sequencing. The applicable genetic-information and GINA provisions are retained in the Sterling consent layout.",
+                  "evidence_refs": [
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "This is not an FDA-regulated investigational drug or device study. There is no investigational product, randomization, masking, radiation or pregnancy testing. Mandatory ClinicalTrials.gov consent disclosure does not apply under this study plan; preparation of registry XML does not itself establish that requirement.",
+                  "evidence_refs": [
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Participant-rights questions and research concerns may be directed to Harbor Independent Research Review Board, 950 Review Avenue, Suite 450, Baltimore, MD 21204, United States; telephone +1 202-555-0168; email participant.rights@example.org.",
+                  "evidence_refs": [
+                    "parties.irb"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            },
+            {
+              "section_id": "risks-benefits.benefits",
+              "paragraphs": [
+                {
+                  "text": "No direct benefit is promised. The research may improve understanding of reported ocular comfort and documented care patterns after routine bilateral cataract surgery.",
+                  "evidence_refs": [
+                    "risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "e8d8aa367b8d6045709facdde4ea188bccba36b247ce238130b64bc4834c8a24",
+        "response": {
+          "request_id": "focus-comfort-sterling.draft.icf-narrative.generation-only.a1.4fd8d275",
+          "request_sha256": "e8d8aa367b8d6045709facdde4ea188bccba36b247ce238130b64bc4834c8a24",
+          "revision_id": "focus-comfort-sterling",
+          "task": "section_drafting",
+          "batch_id": "icf-narrative",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "icf.benefits",
+              "outcome": "drafted",
+              "paragraphs": [
+                {
+                  "text": "You are not promised a direct benefit from taking part. The study may help researchers better understand reported eye comfort and documented patterns of eye care.",
+                  "evidence_refs": [
+                    "source:risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "benefit_interpretation": {
+                "potential_benefits": [],
+                "rationale": "The background describes the scientific rationale and exploratory associations but no additional personal benefit. The supplied potential knowledge benefit is stated from risks_benefits.benefits."
+              }
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  },
+  {
+    "case": "glide-advarra",
+    "study_type": "Ambispective",
+    "family": "Advarra",
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "source_sha256": "13101b9906013960d2534a39a67c8834ccc4b1e13030992ec55b821678e914ba",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "db712143d5fb5990060c406fb9e1e8ff606f9fbea7bf032f0471d6760ab26c9b",
+        "response": {
+          "request_id": "focus-glide-advarra.draft.protocol-operations.generation-only.a1.f0aabef4",
+          "request_sha256": "db712143d5fb5990060c406fb9e1e8ff606f9fbea7bf032f0471d6760ab26c9b",
+          "revision_id": "focus-glide-advarra",
+          "task": "section_drafting",
+          "batch_id": "protocol-operations",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "evaluation-procedures",
+              "paragraphs": [
+                {
+                  "text": "The scheduled study activities are shown in Table 15.1.",
+                  "evidence_refs": [
+                    "procedures.assessments"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "assessment_presentation": {
+                "activity_labels": [
+                  {
+                    "source_text": "Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.",
+                    "display_text": "Daily visual-function rating",
+                    "rationale": "Retain the actual assessment and its three assigned contacts; put question wording, scale and validation qualification in the adjacent note rather than a checked label."
+                  }
+                ],
+                "qualifiers": [],
+                "notes": [
+                  {
+                    "source_text": "Visit 1: Day 0 is in person, no window, about 50 minutes total. Historical abstraction is later staff work, not another participant visit or extra time added to the 50-minute visit total.",
+                    "display_text": "Visit 1: Day 0 is in person, no window, about 50 minutes total. Historical abstraction is later staff work, not another participant visit or extra time added to the 50-minute visit total.",
+                    "rationale": "Retain mode, no-window timing, total duration and the unique distinction that later staff abstraction is not additional participant time."
+                  },
+                  {
+                    "source_text": "Visit 2: Day 30 +/- 5 days after enrollment is by telephone, about 10 minutes. No eye-pressure test, new drug instruction, specimen collection or device assessment occurs by telephone.",
+                    "display_text": "Visit 2: Day 30 +/- 5 days after enrollment is by telephone, about 10 minutes. No eye-pressure test, new drug instruction, specimen collection or device assessment occurs by telephone.",
+                    "rationale": "Retain telephone timing and duration and the unique prohibited telephone procedures; absent checks alone do not express those restrictions."
+                  },
+                  {
+                    "source_text": "Visit 3: Day 60 +/- 7 days after enrollment is in person, about 25 minutes. There is no extra exit form or closeout contact.",
+                    "display_text": "Visit 3: Day 60 +/- 7 days after enrollment is in person, about 25 minutes. There is no extra exit form or closeout contact.",
+                    "rationale": "Retain visit timing, mode and duration and the unique absence of an additional exit form or closeout contact."
+                  },
+                  {
+                    "source_text": "There are no home diaries, adherence targets, app logs, home devices, daily symptom scores, visual acuity tests, imaging, dilation, blood draws, saliva, genetic tests, specimen storage or future specimen use.",
+                    "display_text": "Daily visual-function rating at Day 0, Day 30 +/- 5 days by telephone, and Day 60 +/- 7 days: ask “Over the past seven days, how well could you perform your usual daily visual tasks?” Record one study-specific response per person, from 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty); higher is better. The rating is not represented as a validated instrument. There are no home diaries, adherence targets, app logs, home devices, daily symptom scores, visual acuity tests, imaging, dilation, blood draws, saliva, genetic tests, specimen storage or future specimen use.",
+                    "rationale": "Preserve all exclusions and retain the exact question, person-level unit, scoring anchors, direction and validation qualification removed from the mixed activity label. No actual assessment or staff task is removed from the matrix."
+                  },
+                  {
+                    "source_text": "Ask about assessment-related symptoms at Day 0, Day 30 telephone contact and Day 60. Participants may pause or stop testing. The clinic uses its usual infection control and assessment safety procedures. Persistent symptoms or clinical concerns go to the study doctor and ordinary care. No direct benefit is promised.",
+                    "display_text": "",
+                    "rationale": "The symptom question is checked at Day 0, Day 30 telephone contact and Day 60. All remaining pause/stop, infection-control, referral and no-benefit statements also appear in related_source.safety_sections and related_source.risks_section, where they belong; no unique assessment-specific instruction is lost."
+                  }
+                ]
+              },
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "c492d57c4713adda1aba8a423d8cc1cbce3fa8fe5bfb49ab770a424825b81988",
+        "response": {
+          "request_id": "focus-glide-advarra.draft.protocol-analysis-and-oversight.generation-only.a1.3b237e70",
+          "request_sha256": "c492d57c4713adda1aba8a423d8cc1cbce3fa8fe5bfb49ab770a424825b81988",
+          "revision_id": "focus-glide-advarra",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "Applicable ethics review requirements and ethical and privacy protections govern study conduct. Harborview Independent Research Ethics Board, independent of the sponsor and clinics, is the designated reviewing body. The study has not yet been submitted to the IRB; no approval, approval number or approval date has been obtained. Required ethics approval must precede research activities. Advarra is the selected consent layout, not the reviewing IRB and not evidence of approval. Participant-rights questions are directed to Harborview at +1 202-555-0145 or participant.rights.harborview@example.org, 600 Review Plaza, Suite 400, Baltimore, MD 21203, United States.",
+                  "evidence_refs": [
+                    "parties.irb",
+                    "ethics"
+                  ],
+                  "boilerplate_refs": [
+                    "ethics"
+                  ]
+                },
+                {
+                  "text": "Participants provide personal written consent and authorization before research, including historical record abstraction. No unconsented records-only cohort or waiver of consent or authorization is requested. Adults unable to consent and children are not enrolled; no legally authorized representative, proxy or witness signature is required. Participants must answer English-language questions without a proxy. Pregnancy is not excluded, and there are no research pregnancy tests, contraception requirements, radiation, specimens or study drugs.",
+                  "evidence_refs": [
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Participation is voluntary. Participants may decline or stop by telling or writing to their site coordinator without penalty or loss of ordinary benefits. Any final clinical discussion is optional, with no mandatory final research measurement or additional contact. The investigator may discontinue participation at the participant's request, when assessments cannot be completed, or if the study closes. Reasons are recorded when available; later medication changes alone do not require discontinuation. No direct benefit is promised. Contact-specific compensation is retained when earned, with no completion bonus or requirement to finish all contacts; the payment and injury arrangements are described in Section 17. Research-related concerns are referred through the enrolling site's coordinator to the study doctor, with emergency services used for emergencies.",
+                  "evidence_refs": [
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Authorization expires on 31 August 2027 or earlier written revocation, without extending the planned 60-day follow-up. Written revocation to the enrolling-site coordinator stops new abstraction and collection; previously collected information may remain in analyses and required oversight records. Ordinary care and earned compensation are unaffected. There is no sponsor requirement for public registration before enrollment in this plan. Participant ClinicalTrials.gov consent disclosure is not requested, and preparation of registry XML does not authorize adding that disclosure.",
+                  "evidence_refs": [
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            },
+            {
+              "section_id": "risks-benefits.benefits",
+              "paragraphs": [
+                {
+                  "text": "No direct benefit is promised. Findings may inform future studies of glaucoma care and daily function; they do not establish that the observed medications improve or worsen function. Compensation is not a clinical benefit.",
+                  "evidence_refs": [
+                    "risks_benefits.benefits",
+                    "study.background"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "eb9ea31277b7467bd4e8db8b58e522dbf48bfce742599fe3d9acec02db274ebd",
+        "response": {
+          "request_id": "focus-glide-advarra.draft.icf-narrative.generation-only.a1.c6ac8ba9",
+          "request_sha256": "eb9ea31277b7467bd4e8db8b58e522dbf48bfce742599fe3d9acec02db274ebd",
+          "revision_id": "focus-glide-advarra",
+          "task": "section_drafting",
+          "batch_id": "icf-narrative",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "icf.benefits",
+              "outcome": "drafted",
+              "paragraphs": [
+                {
+                  "text": "No direct benefit to you is promised. Findings may help inform future studies of glaucoma care and daily function. Payment for taking part is not a clinical benefit.",
+                  "evidence_refs": [
+                    "risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": []
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  },
+  {
+    "case": "near-advarra",
+    "study_type": "Prospective",
+    "family": "Advarra",
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "source_sha256": "d4f0bdf7626b160e3dad821c6267be055e4ff3e9e617e95ff29e9a9f459b94f6",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "9e91ff1936e86bfff95212264da1c3c81d151c011bc5d6e1270fa3dcb5acafa2",
+        "response": {
+          "request_id": "focus-near-advarra.draft.protocol-operations.generation-only.a1.c1037ea5",
+          "request_sha256": "9e91ff1936e86bfff95212264da1c3c81d151c011bc5d6e1270fa3dcb5acafa2",
+          "revision_id": "focus-near-advarra",
+          "task": "section_drafting",
+          "batch_id": "protocol-operations",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "evaluation-procedures",
+              "paragraphs": [
+                {
+                  "text": "The scheduled study activities are shown in Table 15.1.",
+                  "evidence_refs": [
+                    "procedures.assessments"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "assessment_presentation": {
+                "activity_labels": [],
+                "qualifiers": [
+                  {
+                    "source_text": "Never, sometimes, often, always",
+                    "display_text": "At Day 0, Week 6 (Day 42 ± 7 days after enrollment) and Week 12 (Day 84 ± 7 days after enrollment), the reading-glasses use questionnaire asks about near tasks over the preceding 7 days, with responses of never, sometimes, often or always.",
+                    "rationale": "These are the response categories of the reading-glasses questionnaire, not a separate assessment. Moving the categories into a questionnaire note preserves the recall period and all three visit associations while the questionnaire remains in its assigned columns."
+                  }
+                ],
+                "notes": [
+                  {
+                    "source_text": "No separate exit form or extra closeout visit is required. Study staff may contact a participant once within 7 days after a missed visit solely to reschedule within its existing window. There are no blood draws, genetic tests, stored specimens, pupil dilation, research imaging, home monitoring, study medications or extra surgeries. Assessment-matrix note: Both cohorts follow exactly the same visit schedule. Only lens-type exposure differs.",
+                    "display_text": "Both cohorts have identical assessments and visit schedules; only their previously implanted lens type differs. No separate exit form or extra closeout visit is required. Staff may contact a participant once within 7 days after a missed visit solely to reschedule within the existing visit window. There are no blood draws, genetic tests, stored specimens, pupil dilation, research imaging, home monitoring, study medications or additional surgeries.",
+                    "rationale": "Retains every unique scheduling condition and excluded procedure in a single adjacent note, removes the internal matrix label and consolidates duplicated cohort and closeout statements."
+                  },
+                  {
+                    "source_text": "No separate exit form or extra closeout visit is required. Both cohorts follow exactly the same schedule; only prior lens exposure differs.",
+                    "display_text": "",
+                    "rationale": "The first edited note already states the identical cohort schedule, prior lens-exposure distinction and absence of an exit form or extra closeout visit; this note adds no condition or activity."
+                  },
+                  {
+                    "source_text": "Both cohorts have identical assessments and schedule. No added exit form, extra closeout visit, specimen procedures or surgical interventions.",
+                    "display_text": "",
+                    "rationale": "Identical cohort assessments and schedules and the absence of exit forms, extra closeout visits, specimen procedures and research surgery are fully retained in the first edited note and the visit matrix."
+                  },
+                  {
+                    "source_text": "Research-related risks: Temporary eye fatigue, dry-eye discomfort or headache during vision testing; mild embarrassment or frustration answering questions; time and travel burden; and a risk of loss of confidentiality. Staff can pause or stop testing at the participant's request. New or persistent symptoms are referred to the study doctor. Do not describe prior cataract surgery as a research procedure or present its surgical risks as new study risks.",
+                    "display_text": "",
+                    "rationale": "The general risks and symptom-management rules are identical to the supplied related_source safety and risks sections. Assessment-related symptom enquiry remains assigned to all three visits in the matrix. This note contains no unique assessment timing, threshold or referral condition beyond that safety context."
+                  }
+                ]
+              },
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "ec218b3593e5cf1f12549d068582318d5aca826df9696a34a86f3a9f897bb911",
+        "response": {
+          "request_id": "focus-near-advarra.draft.protocol-analysis-and-oversight.generation-only.a1.9bd9ab20",
+          "request_sha256": "ec218b3593e5cf1f12549d068582318d5aca826df9696a34a86f3a9f897bb911",
+          "revision_id": "focus-near-advarra",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "Clearview Independent Research Review Board is the designated reviewing body and is independent of both study clinics. The study has not yet been submitted for IRB review, and IRB approval has not been obtained. There is no approval number or approval date. Applicable ethics review requirements and ethical and privacy protections will govern study conduct.",
+                  "evidence_refs": [
+                    "source:parties.irb",
+                    "source:ethics"
+                  ],
+                  "boilerplate_refs": [
+                    "ethics"
+                  ]
+                },
+                {
+                  "text": "Written informed consent will be obtained from adults who can consent personally before any research assessment. Children and adults unable to consent will not be enrolled; legally authorized representative and witness signatures are not required. The Advarra consent family will be used with the study-specific Clearview IRB and site contacts.",
+                  "evidence_refs": [
+                    "source:ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Participation may be stopped at any time without penalty or loss of usual benefits by telling or writing to the coordinator. An optional discussion of symptoms and ordinary-care needs may be offered, but withdrawal does not require a final research examination, extra tests or further data collection. Investigator discontinuation may occur at the participant's request, if assessments cannot be completed, following additional ocular surgery, or if the study is stopped. The reason will be recorded when available, and earned payments and eligible incurred travel expenses remain due.",
+                  "evidence_refs": [
+                    "source:ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Participant-rights questions and research concerns may be directed to Clearview Independent Research Review Board, 360 Review Street, Suite 300, Washington, DC 20003, United States; telephone +1 202-555-0145; email participants.irb@example.org.",
+                  "evidence_refs": [
+                    "source:parties.irb",
+                    "source:ethics"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            },
+            {
+              "section_id": "risks-benefits.benefits",
+              "paragraphs": [
+                {
+                  "text": "No direct benefit is promised to participants. The findings may help describe patients' visual experience after routine care.",
+                  "evidence_refs": [
+                    "source:risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "f1d9e7c45c50a191c102762a5eeccbd741baa29dc5d26e834a3ceb3a5fd93420",
+        "response": {
+          "request_id": "focus-near-advarra.draft.icf-narrative.generation-only.a1.56aec054",
+          "request_sha256": "f1d9e7c45c50a191c102762a5eeccbd741baa29dc5d26e834a3ceb3a5fd93420",
+          "revision_id": "focus-near-advarra",
+          "task": "section_drafting",
+          "batch_id": "icf-narrative",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "icf.benefits",
+              "outcome": "drafted",
+              "paragraphs": [
+                {
+                  "text": "You are not promised any direct benefit from taking part. The information collected may help researchers describe patients' visual experience after routine eye care.",
+                  "evidence_refs": [
+                    "risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": []
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  },
+  {
+    "case": "near-sterling",
+    "study_type": "Prospective",
+    "family": "Sterling",
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "source_sha256": "90d42993aa356f2ae2de9f0a0788923dfb4624f5fcf36bb793e7298881ef5385",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "957628199390a4261f36606d1a13fa6335a28729e451ed054e471683bb920b5a",
+        "response": {
+          "request_id": "focus-near-sterling.draft.protocol-operations.generation-only.a1.f83e0fbe",
+          "request_sha256": "957628199390a4261f36606d1a13fa6335a28729e451ed054e471683bb920b5a",
+          "revision_id": "focus-near-sterling",
+          "task": "section_drafting",
+          "batch_id": "protocol-operations",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "evaluation-procedures",
+              "paragraphs": [
+                {
+                  "text": "The scheduled study activities are shown in Table 15.1.",
+                  "evidence_refs": [
+                    "procedures.assessments"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "assessment_presentation": {
+                "activity_labels": [],
+                "qualifiers": [
+                  {
+                    "source_text": "Never, sometimes, often, always",
+                    "display_text": "For the reading-glasses use questionnaire at Day 0, Week 6 and Week 12, participants report how often they used reading glasses for near tasks during the preceding 7 days: never, sometimes, often or always.",
+                    "rationale": "These are response categories for the questionnaire, not a separate assessment. The questionnaire remains checked at all three visits; its recall period and categories are retained in this adjacent note."
+                  }
+                ],
+                "notes": [
+                  {
+                    "source_text": "No separate exit form or extra closeout visit is required. Study staff may contact a participant once within 7 days after a missed visit solely to reschedule within its existing window. There are no blood draws, genetic tests, stored specimens, pupil dilation, research imaging, home monitoring, study medications or extra surgeries. Assessment-matrix note: Both cohorts follow exactly the same visit schedule. Only lens-type exposure differs.",
+                    "display_text": "Both cohorts follow the same visit schedule; only prior lens-type exposure differs. No separate exit form or extra closeout visit is required. There are no blood draws, genetic tests, stored specimens, pupil dilation, research imaging, home monitoring, study medications or extra surgeries.",
+                    "rationale": "Retains the cohort qualification and all exclusions not expressed by checked activities. The one permitted missed-visit contact, its 7-day limit and existing-window restriction are stated once in Section 9.2 rather than repeated here."
+                  },
+                  {
+                    "source_text": "No separate exit form or extra closeout visit is required. Both cohorts follow exactly the same schedule; only prior lens exposure differs.",
+                    "display_text": "",
+                    "rationale": "All facts are retained in the preceding edited note: identical schedules, differing prior exposure and no separate exit form or extra closeout visit."
+                  },
+                  {
+                    "source_text": "Both cohorts have identical assessments and schedule. No added exit form, extra closeout visit, specimen procedures or surgical interventions.",
+                    "display_text": "",
+                    "rationale": "The matrix presents identical activities and timing for both cohorts; the preceding note retains the no-exit/closeout, no-specimen and no-extra-surgery limitations. This note adds no unique instruction."
+                  },
+                  {
+                    "source_text": "Research-related risks: Temporary eye fatigue, dry-eye discomfort or headache during vision testing; mild embarrassment or frustration answering questions; time and travel burden; and a risk of loss of confidentiality. Staff can pause or stop testing at the participant's request. New or persistent symptoms are referred to the study doctor. Do not describe prior cataract surgery as a research procedure or present its surgical risks as new study risks.",
+                    "display_text": "",
+                    "rationale": "This is the same general risk inventory and general pause/stop and referral policy supplied to the safety and risks sections, as confirmed by related_source. Assessment-related symptom enquiry remains assigned to all three visits in the matrix. There is no additional assessment-specific timing, threshold or referral condition to retain here."
+                  }
+                ]
+              },
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "8174bd5ed9b43edcdc218ce1d1b3bf96499a0850dfd77e211d35a1cd4dcb24de",
+        "response": {
+          "request_id": "focus-near-sterling.draft.protocol-analysis-and-oversight.generation-only.a1.c89fcefa",
+          "request_sha256": "8174bd5ed9b43edcdc218ce1d1b3bf96499a0850dfd77e211d35a1cd4dcb24de",
+          "revision_id": "focus-near-sterling",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "Applicable ethics review requirements and ethical and privacy protections govern study conduct.",
+                  "evidence_refs": [],
+                  "boilerplate_refs": [
+                    "ethics"
+                  ]
+                },
+                {
+                  "text": "The designated reviewing body is Clearview Independent Research Review Board, an independent IRB unaffiliated with either study clinic. The study has not yet been submitted for IRB review, and approval has not been obtained; no approval number or date is available. Participant-rights questions and research concerns may be directed to the IRB at 360 Review Street, Suite 300, Washington, DC 20003, United States; telephone +1 202-555-0145; email participants.irb@example.org.",
+                  "evidence_refs": [
+                    "source:parties.irb",
+                    "source:ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Only adults able to consent personally will participate. Written informed consent is required before any research assessment. Children and adults unable to consent will not be enrolled; no legally authorized representative or witness signature is required.",
+                  "evidence_refs": [
+                    "source:ethics"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Participation may be stopped at any time without penalty or loss of usual benefits by telling or writing to the coordinator. Staff may offer an optional discussion of symptoms and ordinary-care needs, but no mandatory final research examination, extra testing or data collection follows withdrawal. The investigator may discontinue participation at the participant's request, for inability to complete assessments, after additional ocular surgery, or if the study stops. The reason will be recorded when available. Earned payments and eligible incurred travel expenses remain due.",
+                  "evidence_refs": [
+                    "source:ethics"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            },
+            {
+              "section_id": "risks-benefits.benefits",
+              "paragraphs": [
+                {
+                  "text": "No direct benefit is promised. The information collected may help describe patients' visual experience after routine care.",
+                  "evidence_refs": [
+                    "source:risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "38645fab93d235b7449e44c0c18e557559be0966cb6787af6e219406734aa995",
+        "response": {
+          "request_id": "focus-near-sterling.draft.icf-narrative.generation-only.a1.ae44d286",
+          "request_sha256": "38645fab93d235b7449e44c0c18e557559be0966cb6787af6e219406734aa995",
+          "revision_id": "focus-near-sterling",
+          "task": "section_drafting",
+          "batch_id": "icf-narrative",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "icf.benefits",
+              "outcome": "drafted",
+              "paragraphs": [
+                {
+                  "text": "You are not promised a direct benefit from taking part. The information collected may help researchers describe patients' visual experiences after routine eye care.",
+                  "evidence_refs": [
+                    "source:risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "benefit_interpretation": {
+                "potential_benefits": [],
+                "rationale": "The background describes the comparison and consistent assessments, not an additional participant benefit. The supplied possible informational benefit and no-direct-benefit policy are stated in the prose."
+              }
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  },
+  {
+    "case": "puresee",
+    "study_type": "Prospective",
+    "family": "Advarra",
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "source_sha256": "0dc4ba610f8c0e6d01801b8ab54e3e2f067a7cc17abdc298e6458599107ff776",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "a846441076da60518732e8edbe273c84484de2185506c8eb5a6f5faa186f742d",
+        "response": {
+          "request_id": "focus-puresee.draft.protocol-operations.generation-only.a1.433ce782",
+          "request_sha256": "a846441076da60518732e8edbe273c84484de2185506c8eb5a6f5faa186f742d",
+          "revision_id": "focus-puresee",
+          "task": "section_drafting",
+          "batch_id": "protocol-operations",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "evaluation-procedures",
+              "paragraphs": [
+                {
+                  "text": "The scheduled study activities are shown in Table 15.1.",
+                  "evidence_refs": [
+                    "procedures.assessments"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "b872ca28da490568d7c3f1956032e3217d2361467ad31a9a98192baaf3aa4bf5",
+        "response": {
+          "request_id": "focus-puresee.draft.protocol-analysis-and-oversight.generation-only.a1.dec2a71c",
+          "request_sha256": "b872ca28da490568d7c3f1956032e3217d2361467ad31a9a98192baaf3aa4bf5",
+          "revision_id": "focus-puresee",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "The designated reviewing organization is Example Independent Review Board, an independent ethics review organization. The study has not been submitted for ethics review. Applicable ethics review requirements and ethical and privacy protections govern study conduct.",
+                  "evidence_refs": [
+                    "parties.irb",
+                    "ethics"
+                  ],
+                  "boilerplate_refs": [
+                    "ethics"
+                  ]
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            },
+            {
+              "section_id": "risks-benefits.benefits",
+              "paragraphs": [
+                {
+                  "text": "Mix-and-match implantation of PureSee in the dominant eye and Odyssey in the non-dominant eye may provide a broader range of vision and fewer visual disturbances than bilateral implantation of either lens alone. Excellent distance, intermediate and near vision, high satisfaction and fewer visual disturbances remain hypothesized rather than established benefits. Participants may receive no direct benefit; findings may improve understanding of outcomes with this combination.",
+                  "evidence_refs": [
+                    "risks_benefits.benefits",
+                    "study.background"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "a1579a2dcb70a155b7942e5e84789f7a8368ed181356101ebe6701c6c91fca6a",
+        "response": {
+          "request_id": "focus-puresee.draft.icf-narrative.generation-only.a1.78f95845",
+          "request_sha256": "a1579a2dcb70a155b7942e5e84789f7a8368ed181356101ebe6701c6c91fca6a",
+          "revision_id": "focus-puresee",
+          "task": "section_drafting",
+          "batch_id": "icf-narrative",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "icf.benefits",
+              "outcome": "drafted",
+              "paragraphs": [
+                {
+                  "text": "Using PureSee in your dominant eye and Odyssey in your other eye may give you a wider range of vision and fewer unwanted visual effects than using the same lens in both eyes. Clear vision at different distances, less need for glasses and greater satisfaction are possible benefits, not proven results or promises. You may receive no direct benefit. The study may help researchers better understand outcomes with this combination.",
+                  "evidence_refs": [
+                    "risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "benefit_interpretation": {
+                "potential_benefits": [
+                  {
+                    "source_path": "study.background",
+                    "source_excerpt": "Mix-and-match implantation of an EDOF IOL in the dominant eye and multifocal IOL in the non-dominant eye may enable better range of vision and fewer visual disturbances compared to bilateral implantation of the EDOF or trifocal IOLs alone."
+                  }
+                ],
+                "rationale": "The combination has a source-supported possible benefit, not an established advantage. The paragraph preserves the lens-to-eye relationship, comparison and uncertainty without treating earlier individual-lens studies as proof of benefit."
+              }
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  },
+  {
+    "case": "record-retrospective",
+    "study_type": "Retrospective",
+    "family": null,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight"
+    ],
+    "source_sha256": "98649bbe0c1c99530c0a71869a2d215b319ad529363bcd7601142e1f43f3fd21",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "af330b24ab60ac70ace1302610f5f93dbf38f3cd641ad7ebb996533136cf596c",
+        "response": {
+          "request_id": "focus-record-retrospective.draft.protocol-analysis-and-oversight.generation-only.a1.7d1b3b5b",
+          "request_sha256": "af330b24ab60ac70ace1302610f5f93dbf38f3cd641ad7ebb996533136cf596c",
+          "revision_id": "focus-record-retrospective",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "The requested review body is Northfield Independent Research Ethics Board, independent of the sponsor and clinic. The study has not been submitted to the IRB. No approval, consent waiver, privacy-authorization waiver, approval number or approval date has been obtained. Applicable ethics review requirements and ethical and privacy protections govern study conduct.",
+                  "evidence_refs": [
+                    "parties.irb",
+                    "ethics"
+                  ],
+                  "boilerplate_refs": [
+                    "ethics"
+                  ]
+                },
+                {
+                  "text": "The study will request waivers of informed consent and privacy authorization for this records-only review. The application will address privacy protections and the burden and selection bias of recontacting former clinic patients. Research access may begin only after the required ethics/privacy decisions and site permission. If permissions are not granted, the investigator must obtain an authorized revised study plan before research access; this protocol does not authorize patient contact, prospective enrollment or a contact campaign.",
+                  "evidence_refs": [
+                    "ethics",
+                    "parties.irb"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "No direct benefit to people whose records are reviewed is expected; findings may inform future research and documentation practices. Ordinary care is unaffected. There is no recruitment, consent appointment, participant payment, compensation, travel reimbursement, new clinical charge or research treatment.",
+                  "evidence_refs": [
+                    "risks_benefits.benefits",
+                    "risks_benefits.compensation_or_reimbursement"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "No new research-injury treatment program or insurance promise is established. The investigator handles suspected privacy incidents under site policy and applicable ethics/privacy reporting requirements. This review creates no physical adverse-event collection, follow-up examination or new contact obligation.",
+                  "evidence_refs": [
+                    "risks_benefits.injury_handling"
+                  ],
+                  "boilerplate_refs": []
+                },
+                {
+                  "text": "Rights and privacy questions and oversight matters may be directed to Northfield Independent Research Ethics Board, 410 Review Avenue, Suite 300, Columbus, OH 43217, United States; +1 202-555-0163; research.rights.northfield@example.org. This contact does not authorize prospective enrollment or patient outreach. Oversight access, aggregate publication safeguards and handling of site privacy requests are described in Confidentiality/Publication of the Study.",
+                  "evidence_refs": [
+                    "parties.irb",
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  },
+  {
+    "case": "puresee03",
+    "study_type": "Prospective",
+    "family": "Advarra",
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "source_sha256": "e8d424a29481ab783ef554dfa71ff929dd3297b6617b15179d847bb71fffd5da",
+    "source_unchanged": true,
+    "transport_passed": true,
+    "trials": [
+      {
+        "request_sha256": "e3e5a6aabeaeb9df876d8007cf82ca871707efc2e13e7b4f07c9c4e60628390a",
+        "response": {
+          "request_id": "focus-puresee03.draft.protocol-operations.generation-only.a1.6dffe8ed",
+          "request_sha256": "e3e5a6aabeaeb9df876d8007cf82ca871707efc2e13e7b4f07c9c4e60628390a",
+          "revision_id": "focus-puresee03",
+          "task": "section_drafting",
+          "batch_id": "protocol-operations",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "evaluation-procedures",
+              "paragraphs": [
+                {
+                  "text": "The Schedule of Assessments summarizes the planned activities by study phase; accompanying notes clarify the table where needed.",
+                  "evidence_refs": [
+                    "source:procedures.assessments"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "assessment_presentation": {
+                "activity_labels": [],
+                "qualifiers": [],
+                "notes": [
+                  {
+                    "source_text": "The source labels the final assessment column Month 3; narrative and visit list specify 3 months postoperative.",
+                    "display_text": "",
+                    "rationale": "The final phase and its timing are already identified in the structured schedule as 3 Month postoperative and 3 months postoperative; the source-column naming comparison adds no assessment instruction."
+                  },
+                  {
+                    "source_text": "Complete Exit Form1 retains the unexplained source footnote marker 1; no footnote text or additional procedure meaning is supplied.",
+                    "display_text": "",
+                    "rationale": "This is unresolved-marker commentary, not an assessment instruction. The source form identifier Complete Exit Form1 and its final-assessment assignment remain unchanged in the matrix; no footnote meaning is inferred."
+                  },
+                  {
+                    "source_text": "Monitor for adverse events and device deficiencies at 3 months postoperative.",
+                    "display_text": "",
+                    "rationale": "The structured schedule already places adverse events and device deficiencies at 3 months postoperative. The related safety source repeats this identical monitoring instruction and supplies no additional threshold, condition, or timing rule."
+                  }
+                ]
+              },
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "be2ca78aad90a801d4da5348f0158826b4c9b163f3db4f9d53e4903aaf00ad8d",
+        "response": {
+          "request_id": "focus-puresee03.draft.protocol-analysis-and-oversight.generation-only.a1.3b04b5e4",
+          "request_sha256": "be2ca78aad90a801d4da5348f0158826b4c9b163f3db4f9d53e4903aaf00ad8d",
+          "revision_id": "focus-puresee03",
+          "task": "section_drafting",
+          "batch_id": "protocol-analysis-and-oversight",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "ethics",
+              "paragraphs": [
+                {
+                  "text": "Applicable ethics review requirements and ethical and privacy protections govern study conduct.",
+                  "evidence_refs": [],
+                  "boilerplate_refs": [
+                    "ethics"
+                  ]
+                },
+                {
+                  "text": "The designated review body is Example Independent Review Board, an independent ethics review organization. The study has not been submitted for ethics review.",
+                  "evidence_refs": [
+                    "parties.irb",
+                    "ethics"
+                  ],
+                  "boilerplate_refs": []
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            },
+            {
+              "section_id": "risks-benefits.benefits",
+              "paragraphs": [
+                {
+                  "text": "Mix-and-match implantation of PureSee in the dominant eye and Odyssey in the non-dominant eye may provide a broader range of vision and fewer visual disturbances than bilateral implantation of either lens alone. Excellent distance, intermediate and near vision, high satisfaction and fewer visual disturbances remain hypothesized rather than established benefits. Participants may receive no direct benefit; findings may improve understanding of outcomes with this combination.",
+                  "evidence_refs": [
+                    "risks_benefits.benefits",
+                    "study.background"
+                  ],
+                  "boilerplate_refs": [
+                    "protocol-sparse-benefits"
+                  ]
+                }
+              ],
+              "lists": [],
+              "outcome": "drafted"
+            }
+          ]
+        },
+        "findings": []
+      },
+      {
+        "request_sha256": "ed8b03137d61a8ec70b54ade92edd09e996f623439a04f58fba919112f20abcf",
+        "response": {
+          "request_id": "focus-puresee03.draft.icf-narrative.generation-only.a1.d0b5d89e",
+          "request_sha256": "ed8b03137d61a8ec70b54ade92edd09e996f623439a04f58fba919112f20abcf",
+          "revision_id": "focus-puresee03",
+          "task": "section_drafting",
+          "batch_id": "icf-narrative",
+          "schema_version": "hermes-response/v2",
+          "producer": {
+            "model_id": "Codex-local-controlled-section-trial"
+          },
+          "section_results": [
+            {
+              "section_id": "icf.benefits",
+              "outcome": "drafted",
+              "paragraphs": [
+                {
+                  "text": "Using PureSee in your dominant eye and Odyssey in your other eye may give you a wider range of vision and fewer unwanted visual effects than using the same lens in both eyes. Clear vision at different distances, less need for glasses and greater satisfaction are possible benefits, not proven results or promises. You may receive no direct benefit. The study may help researchers better understand outcomes with this combination.",
+                  "evidence_refs": [
+                    "source:risks_benefits.benefits"
+                  ],
+                  "boilerplate_refs": [
+                    "icf-sparse-benefits"
+                  ]
+                }
+              ],
+              "lists": []
+            }
+          ]
+        },
+        "findings": []
+      }
+    ]
+  }
+]

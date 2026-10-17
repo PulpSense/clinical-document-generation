@@ -62,7 +62,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v35-ai-owned-section-prose"
+PROMPT_VERSION = "section-drafting-v36-clinical-prose-focus"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "rendering.py", "workflow.py", "output_recovery.py")
 
@@ -134,7 +134,7 @@ def _request_constraints() -> list[str]:
         "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
         "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
         "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
-        "The assembler owns the single final Protocol REFERENCES section and populates it from the approved bibliography. Draft Protocol sections as clinical prose with supplied citation numbers beside the claims they support, linked to those same bibliography entries; omit reference headings and full bibliographic entries from section responses. Do not invent citations; ICF explanations use plain language.",
+        "The assembler owns the single final Protocol REFERENCES section and populates it from the approved bibliography. Draft Protocol sections as clinical prose with supplied citation numbers beside the claims they support, linked to those same bibliography entries. Format citation numbers in square brackets before sentence punctuation, for example 'prior evidence [1,2].' Omit reference headings and full bibliographic entries from section responses. Do not invent citations; ICF explanations use plain language.",
         "Return exactly one result for every requested section ID.",
         "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
         "Return structured section content, not a whole document or document markup.",
@@ -153,7 +153,7 @@ def _request_constraints() -> list[str]:
         "Express source form instructions as natural actions, distinguishing the action verb from the form name: an instruction 'Complete Exit Form' becomes 'complete the Exit Form'. Retain 'Complete' within a title only when the source explicitly identifies it as part of the official form name; then write 'fill out the form titled Complete Exit Form'. Preserve supplied form identifiers and numbers, including an ambiguous trailing numeral unless the source establishes that it is a footnote marker. A list or schedule label alone does not establish an official title. Apply this distinction consistently to Protocol, ICF and PRS narratives without renaming source-owned table labels.",
         "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
-        "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+        "Internal provenance stays in run records: test/synthetic input labels, preparation warnings, approval-workflow notes and unresolved-marker commentary are authoring context, even when stored inside a clinical source field. Write the applicable study fact in clinical prose. Preserve the actual ethics submission/approval/exemption/waiver status and every material clinical uncertainty, condition and limitation. Retain an ambiguous form identifier as supplied without explaining the unresolved marker in Protocol, ICF, XML or table notes. Keep explanations of source interpretation in structured rationale fields only. When an instrument, scoring rule, denominator, missing-data method, date or version is undefined, preserve that limit without inventing a value or exposing an internal source-gap note.",
         "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
         "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays.",
     ]

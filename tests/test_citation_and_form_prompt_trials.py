@@ -40,6 +40,17 @@ def test_editorial_ownership_reaches_each_active_drafting_batch(branch, family, 
         assert 'official form name' in constraints
         assert 'ambiguous trailing numeral' in constraints
         assert 'without renaming source-owned table labels' in constraints
+        assert 'Internal provenance stays in run records' in constraints
+        assert 'square brackets before sentence punctuation' in constraints
+        sections = {s['section_id']: s for s in request['section_contracts']}
+        for target in ('risks-benefits.benefits', 'icf.benefits'):
+            if target in sections:
+                assert 'one concise paragraph' in ' '.join(sections[target]['content_expectations'])
+                assert 'background literature' in ' '.join(sections[target]['content_expectations'])
+        if 'evaluation-procedures' in sections:
+            instructions = sections['evaluation-procedures']['assessment_presentation']['instructions']
+            assert 'unresolved-marker commentary' in instructions
+            assert 'source_text' in instructions and 'display_text' in instructions
         assert request['prompt_version'] == drafting.PROMPT_VERSION
         assert request['generation_only_prompts']['profile'] == 'n8n-with-brad-corrections/v1'
         assert drafting.request_hash_valid(request)
