@@ -1,0 +1,63 @@
+{
+  "case": "break",
+  "producer": "Codex in this conversation; manually generated section-only writing trial from saved current request. No separate model API, Hermes run or independent quality validation.",
+  "section_results": [
+    {
+      "section_id": "study-design.bias",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "An independent statistician generates the 1:1 allocation sequence, stratified by site in randomly varying blocks of four and six. The secure service releases assignment to the training coordinator only after consent, eligibility and baseline measurements; clinic assessors cannot access the allocation list. Keep assignment unchanged by subsequent adherence."
+        },
+        {
+          "text": "The clinic vision assessor remains masked using the safeguards in Study Methods and Measurements. Participants and the training coordinator know assignment, so self-reported symptoms remain susceptible to expectation effects. Analyze observed data in assigned groups and describe masking breaches and ordinary-care changes without automatic exclusion. The primary model adjusts for baseline symptoms and site. These controls do not establish confirmatory efficacy or eliminate uncertainty."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.visits",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "There are four scheduled contacts from Day 0 randomization: three clinic visits and one telephone call. The evening diary is a separate activity."
+        },
+        {
+          "text": "Day 0 is an in-person enrollment visit without a window, about 65 minutes including the ten-minute break explanation. Obtain consent before research, confirm eligibility, record demographics, current eye care and screen-use history, and obtain discomfort, satisfaction, binocular acuity and symptom assessments. Record baseline measurements before assignment through the secure allocation service, then provide group-specific instructions and diary training. Allocation safeguards are described under Methods Used to Minimize Bias."
+        },
+        {
+          "text": "Day 14 +/- 3 days is a telephone contact of about 15 minutes for discomfort, eye-care updates, assessment-related symptoms and diary-completion questions. It includes no acuity test, satisfaction rating, new training or specimen collection."
+        },
+        {
+          "text": "Day 28 +/- 5 days is an in-person visit of about 30 minutes for discomfort, satisfaction and binocular acuity, eye-care and symptom updates, and diary-completeness review without changing assignment or the routine."
+        },
+        {
+          "text": "Day 56 +/- 7 days is an in-person final visit of about 35 minutes, repeating those assessments, collecting the diary and confirming completion. There is no extra exit form or closeout contact. Staff may make up to two scheduling attempts within a missed contact's existing window; home vision tests are not substituted."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.measurements",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Scheduled-break participants receive a printed sheet and ten-minute explanation at Day 0: during screen-use sessions lasting at least two hours, take a two-minute break away after each 30 minutes of screen use. No app, timer or screen device is supplied or tested. Usual-habits participants continue ordinary breaks without being asked to avoid them. Both groups may continue ordinary eye care."
+        },
+        {
+          "text": "At Day 0, Day 14 +/- 3 days, Day 28 +/- 5 days and Day 56 +/- 7 days, ask: 'Over the past seven days, how severe was your average eye discomfort while using a digital screen?' Record the study-specific single-item score from 0, no discomfort, to 10, worst imaginable discomfort; higher is worse. No validation claim is made. Primary change is Day 56 minus Day 0: negative means improvement and positive worsening. Intermediate ratings provide descriptive trajectories."
+        },
+        {
+          "text": "At the three clinic visits, rate near-task satisfaction from 0, not satisfied, to 10, fully satisfied, with higher scores better. Measure binocular best-corrected distance acuity at 4 meters using a logMAR chart and current correction; lower logMAR is better. The masked vision assessor uses the same measurements in both groups without access to training records or diaries. Ask participants not to reveal assignment and record inadvertent disclosure without automatic removal. Clinical staff may access assignment when necessary; there is no placebo or emergency unmasking procedure. No per-eye outcome or paired-eye model is used."
+        },
+        {
+          "text": "Both groups make one approximately two-minute paper-diary entry each evening on Days 1 through 56 inclusive, recording screen-use hours and whether screen use occurred. There is no Day 0 home entry or diary symptom score. Scheduled-break participants also record eligible 30-minute intervals and completed prescribed breaks; usual-habits participants record naturally taken breaks without adherence targets. Intervention-group adherence is 100 times completed prescribed breaks divided by eligible intervals over observed days. No eligible intervals means not estimable, not zero. Report diary completeness and no-screen-use days separately; missing days are not zero adherence. No control-group intervention adherence is calculated."
+        },
+        {
+          "text": "Offer individual vision results at attended clinic visits, explain clinical concerns and refer to ordinary care. An aggregate plain-language summary is available on request after analysis. There is no specimen collection, genetic testing, banking, imaging, dilation, home device, study medicine or surgery."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.50-registry-disclosure-mapping"
+CONTRACT_VERSION = "clinical-documents-v2.51-prs-transport"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"

@@ -1,0 +1,34 @@
+{
+  "changes": [
+    {
+      "path": "/oversight_info[0]/fda_regulated_drug[0]",
+      "before": "False",
+      "after": "No"
+    },
+    {
+      "path": "/oversight_info[0]/fda_regulated_device[0]",
+      "before": "False",
+      "after": "No"
+    },
+    {
+      "path": "/eligibility[0]/healthy_volunteers[0]",
+      "before": "False",
+      "after": "No"
+    },
+    {
+      "path": "/arm_group[0]/arm_type[0]",
+      "before": "Observational exposure group",
+      "after": ""
+    },
+    {
+      "path": "/arm_group[1]/arm_type[0]",
+      "before": "Observational exposure group",
+      "after": ""
+    }
+  ],
+  "source_unchanged": true,
+  "narratives_unchanged": true,
+  "docx_generated": false,
+  "template_structure_preserved": true,
+  "xml_sha256": "5e692ad4ca7accb5134a6e8d81bdce87a1d58fe42ea95128e1694283a206a4d5"
+}

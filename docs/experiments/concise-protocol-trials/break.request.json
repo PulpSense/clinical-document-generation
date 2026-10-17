@@ -1,0 +1,798 @@
+{
+  "case": "break",
+  "purpose": "Controlled Codex writing trial; no Hermes execution or separate model API. Source copied from retained approved run; no source changes approved here.",
+  "source": {
+    "meta": {
+      "document_set": [
+        "protocol_docx",
+        "icf_docx",
+        "xml"
+      ],
+      "study_type": "Prospective",
+      "protocol_number": "BREAK-27-05",
+      "version": "1.0",
+      "date": "16 October 2026",
+      "icf_template": "Sterling"
+    },
+    "source": {
+      "source_of_truth_file": "reference/source-of-truth.md",
+      "input_files": [
+        "input/BREAK-27-05-study-input.txt"
+      ],
+      "field_candidates": {
+        "study.title": [
+          {
+            "value": "Scheduled Screen Breaks and Eye Discomfort in Adults With Frequent Digital Screen Use: A Randomized Prospective Behavioral Study.",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "study.background": [
+          {
+            "value": "The study asks whether a scheduled break routine changes eye discomfort during frequent screen use compared with usual break habits. A benefit is uncertain. No prior treatment-effect estimate or bibliography is supplied.",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "objectives.primary": [
+          {
+            "value": [
+              "Estimate the between-group difference in change in average eye-discomfort rating from Day 0 to Day 56 after randomization."
+            ],
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "study.hypothesis": [
+          {
+            "value": "The scheduled-break group will have a greater reduction in eye discomfort than the usual-habits group. This is an exploratory feasibility study, not a confirmatory efficacy study; benefit is not established.",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "design.study_design": [
+          {
+            "value": "Study type for protocol selection: Prospective. Registry study classification: Interventional. Primary purpose: Supportive Care. Allocation: Randomized. Intervention model: Parallel Assignment. Two groups. Masking: Single, Outcomes Assessor. Participants and the training coordinator know assignment. The clinic vision assessor is masked. This is not a double-masked study; participant-reported symptoms cannot be masked. Number of sites: 2, both in the United States. Condition: Eye discomfort associated with frequent digital screen use. Intervention category: Behavioral. No study-assigned drug, device or surgery. The research assigns a break routine after consent and eligibility confirmation; it does not merely observe a routine chosen before enrollment. Group 1: Scheduled screen breaks, target 36 participants. Group 2: Usual screen-break habits, target 36 participants. Total enrollment: 72 unique people, target 36 per site and 36 per group overall. People, not eyes or diary entries, are the enrollment and primary analysis unit.",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "design.intervention_name": [
+          {
+            "value": "Scheduled screen breaks",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "design.intervention_type": [
+          {
+            "value": "Behavioral",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "design.number_of_sites": [
+          {
+            "value": 2,
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "endpoints.primary": [
+          {
+            "value": [
+              {
+                "label": "Change in seven-day average eye-discomfort rating from Day 0 to Day 56",
+                "time_frame": "Day 0 to Day 56 +/- 7 days after randomization",
+                "description": "0–10 scale. Day 56 minus Day 0; negative change is improvement, positive change is worsening."
+              }
+            ],
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "procedures.assessments": [
+          {
+            "value": [
+              "No visual acuity test, satisfaction rating, new training or specimen collection occurs by telephone.",
+              "No extra exit form or separate closeout contact is required.",
+              "Both groups complete one paper diary entry each evening from the day after randomization (Day 1) through Day 56 inclusive, about two minutes per day. Each entry records total screen-use hours and whether screen use occurred. Scheduled-break participants additionally record the number of eligible 30-minute intervals and the number followed by a completed two-minute break. Usual-habits participants record the number of breaks they naturally took; they are not given adherence targets. An evening entry is not a clinic visit. Day 0 has no home-diary entry. Clinic visits are not multiplied by diary days. Do not invent daily symptom ratings: the diary does not collect symptom scores.",
+              "There are no research blood draws, saliva, genetic testing, banking, imaging, dilation, home devices, study medicines or surgical procedures.",
+              "No other or exploratory outcomes are authorized. Day 14/28 symptoms support descriptive trajectory summaries, without creating additional registry outcomes."
+            ],
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "population.inclusion_criteria": [
+          {
+            "value": [
+              "Age 21 through 65 years inclusive at consent.",
+              "Use a digital screen for at least four hours on at least five days per week, based on self-report covering the preceding four weeks.",
+              "Average eye discomfort during screen use of at least 4 on the 0-to-10 study rating over the preceding seven days at Day 0.",
+              "Able to provide personal written consent, answer English-language questions without a proxy, and complete a paper diary.",
+              "Able and willing to attend three clinic visits and one telephone contact."
+            ],
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "population.exclusion_criteria": [
+          {
+            "value": [
+              "Eye surgery within 90 days before Day 0, or planned during follow-up.",
+              "An active ocular infection or an ocular condition that the investigator determines makes the specified assessments unsuitable.",
+              "A planned major change in screen-use work pattern during follow-up.",
+              "Participation in another interventional study within 30 days before Day 0, or planned participation in one during the eight-week follow-up."
+            ],
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "procedures.minimum_days_before_screening_without_participation": [
+          {
+            "value": "30",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "population.sample_size": [
+          {
+            "value": "72 unique people, target 36 per site and 36 per group overall.",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "population.sample_justification": [
+          {
+            "value": "72 people is a feasible pilot sample, allowing about 15% failure to complete follow-up. No formal power calculation, assumed effect size or confirmatory significance threshold is specified.",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "risks_benefits.compensation_or_reimbursement": [
+          {
+            "value": "Participant compensation: None. No attendance payments, bonus or gift cards. Travel reimbursement only: actual parking or public-transit expenses up to $25 for each of the three attended in-person visits, with receipts; maximum $75 across those visits. No telephone-visit reimbursement or mileage payment. Payment is by check within 30 days after receipt submission. Eligible expenses already incurred remain reimbursable after withdrawal. Reimbursement is not conditional on finishing the study and is not a guaranteed personal benefit.",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "statistics.analysis_plan": [
+          {
+            "value": "Analysis population: all randomized participants with relevant observed data, analyzed in their assigned group regardless of adherence. Report disposition, withdrawal and missing data by group and site. No automatic exclusion for masking breaches or changes in ordinary care; describe those events. Primary analysis: linear model of Day 56 minus Day 0 symptom change including group, Day 0 symptom score and site. Report adjusted mean change by group and the scheduled-break minus usual-habits adjusted difference with 95% confidence interval. A negative between-group difference favors scheduled breaks. Summarize continuous observations with count, mean, standard deviation, median and range, categorical observations as counts and percentages with explicit denominators. Summarize secondary outcomes descriptively by assigned group, except intervention adherence which is intervention-group-only. Use available observations; do not impute missing symptoms or diaries. Report completeness and missing reasons. No multiplicity-adjusted confirmatory claims or causal certainty is justified by this feasibility study.",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ],
+        "study.timeline": [
+          {
+            "value": "Recruitment: 1 February 2027 through 30 June 2027. Final participant assessments, primary completion and study completion anticipated by 1 September 2027, allowing the final Day 56 window. Administrative closeout: 31 December 2027.",
+            "source": "BREAK-27-05-study-input.txt"
+          }
+        ]
+      },
+      "provenance": {
+        "input_sha256": "3923200f2727950deda877f4dc9ee585746c06c22d28887f841c502667a00525",
+        "implementation_commit": "cf810a8db32d13050dae3531b71114ac93d691b0",
+        "normalizations": "Age restriction retained in inclusion list and structured age fields. Registry arms normalized as Experimental scheduled breaks and No Intervention usual habits; no prescribed avoidance of breaks. Four scheduled contacts are separate from daily diary activities. Sterling layout does not replace Meridian IRB. Participant registry disclosure explicitly requested by sponsor, not inferred from XML or classification."
+      }
+    },
+    "approval": {
+      "status": "approved",
+      "approved_by": "client",
+      "approved_at": "2026-10-16T23:50:10.573012+00:00",
+      "review_file": "reference/source-of-truth.md",
+      "source_sha256": "0297e7b2edf766b8ebeec6ad7bca270f7bdff6b5d78da39614680dde616ec14f",
+      "revision_id": "r-34948dcf0dfe",
+      "source_approval_identity": "34948dcf0dfe08cf25d9b04d37f869cb32ac3a19f31f5297004b96e9c380f05e",
+      "generation_authority_sha256": "b0827be199ba0861bb42d222c12d0bed450a6fcb9033cf8caf3dbf9f321df13d",
+      "governing_sha256": "b0827be199ba0861bb42d222c12d0bed450a6fcb9033cf8caf3dbf9f321df13d"
+    },
+    "study": {
+      "title": "Scheduled Screen Breaks and Eye Discomfort in Adults With Frequent Digital Screen Use: A Randomized Prospective Behavioral Study.",
+      "short_title": "Screen Breaks and Eye Discomfort.",
+      "condition": "Eye discomfort associated with frequent digital screen use",
+      "background": "The study asks whether a scheduled break routine changes eye discomfort during frequent screen use compared with usual break habits. A benefit is uncertain. No prior treatment-effect estimate or bibliography is supplied.",
+      "hypothesis": "The scheduled-break group will have a greater reduction in eye discomfort than the usual-habits group. This is an exploratory feasibility study, not a confirmatory efficacy study; benefit is not established.",
+      "participation_duration": "Follow-up lasts 56 days from Day 0/randomization, not from symptom onset. Four scheduled contacts: three in person and one by telephone.",
+      "timeline": "Recruitment: 1 February 2027 through 30 June 2027. Final participant assessments, primary completion and study completion anticipated by 1 September 2027, allowing the final Day 56 window. Administrative closeout: 31 December 2027.",
+      "completion": "Closeout includes disposition and reimbursement reconciliation, diary/data queries, dataset lock, analysis, aggregate summary preparation and archiving. These staff activities do not extend individual follow-up."
+    },
+    "parties": {
+      "sponsor": {
+        "name": "Meridian Visual Habits Research",
+        "address": "110 Research Way, Suite 200, Philadelphia, PA 19103, United States",
+        "contact": {
+          "name": "Taylor Morgan",
+          "first_name": "Taylor",
+          "last_name": "Morgan",
+          "degrees": null,
+          "title": "Research Director",
+          "phone": "+1 202-555-0180",
+          "email": "taylor.morgan@example.org"
+        }
+      },
+      "principal_investigator": {
+        "name": "Dr. Rowan Blake",
+        "first_name": "Rowan",
+        "last_name": "Blake",
+        "degrees": "MD",
+        "title": "Principal Investigator"
+      },
+      "study_coordinator": {
+        "name": "Devon Reed",
+        "first_name": "Devon",
+        "last_name": "Reed",
+        "degrees": "CCRC",
+        "title": "Lead Study Coordinator",
+        "business_phone": "+1 202-555-0181",
+        "office_phone": "+1 202-555-0182",
+        "email": "devon.reed@example.org",
+        "address": "220 Clinic Avenue, Suite 110, Philadelphia, PA 19104, United States"
+      },
+      "irb": {
+        "name": "Meridian Independent Research Review Board",
+        "affiliation": "Independent IRB, unaffiliated with sponsor and clinics",
+        "address": "440 Review Street, Suite 300, Philadelphia, PA 19106, United States",
+        "phone": "+1 202-555-0185",
+        "email": "participant.rights.meridian@example.org",
+        "contact_scope": "The IRB contact is for participant-rights questions and research concerns. Sterling is the selected consent layout; retain its template-managed opening merge fields. Use these study-specific contacts in the body. Layout selection does not substitute another IRB, establish approval or populate an approval ID."
+      }
+    },
+    "sites": [
+      {
+        "contact": {
+          "address": "220 Clinic Avenue, Suite 110, Philadelphia, PA 19104, United States",
+          "business_phone": "+1 202-555-0181",
+          "degrees": "CCRC",
+          "email": "devon.reed@example.org",
+          "first_name": "Devon",
+          "last_name": "Reed",
+          "name": "Devon Reed",
+          "office_phone": "+1 202-555-0182",
+          "title": "Lead Study Coordinator"
+        },
+        "facility": {
+          "address": "220 Clinic Avenue, Suite 110, Philadelphia, PA 19104, United States",
+          "city": "Philadelphia",
+          "country": "United States",
+          "name": "Meridian Eye Research Clinic",
+          "state": "PA",
+          "zip": "19104"
+        },
+        "id": "site-1",
+        "investigators": [
+          {
+            "degrees": "MD",
+            "first_name": "Rowan",
+            "last_name": "Blake",
+            "name": "Dr. Rowan Blake",
+            "title": "Principal Investigator"
+          }
+        ]
+      },
+      {
+        "contact": {
+          "address": "330 Brookside Road, Suite 210, Wilmington, DE 19801, United States",
+          "business_phone": "+1 202-555-0183",
+          "degrees": "CCRC",
+          "email": "reese.quinn@example.org",
+          "first_name": "Reese",
+          "last_name": "Quinn",
+          "name": "Reese Quinn",
+          "office_phone": "+1 202-555-0184",
+          "title": "Site Study Coordinator"
+        },
+        "facility": {
+          "address": "330 Brookside Road, Suite 210, Wilmington, DE 19801, United States",
+          "city": "Wilmington",
+          "country": "United States",
+          "name": "Brookside Vision Research Center",
+          "state": "DE",
+          "zip": "19801"
+        },
+        "id": "site-2",
+        "investigators": [
+          {
+            "degrees": "MD",
+            "first_name": "Emery",
+            "last_name": "Shaw",
+            "name": "Dr. Emery Shaw",
+            "title": "Site Investigator"
+          }
+        ]
+      }
+    ],
+    "population": {
+      "study_population": "Adults aged 21 through 65 years inclusive at consent; all sexes eligible. Healthy volunteers: No. Participants must have the specified eye discomfort. Recruitment is through consecutive eligible clinic patients who express interest after routine clinic notices; participation does not affect care.",
+      "sample_size": "72 unique people, target 36 per site and 36 per group overall.",
+      "sample_justification": "72 people is a feasible pilot sample, allowing about 15% failure to complete follow-up. No formal power calculation, assumed effect size or confirmatory significance threshold is specified.",
+      "minimum_age": "21 Years",
+      "maximum_age": "65 Years",
+      "sex": "All",
+      "healthy_volunteers": "No",
+      "inclusion_criteria": [
+        "Age 21 through 65 years inclusive at consent.",
+        "Use a digital screen for at least four hours on at least five days per week, based on self-report covering the preceding four weeks.",
+        "Average eye discomfort during screen use of at least 4 on the 0-to-10 study rating over the preceding seven days at Day 0.",
+        "Able to provide personal written consent, answer English-language questions without a proxy, and complete a paper diary.",
+        "Able and willing to attend three clinic visits and one telephone contact."
+      ],
+      "exclusion_criteria": [
+        "Eye surgery within 90 days before Day 0, or planned during follow-up.",
+        "An active ocular infection or an ocular condition that the investigator determines makes the specified assessments unsuitable.",
+        "A planned major change in screen-use work pattern during follow-up.",
+        "Participation in another interventional study within 30 days before Day 0, or planned participation in one during the eight-week follow-up."
+      ],
+      "eligibility_notes": "Screening and enrollment occur together on Day 0. The minimum nonparticipation period for another interventional study before screening is 30 days. Pregnancy is not excluded. No pregnancy tests, contraception requirements, radiation, specimen collection or study drugs are involved. No children, adults unable to consent, proxy respondents, legally authorized representatives or witness signatures are included under this study plan. Recruitment is through consecutive eligible clinic patients who express interest after routine clinic notices; participation does not affect care. Total enrollment: 72 unique people, target 36 per site and 36 per group overall. People, not eyes or diary entries, are the enrollment and primary analysis unit."
+    },
+    "design": {
+      "study_design": "Study type for protocol selection: Prospective. Registry study classification: Interventional. Primary purpose: Supportive Care. Allocation: Randomized. Intervention model: Parallel Assignment. Two groups. Masking: Single, Outcomes Assessor. Participants and the training coordinator know assignment. The clinic vision assessor is masked. This is not a double-masked study; participant-reported symptoms cannot be masked. Number of sites: 2, both in the United States. Condition: Eye discomfort associated with frequent digital screen use. Intervention category: Behavioral. No study-assigned drug, device or surgery. The research assigns a break routine after consent and eligibility confirmation; it does not merely observe a routine chosen before enrollment. Group 1: Scheduled screen breaks, target 36 participants. Group 2: Usual screen-break habits, target 36 participants. Total enrollment: 72 unique people, target 36 per site and 36 per group overall. People, not eyes or diary entries, are the enrollment and primary analysis unit.",
+      "study_design_summary": "Two-site prospective randomized behavioral study, 1:1 parallel assignment to scheduled screen breaks or usual habits. Clinic vision assessor masked; participants and training coordinator unmasked.",
+      "number_of_sites": "2",
+      "intervention_name": "Scheduled screen breaks",
+      "intervention_type": "Behavioral",
+      "intervention_description": "The training coordinator gives scheduled-break participants a printed sheet and a ten-minute explanation at Day 0: take a two-minute break away from the screen after each 30 minutes of screen use during screen-use sessions lasting at least two hours. No app, timer or screen device is supplied or tested. Usual-habits participants continue their ordinary break habits; they are not instructed to avoid breaks. Both groups may continue ordinary eye care.",
+      "randomization": "After written consent, eligibility confirmation and baseline measurements, randomize participants 1:1 using an independent statistician's computer-generated sequence, stratified by site with randomly varying blocks of four and six. A secure allocation service releases assignment to the training coordinator only after eligibility and baseline measurements have been recorded. Clinic assessors cannot access the allocation list. Do not assign before consent or alter group membership according to later adherence.",
+      "masking": "Single (Outcomes Assessor)",
+      "masking_description": "Masking: Single, Outcomes Assessor. Participants and the training coordinator know assignment. The clinic vision assessor is masked. This is not a double-masked study; participant-reported symptoms cannot be masked. The vision assessor performs the same measurements in both groups without access to training records or diaries. Participants are asked not to disclose assignment to that assessor. If assignment is inadvertently disclosed, record the masking breach; do not remove the participant automatically. There is no placebo, emergency unmasking procedure or concealed treatment needed for clinical safety. Clinical staff can access assignment when necessary.",
+      "arms": [
+        {
+          "description": "Target 36 participants. The training coordinator gives scheduled-break participants a printed sheet and a ten-minute explanation at Day 0: take a two-minute break away from the screen after each 30 minutes of screen use during screen-use sessions lasting at least two hours. No app, timer or screen device is supplied or tested.",
+          "name": "Scheduled screen breaks",
+          "type": "Experimental"
+        },
+        {
+          "description": "Target 36 participants. Usual-habits participants continue their ordinary break habits; they are not instructed to avoid breaks. Both groups may continue ordinary eye care.",
+          "name": "Usual screen-break habits",
+          "type": "No Intervention"
+        }
+      ],
+      "sampling_method": "Consecutive eligible clinic patients expressing interest after routine clinic notices"
+    },
+    "objectives": {
+      "primary": [
+        "Estimate the between-group difference in change in average eye-discomfort rating from Day 0 to Day 56 after randomization."
+      ],
+      "secondary": [
+        "Describe near-task satisfaction at Day 56, distance visual acuity at Day 56, and adherence to the assigned break routine during the eight-week follow-up. Adherence is assessed only in the scheduled-break group."
+      ]
+    },
+    "endpoints": {
+      "primary": [
+        {
+          "analysis_method": "",
+          "description": "0–10 scale. Day 56 minus Day 0; negative change is improvement, positive change is worsening.",
+          "label": "Change in seven-day average eye-discomfort rating from Day 0 to Day 56",
+          "time_frame": "Day 0 to Day 56 +/- 7 days after randomization"
+        }
+      ],
+      "secondary": [
+        {
+          "analysis_method": "",
+          "description": "0–10; higher indicates greater satisfaction.",
+          "label": "Near-task satisfaction rating",
+          "time_frame": "Day 56 +/- 7 days after randomization"
+        },
+        {
+          "analysis_method": "",
+          "description": "logMAR; lower indicates better acuity.",
+          "label": "Binocular best-corrected distance visual acuity",
+          "time_frame": "Day 56 +/- 7 days after randomization"
+        },
+        {
+          "analysis_method": "",
+          "description": "Calculate 100 times completed prescribed breaks divided by eligible intervals recorded across observed diary days. With no eligible intervals adherence is not estimable, not zero. Report diary completeness and days with no screen use separately. Missing days are not zero adherence; no control-group intervention adherence.",
+          "label": "Adherence to scheduled breaks in scheduled-break group only",
+          "time_frame": "Days 1 through 56 after randomization"
+        }
+      ]
+    },
+    "procedures": {
+      "minimum_days_before_screening_without_participation": "30",
+      "consent": "Written personal consent before any research; screening and enrollment together on Day 0. No children, adults unable to consent, proxy respondents, legally authorized representatives or witness signatures are included under this study plan.",
+      "visit_schedule": [
+        {
+          "duration": "About 65 minutes total, including the ten-minute break explanation",
+          "mode": "In person",
+          "procedures": "Written informed consent before research; Eligibility confirmation; Demographics, current eye-care and screen-use history; Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Near-task satisfaction rating, 0 (not satisfied) to 10 (fully satisfied); higher is better; Binocular best-corrected distance visual acuity at 4 meters using a logMAR chart and current correction; Symptom enquiry; Randomization after baseline assessments; Allocation-specific instruction and paper-diary training",
+          "timing": "Day 0 / randomization; no window",
+          "visit": "Visit 1 — Day 0 / Enrollment and Randomization"
+        },
+        {
+          "duration": "About 15 minutes",
+          "mode": "Telephone",
+          "procedures": "Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Interval eye-care update; Assessment-related symptom enquiry; Questions about diary completion",
+          "timing": "Day 14 +/- 3 days after randomization",
+          "visit": "Visit 2 — Day 14"
+        },
+        {
+          "duration": "About 30 minutes",
+          "mode": "In person",
+          "procedures": "Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Near-task satisfaction rating, 0 (not satisfied) to 10 (fully satisfied); higher is better; Binocular best-corrected distance visual acuity at 4 meters using a logMAR chart and current correction; Interval eye-care and symptom updates; Review of diary completeness without changing assignment or prescribed routine",
+          "timing": "Day 28 +/- 5 days after randomization",
+          "visit": "Visit 3 — Day 28"
+        },
+        {
+          "duration": "About 35 minutes",
+          "mode": "In person",
+          "procedures": "Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Near-task satisfaction rating, 0 (not satisfied) to 10 (fully satisfied); higher is better; Binocular best-corrected distance visual acuity at 4 meters using a logMAR chart and current correction; Interval eye-care and symptom updates; Review of diary completeness without changing assignment or prescribed routine; Collection of completed diary; Confirmation of completion",
+          "timing": "Day 56 +/- 7 days after randomization",
+          "visit": "Visit 4 — Day 56 / Final Visit"
+        }
+      ],
+      "assessments": [
+        "No visual acuity test, satisfaction rating, new training or specimen collection occurs by telephone.",
+        "No extra exit form or separate closeout contact is required.",
+        "Both groups complete one paper diary entry each evening from the day after randomization (Day 1) through Day 56 inclusive, about two minutes per day. Each entry records total screen-use hours and whether screen use occurred. Scheduled-break participants additionally record the number of eligible 30-minute intervals and the number followed by a completed two-minute break. Usual-habits participants record the number of breaks they naturally took; they are not given adherence targets. An evening entry is not a clinic visit. Day 0 has no home-diary entry. Clinic visits are not multiplied by diary days. Do not invent daily symptom ratings: the diary does not collect symptom scores.",
+        "There are no research blood draws, saliva, genetic testing, banking, imaging, dilation, home devices, study medicines or surgical procedures.",
+        "No other or exploratory outcomes are authorized. Day 14/28 symptoms support descriptive trajectory summaries, without creating additional registry outcomes."
+      ],
+      "methods": "The training coordinator gives scheduled-break participants a printed sheet and a ten-minute explanation at Day 0: take a two-minute break away from the screen after each 30 minutes of screen use during screen-use sessions lasting at least two hours. No app, timer or screen device is supplied or tested. Usual-habits participants continue their ordinary break habits; they are not instructed to avoid breaks. Both groups may continue ordinary eye care. The vision assessor performs the same measurements in both groups without access to training records or diaries. Participants are asked not to disclose assignment to that assessor. If assignment is inadvertently disclosed, record the masking breach; do not remove the participant automatically. There is no placebo, emergency unmasking procedure or concealed treatment needed for clinical safety. Clinical staff can access assignment when necessary. Both groups complete one paper diary entry each evening from the day after randomization (Day 1) through Day 56 inclusive, about two minutes per day. Each entry records total screen-use hours and whether screen use occurred. Scheduled-break participants additionally record the number of eligible 30-minute intervals and the number followed by a completed two-minute break. Usual-habits participants record the number of breaks they naturally took; they are not given adherence targets. An evening entry is not a clinic visit. Day 0 has no home-diary entry. Clinic visits are not multiplied by diary days. Do not invent daily symptom ratings: the diary does not collect symptom scores. At Day 0, Day 14, Day 28 and Day 56, ask: \"Over the past seven days, how severe was your average eye discomfort while using a digital screen?\" The answer is 0 (no discomfort) through 10 (worst imaginable discomfort). Higher is worse. This is a study-specific single-item rating; no validation claim is supplied. Near-task satisfaction is 0 (not satisfied) to 10 (fully satisfied), asked only at Day 0, Day 28 and Day 56. Higher is better on this different scale. Distance visual acuity is binocular, with current correction, in logMAR; lower is better. No per-eye outcome or paired-eye model is specified. There are no research blood draws, saliva, genetic testing, banking, imaging, dilation, home devices, study medicines or surgical procedures.",
+      "home_diary": "Both groups complete one paper diary entry each evening from the day after randomization (Day 1) through Day 56 inclusive, about two minutes per day. Each entry records total screen-use hours and whether screen use occurred. Scheduled-break participants additionally record the number of eligible 30-minute intervals and the number followed by a completed two-minute break. Usual-habits participants record the number of breaks they naturally took; they are not given adherence targets. An evening entry is not a clinic visit. Day 0 has no home-diary entry. Clinic visits are not multiplied by diary days. Do not invent daily symptom ratings: the diary does not collect symptom scores.",
+      "retention": "A missed scheduled contact may prompt up to two scheduling attempts within that contact's existing window. There are no replacement home vision tests.",
+      "evaluation": "Four scheduled contacts, three in person and one by telephone. Daily diaries are a separate activity, not extra visits; Day 0 has no home entry, and diaries collect no symptom scores. Training explanation is included in Day 0 total duration.",
+      "pregnancy_testing": "Pregnancy is not excluded. No pregnancy tests, contraception requirements, radiation, specimen collection or study drugs are involved. No children, adults unable to consent, proxy respondents, legally authorized representatives or witness signatures are included under this study plan.",
+      "discontinuation": "Participation is voluntary and may end without penalty or loss of usual benefits. Tell or write to the site coordinator to stop participation. A final discussion about symptoms and ordinary care is optional. No mandatory final research test, diary submission or extra data collection is required after withdrawal. The investigator may discontinue participation at the participant's request, if assessments cannot be completed, or if the study closes. Record the reason when available; do not demand diary completion to retain reimbursement.",
+      "return_of_results": "Offer individual vision results at each attended in-person visit. Explain clinical concerns and refer to ordinary care. An aggregate plain-language summary is available on request after analysis. There is no individual genetic result, clinical genetic report or treatment unmasking promised at completion.",
+      "completion": "Ends after Day 56 assessments or earlier withdrawal/discontinuation. Closeout includes disposition and reimbursement reconciliation, diary/data queries, dataset lock, analysis, aggregate summary preparation and archiving. These staff activities do not extend individual follow-up.",
+      "specimens": "There are no research blood draws, saliva, genetic testing, banking, imaging, dilation, home devices, study medicines or surgical procedures.",
+      "adverse_events": "Participants can pause or stop testing. Persistent or worsening symptoms go to the study doctor; clinical concerns are referred to ordinary care. For possible research injury or persistent discomfort, contact the enrolling site's coordinator to reach its study doctor. The clinic arranges evaluation. Use ordinary emergency services for emergencies. No sponsor fund for free injury treatment or additional injury compensation is established. Ordinary treatment may be billed to the participant or insurer; legal rights are not waived. Do not promise free care or automatic injury payments.",
+      "unscheduled_visits": null,
+      "termination": null,
+      "study_termination": null
+    },
+    "statistics": {
+      "analysis_plan": "Analysis population: all randomized participants with relevant observed data, analyzed in their assigned group regardless of adherence. Report disposition, withdrawal and missing data by group and site. No automatic exclusion for masking breaches or changes in ordinary care; describe those events. Primary analysis: linear model of Day 56 minus Day 0 symptom change including group, Day 0 symptom score and site. Report adjusted mean change by group and the scheduled-break minus usual-habits adjusted difference with 95% confidence interval. A negative between-group difference favors scheduled breaks. Summarize continuous observations with count, mean, standard deviation, median and range, categorical observations as counts and percentages with explicit denominators. Summarize secondary outcomes descriptively by assigned group, except intervention adherence which is intervention-group-only. Use available observations; do not impute missing symptoms or diaries. Report completeness and missing reasons. No multiplicity-adjusted confirmatory claims or causal certainty is justified by this feasibility study.",
+      "analysis_populations": "Analysis population: all randomized participants with relevant observed data, analyzed in their assigned group regardless of adherence. Report disposition, withdrawal and missing data by group and site. No automatic exclusion for masking breaches or changes in ordinary care; describe those events.",
+      "sample_size_justification": "72 people is a feasible pilot sample, allowing about 15% failure to complete follow-up. No formal power calculation, assumed effect size or confirmatory significance threshold is specified.",
+      "missing_data_handling": "Use available observations; do not impute missing symptoms or diaries. Report completeness and missing reasons. Missing diary days do not count as zero adherence; no eligible intervals means not estimable.",
+      "methodology": "Primary analysis: linear model of Day 56 minus Day 0 symptom change including group, Day 0 symptom score and site. Report adjusted mean change by group and the scheduled-break minus usual-habits adjusted difference with 95% confidence interval. A negative between-group difference favors scheduled breaks. Summarize continuous observations with count, mean, standard deviation, median and range, categorical observations as counts and percentages with explicit denominators. Summarize secondary outcomes descriptively by assigned group, except intervention adherence which is intervention-group-only. Use available observations; do not impute missing symptoms or diaries. Report completeness and missing reasons. No multiplicity-adjusted confirmatory claims or causal certainty is justified by this feasibility study."
+    },
+    "safety": {
+      "general_information": "Potential research risks are temporary eye fatigue or headache from vision testing, frustration or embarrassment with questions, inconvenience from interrupting screen work and diary completion, travel burden, and loss of privacy. Participants can pause or stop testing. The break routine may be inconvenient and may not reduce discomfort. It is not a replacement for ordinary eye care. Persistent or worsening symptoms should be discussed with the study doctor; clinical concerns are referred to ordinary care. No direct benefit is promised. Results may help design future studies of screen-break routines. The alternative is ordinary care without joining; usual breaks and clinical treatments remain available regardless of participation.",
+      "monitoring": "Participants may pause or stop testing. Persistent or worsening symptoms go to the study doctor and clinical concerns to ordinary care.",
+      "roles": "Both coordinators handle scheduling, study questions and access to the study doctor Monday through Friday, 9 a.m. to 5 p.m. local time. These numbers are not 24-hour emergency services.",
+      "adverse_events": "For possible research injury or persistent discomfort, contact the enrolling site's coordinator to reach its study doctor. The clinic arranges evaluation. Use ordinary emergency services for emergencies. No sponsor fund for free injury treatment or additional injury compensation is established. Ordinary treatment may be billed to the participant or insurer; legal rights are not waived. Do not promise free care or automatic injury payments.",
+      "follow_up": null
+    },
+    "ethics": {
+      "approval_status": "Not yet submitted; no approval obtained, number or date.",
+      "consent": "No children, adults unable to consent, proxy respondents, legally authorized representatives or witness signatures are included under this study plan.",
+      "registry_disclosure": "The sponsor requires public trial registration before enrollment and requests the standard ClinicalTrials.gov consent disclosure for this study. Include that disclosure without inventing an NCT identifier or claiming registration has already occurred. This is a supplied study-plan requirement, not a legal conclusion inferred merely from requesting XML."
+    },
+    "confidentiality": {
+      "data_handling": "Collect name, contact information, signed consent, age, sex, eligibility, screen-use history, ordinary eye-care updates, assignment, visual acuity, ratings, diary records and reimbursement documentation. No date of birth, Social Security number, specimen or genetic information is collected. Each clinic keeps its identifying key separately on an access-controlled encrypted drive; signed consent and paper diaries are stored in locked research cabinets. Diary sheets carry study ID only and are returned at clinic visits. Participants are asked to keep diaries private while at home. Authorized clinic investigators/coordinators can access identifying records for study duties. The sponsor's reimbursement team receives participant name, mailing address, receipts and reimbursement amount solely to mail checks and reconcile expenses. Thus the sponsor DOES receive limited identifiable information; do not describe all sponsor access as coded-only. The sponsor's analysis team and statistician receive coded assessments, with no contact details or identity key. Authorized monitors, the IRB and legally authorized oversight bodies may inspect relevant original records for oversight. Sponsor reimbursement records are stored separately with restricted access. Study records, identity keys, diaries and reimbursement records are retained securely for seven years after administrative closeout on 31 December 2027, then destroyed unless a binding requirement requires longer retention. Authorization for new research health information ends at the final Day 56 contact or earlier written withdrawal. Retention does not extend collection. Withdraw authorization by writing to the coordinator at the enrolling site's mailing address. New research collection then stops; already collected data may remain in analyses and required oversight records. Ordinary care continues. No public individual-data sharing, data sale, unrelated future research use, genetic research, commercial specimens or specimen banking is planned.",
+      "authorization_duration": "Authorization for new research health information ends at the final Day 56 contact or earlier written withdrawal. Retention does not extend collection.",
+      "authorization_withdrawal": "Withdraw authorization by writing to the coordinator at the enrolling site's mailing address. New research collection then stops; already collected data may remain in analyses and required oversight records. Ordinary care continues.",
+      "publication": "No public individual-data sharing, data sale, unrelated future research use, genetic research, commercial specimens or specimen banking is planned."
+    },
+    "risks_benefits": {
+      "risks": "Potential research risks are temporary eye fatigue or headache from vision testing, frustration or embarrassment with questions, inconvenience from interrupting screen work and diary completion, travel burden, and loss of privacy. Participants can pause or stop testing. The break routine may be inconvenient and may not reduce discomfort. It is not a replacement for ordinary eye care. Persistent or worsening symptoms should be discussed with the study doctor; clinical concerns are referred to ordinary care.",
+      "risk_mitigation": "Participants may pause or stop testing. The routine may be inconvenient and not reduce discomfort; it does not replace ordinary care. Persistent or worsening symptoms go to the study doctor; clinical concerns are referred to ordinary care.",
+      "benefits": "No direct benefit is promised. Benefit is uncertain. Results may help design future studies of screen-break routines.",
+      "alternatives": "The alternative is ordinary care without joining; usual breaks and clinical treatments remain available regardless of participation.",
+      "compensation_or_reimbursement": "Participant compensation: None. No attendance payments, bonus or gift cards. Travel reimbursement only: actual parking or public-transit expenses up to $25 for each of the three attended in-person visits, with receipts; maximum $75 across those visits. No telephone-visit reimbursement or mileage payment. Payment is by check within 30 days after receipt submission. Eligible expenses already incurred remain reimbursable after withdrawal. Reimbursement is not conditional on finishing the study and is not a guaranteed personal benefit.",
+      "costs": "The sponsor pays for research assessments, printing and allocation services. No research costs are billed to participants or insurance. Ordinary care is paid by the participant or insurer under usual arrangements.",
+      "injury_handling": "For possible research injury or persistent discomfort, contact the enrolling site's coordinator to reach its study doctor. The clinic arranges evaluation. Use ordinary emergency services for emergencies. No sponsor fund for free injury treatment or additional injury compensation is established. Ordinary treatment may be billed to the participant or insurer; legal rights are not waived. Do not promise free care or automatic injury payments.",
+      "privacy": "Collect name, contact information, signed consent, age, sex, eligibility, screen-use history, ordinary eye-care updates, assignment, visual acuity, ratings, diary records and reimbursement documentation. No date of birth, Social Security number, specimen or genetic information is collected. Each clinic keeps its identifying key separately on an access-controlled encrypted drive; signed consent and paper diaries are stored in locked research cabinets. Diary sheets carry study ID only and are returned at clinic visits. Participants are asked to keep diaries private while at home. Authorized clinic investigators/coordinators can access identifying records for study duties. The sponsor's reimbursement team receives participant name, mailing address, receipts and reimbursement amount solely to mail checks and reconcile expenses. Thus the sponsor DOES receive limited identifiable information; do not describe all sponsor access as coded-only. The sponsor's analysis team and statistician receive coded assessments, with no contact details or identity key. Authorized monitors, the IRB and legally authorized oversight bodies may inspect relevant original records for oversight. Sponsor reimbursement records are stored separately with restricted access. Study records, identity keys, diaries and reimbursement records are retained securely for seven years after administrative closeout on 31 December 2027, then destroyed unless a binding requirement requires longer retention. Authorization for new research health information ends at the final Day 56 contact or earlier written withdrawal. Retention does not extend collection. Withdraw authorization by writing to the coordinator at the enrolling site's mailing address. New research collection then stops; already collected data may remain in analyses and required oversight records. Ordinary care continues. No public individual-data sharing, data sale, unrelated future research use, genetic research, commercial specimens or specimen banking is planned."
+    },
+    "regulatory": {
+      "prs": {
+        "study_type": "Interventional",
+        "allocation": "Randomized",
+        "intervention_model": "Parallel Assignment",
+        "primary_purpose": "Supportive Care",
+        "masking_description": "Masking: Single, Outcomes Assessor. Participants and the training coordinator know assignment. The clinic vision assessor is masked. This is not a double-masked study; participant-reported symptoms cannot be masked. The vision assessor performs the same measurements in both groups without access to training records or diaries. Participants are asked not to disclose assignment to that assessor. If assignment is inadvertently disclosed, record the masking breach; do not remove the participant automatically. There is no placebo, emergency unmasking procedure or concealed treatment needed for clinical safety. Clinical staff can access assignment when necessary.",
+        "participant_registry_disclosure": true,
+        "overall_status": "Not yet recruiting",
+        "enrollment": "72",
+        "enrollment_type": "Anticipated",
+        "verification_date": "October 2026",
+        "start_date": "2027-02-01",
+        "start_date_type": "Anticipated",
+        "primary_completion_date": "2027-09-01",
+        "primary_completion_date_type": "Anticipated",
+        "study_completion_date": "2027-09-01",
+        "study_completion_date_type": "Anticipated",
+        "fda_regulated_drug": "No",
+        "fda_regulated_device": "No",
+        "ipd_sharing": "No",
+        "provider_study_id": "BREAK-27-05",
+        "observational_study_design": null,
+        "time_perspective": null,
+        "patient_registry": null,
+        "target_duration_quantity": null,
+        "target_duration_units": null
+      },
+      "sponsor_receives_identifiable_information": "Yes, limited reimbursement data; analysis team and statistician receive coded assessments.",
+      "genetic_information_collected": "No",
+      "future_specimen_use": "No"
+    }
+  },
+  "section_contracts": [
+    {
+      "section_id": "study-design.bias",
+      "number": "8.2.",
+      "title": "Methods Used to Minimize Bias",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft",
+        "fixed_boilerplate"
+      ],
+      "minimum_evidence": [
+        "design.study_design"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [
+        {
+          "boilerplate_id": "bias",
+          "text": "Potential sources of selection, measurement, and analysis bias will be addressed through consistent eligibility criteria, predefined assessments, and the approved analysis plan.",
+          "sha256": "52a1c44db10ce81e78401f0d22f6fa95bdf25be4e7d8b40d379523925978ed70"
+        }
+      ],
+      "content_expectations": [
+        "State the source-supported bias controls directly, including supplied common testing conditions, predefined outcomes and analysis methods, and limits on interpreting nonrandomized cohort differences. If none are supplied, use the listed concise boilerplate. Do not repeat the design, setting, arms, or masking account already given in Study Design.",
+        "Do not replace supplied detail with generic clinical prose."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_evidence",
+      "evidence_scopes": [],
+      "approved_source_word_count": 141,
+      "reference_detail_target_words": 0,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [],
+        "brief_reference_only": [],
+        "do_not_restate": []
+      }
+    },
+    {
+      "section_id": "study-procedure.visits",
+      "number": "9.2.",
+      "title": "Visits and Examinations",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft"
+      ],
+      "minimum_evidence": [
+        "procedures.assessments",
+        "procedures.visit_schedule",
+        "procedures.visit_schedule_table",
+        "procedures.assessment_details",
+        "procedures.intervention_management",
+        "procedures.retention"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [],
+      "content_expectations": [
+        "Account for every approved visit, time point, and visit-specific procedure.",
+        "Do not replace supplied detail with generic clinical prose."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_items",
+      "evidence_scopes": [],
+      "approved_source_word_count": 488,
+      "reference_detail_target_words": 317,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [
+          "complete-visit-schedule"
+        ],
+        "brief_reference_only": [],
+        "do_not_restate": []
+      }
+    },
+    {
+      "section_id": "study-procedure.measurements",
+      "number": "9.3.",
+      "title": "Study Methods and Measurements",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft"
+      ],
+      "minimum_evidence": [
+        "procedures.methods",
+        "procedures.assessment_details",
+        "procedures.specimens",
+        "procedures.return_of_results",
+        "endpoints.primary",
+        "endpoints.secondary",
+        "endpoints.other"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [],
+      "content_expectations": [
+        "Explain the approved measurement activities in operational language. Connect each measure to the source-supplied assessment activities and relevant time point, such as chart abstraction, score review, device download, or questionnaire when those activities are approved. When the source gives no instrument, scoring rule, denominator, or detailed method, state only the observable activity; an endpoint restatement such as 'the endpoint will be evaluated' is not a measurement method. Group related measures without repeating the complete visit schedule or inventing details.",
+        "Do not replace supplied detail with generic clinical prose.",
+        "This section owns supplied specimen handling and results-return policies. Preserve collection/coding, transfer recipients and access limits, testing purpose, specimen destruction timing and any absolute deadline, future-use/sharing/sale/commercial restrictions, and the distinction between specimen retention and derived-data retention. Distinguish individual clinical results, research/genetic results, incidental findings and aggregate summaries, including any limits, preferences, recipients and timing. Keep routine-care referral arrangements when supplied. Preserve uncertainty; absent optional policies remain absent. For records-only research, describe only the approved existing records/specimens and results policies without adding collection or participant contact."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_evidence",
+      "evidence_scopes": [],
+      "approved_source_word_count": 541,
+      "reference_detail_target_words": 324,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [
+          "endpoint-measurement-methods",
+          "specimen-handling",
+          "return-of-results"
+        ],
+        "brief_reference_only": [
+          "complete-visit-schedule",
+          "endpoint-inventory"
+        ],
+        "do_not_restate": [
+          "complete-visit-schedule",
+          "endpoint-inventory"
+        ]
+      }
+    }
+  ],
+  "constraints": [
+    "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+    "Use only supplied approved evidence and applicable template/Fixed Clinical Boilerplate. Align shared population, groups, quantities, timing, procedures and outcomes across the Protocol, selected ICF and PRS narratives; preserve relationships and qualifications rather than copying wording.",
+    "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+    "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
+    "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
+    "Preserve supplied numbered citations next to the Protocol claims they support and their bibliography linkage. Do not invent citations; ICF explanations use plain language.",
+    "Return exactly one result for every requested section ID.",
+    "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
+    "Return structured section content, not a whole document or document markup.",
+    "Write to each section's purpose and ownership. Explain each operational rule fully in its owning section; elsewhere give only the fact needed for that section and a brief reference to the owning heading. Preserve necessary identifiers, endpoint definitions, quantities, timing anchors/windows, conditions, exceptions, safety information and client consent language. Compress repeated explanations, not clinical meaning.",
+    "Use participant-facing language for ICF sections.",
+    "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",
+    "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+    "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+    "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
+    "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+    "Protocol General Information is a compact synopsis; Objectives states the study purpose and objectives; Study Design owns the design, comparisons and grouped endpoint inventory. Study Methods and Measurements owns detailed measurement, exposure-counting, study-eye and historical-record selection rules; Visits and Examinations owns contact mode, timing and scheduled activities. Bias describes the purpose of controls with brief references to their methods, rather than repeating those instructions. Analysis Data Sets owns which observations enter analyses; Statistical Methodology owns calculations, models and interpretation. Retain complete methods once, using the actual owning headings for references.",
+    "Satisfy every section's content_expectations and cover every material value named by minimum_evidence, except that Section 15's source-derived table and notes carry its detailed inventory. Its adjacent prose should briefly introduce the table without restating its rows or notes.",
+    "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
+    "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+    "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+    "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+    "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+    "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays."
+  ],
+  "generation_only_prompts": {
+    "profile": "n8n-with-brad-corrections/v1",
+    "source": {
+      "filename": "Form Fill Fillout -_ Generate Protocol + Send Gmail.json",
+      "sha256": "15b20d12597b6f0fc8829650771302fb9161d8718a96c1c631b93d0154b55b1a"
+    },
+    "prompts": [
+      {
+        "node": "Study Design & Methods",
+        "targets": [
+          {
+            "section_id": "study-design.bias",
+            "legacy_fields": "methods"
+          }
+        ],
+        "original_messages": [
+          {
+            "content": "You are a medical writer generating the Study Design and Methods sections of clinical study protocols.",
+            "role": "system"
+          },
+          {
+            "content": "=### Context:\nWe are writing a clinical study protocol document.  \nYour task is to generate the **Study Design and Methods** sections.\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n\n### What you need to do:\n- Generate **studyDesignLong**: an expanded paragraph that integrates studyDesign, numberOfSites, endpoints, and assessmentsSchedule. Mention timepoints only if they are explicitly present in the inputs.\n- Generate **methods**: describe bias minimization procedures.\n- Generate **masked**: extract masking or blinding details.\n- Generate **variables**: present the endpoits gropued.\n- Generate **duration**: A very short description of how long will the patients in the study will bethe.\n- Determine **studyArm**: Identify if the study is \"single arm\" or \"double arm\" based on the Study Design input.\n\n### Important notes:\n- Do not invent outcomes, procedures, masking, timepoints, or measurements beyond what is provided.\n- Keep the tone professional, neutral, and consistent with clinical protocol style.\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"studyDesignLong\": \"expanded description paragraph\",\n  \"methods\": \"bias minimization methods\",\n  \"masked\": \"masking/blinding details\",\n  \"variables\": \"endpoints in structured text\",\n  \"duration\": \"duration in a very short text\",\n  \"studyArm\": \"single arm or double arm\"\n}\n"
+          },
+          {
+            "content": "=### Study Title:\nA Single-Site, Randomized, Contralateral Eye Trial Comparing Active Sentry at Low IOP vs Ozil at High IOP\n\n\n### Study Design:\nSingle site, single-masked, randomized, prospective contralateral eye study.\n\n\n### Endpoints:\nPrimary Endpoint: The total aspiration time between groups on the day of surgery.  \n\nSecondary Endpoints:  \n- Total fluid volume between groups on the day of surgery.  \n- Total phaco time between groups on the day of surgery.  \n- Total case time between groups on the day of surgery.  \n- Aspiration time during phaco between groups on the day of surgery.  \n- Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.  \n\nExploratory Endpoint:  \n- Cumulative dissipated energy between groups on the day of surgery.  \n\n\n### Assessments Schedule:\n- Preoperative: Eligibility evaluation, consent, visual acuity, slit lamp, and CCT measurement.  \n- Operative (two visits): Sequential bilateral cataract surgeries with standard surgical findings recorded.  \n- Postoperative Day 1: CCT measurement, slit lamp exam, VA testing, AE monitoring.  \n- Postoperative Week 1: CCT measurement, slit lamp exam, VA testing, AE monitoring. \n\n\n### Timeline\nStudy Start Date: March 1, 2025  \nFirst Patient In: March 15, 2025  \nLast Patient Out: December 15, 2025  \nData Analysis: January 2026  \nFinal Report Submission: February 28, 2026\n\n\n### Number of Sites:\nOne\n\n\n### Background:\nElevated bottle height (i.e., intraocular pressure, IOP) during cataract surgery impacts corneal tissue and the anterior chamber. Previous studies found Active Sentry at 44–50 mmHg as safe and efficacious as Ozil at 65–70 mmHg, but did not test Active Sentry at lower IOP levels (20 mmHg), which is its main advantage.\n\n\n### Primary Objective:\nTo assess the efficiency of the Active Sentry handpiece at low IOP compared with the Ozil handpiece at high IOP.\n\n\n### Hypothesis:\nThe Active Sentry handpiece at low IOP is non-inferior to the Ozil at high IOP in terms of surgical efficiency.\n\n"
+          },
+          {
+            "content": "={\n  \"studyDesignLong\": \"This study is a single site, single-masked, randomized, prospective, contralateral eye study of the efficiency of the Active Sentry handpiece at low IOP compared with the Ozil at high IOP. Subjects will be assessed pre-operatively, operatively, and at 1 day and 1 week post-operatively. Clinical evaluations will include measurement of visual acuity and central corneal thickness (CCT).\\n\\nThe primary outcome measure will be the total aspiration time between groups on the day of surgery.\\n\\nSecondary outcome measures are as follows:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory outcome measures are as follows:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"methods\": \"As a randomized study there is no expected bias. Patient selection will be based on the patient’s interest and the surgeon’s opinion as to whether they are a suitable candidate for sequential bilateral cataract surgery. The data analyzer will be masked.\\n\\nThe measurement of visual acuity will be conducted in a systematic fashion to minimize bias. Individuals conducting visual acuity measures will be instructed to perform the same testing in the same fashion for all subjects, with the same level of encouragement to subjects.\\n\\nAll data collection will be completed through provided Case Report Forms (CRFs) or computer files generated by automated test equipment. All site personnel involved in the study will be trained in regard to conducting study-specific procedures.\",\n  \"masked\": \"The data analyzer will be masked.\",\n  \"variables\": \"Primary: The total aspiration time between groups on the day of surgery.\\n\\nSecondary:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"duration\": \"Preoperative (≤90 days) to 1 week postoperative\",\n  \"studyArm\": \"double arm\"\n}",
+            "role": "assistant"
+          },
+          {
+            "content": "=### Study Title: \n{{ $('Set Questions').first().json.whatIsTheFullTitleOfTheStudy }}\n\n\n### Study Design: \n{{ $('Set Questions').first().json.describeTheStudyDesign }}\n\n\n### Endpoints:\n{{ $('Set Questions').first().json.listThePrimaryAndSecondaryEndpoints }}\n\n\n### Assessments Schedule:\n{{ $('Set Questions').first().json.listAllPlannedAssessmentsAndTheirSchedule }}\n\n\n### Timeline\n{{ $('Set Questions').first().json.provideTheStudyTimeline }}\n\n\n### Number of Sites:\n{{ $('Set Questions').first().json.howManyInvestigationalSitesWillParticipateInTheStudy }}\n\n\n### Background:\n{{ $('Set Questions').first().json.provideTheBackgroundAndSignificanceOfTheStudy }}\n\n\n### Primary Objective:\n{{ $('Set Questions').first().json.whatAreThePrimaryObjectivesOfTheStudy }}\n\n\n### Hypothesis:\n{{ $('Set Questions').first().json.stateTheStudyHypothesis }}"
+          }
+        ],
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a medical writer generating the Study Design and Methods sections of clinical study protocols."
+          },
+          {
+            "role": "user",
+            "content": "### Context:\nWe are writing a clinical study protocol document.  \nYour task is to generate the **Study Design and Methods** sections.\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n\n### What you need to do:\n- Generate **studyDesignLong**: an expanded paragraph that integrates studyDesign, numberOfSites, endpoints, and assessmentsSchedule. Mention timepoints only if they are explicitly present in the inputs.\n- Generate **methods**: describe bias minimization procedures.\n- Generate **masked**: extract masking or blinding details.\n- Generate **variables**: present the endpoits gropued.\n- Generate **duration**: A very short description of how long will the patients in the study will bethe.\n- Determine **studyArm**: Identify if the study is \"single arm\" or \"double arm\" based on the Study Design input.\n\n### Important notes:\n- Do not invent outcomes, procedures, masking, timepoints, or measurements beyond what is provided.\n- Keep the tone professional, neutral, and consistent with clinical protocol style.\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"studyDesignLong\": \"expanded description paragraph\",\n  \"methods\": \"bias minimization methods\",\n  \"masked\": \"masking/blinding details\",\n  \"variables\": \"endpoints in structured text\",\n  \"duration\": \"duration in a very short text\",\n  \"studyArm\": \"single arm or double arm\"\n}\n"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title:\nA Single-Site, Randomized, Contralateral Eye Trial Comparing Active Sentry at Low IOP vs Ozil at High IOP\n\n\n### Study Design:\nSingle site, single-masked, randomized, prospective contralateral eye study.\n\n\n### Endpoints:\nPrimary Endpoint: The total aspiration time between groups on the day of surgery.  \n\nSecondary Endpoints:  \n- Total fluid volume between groups on the day of surgery.  \n- Total phaco time between groups on the day of surgery.  \n- Total case time between groups on the day of surgery.  \n- Aspiration time during phaco between groups on the day of surgery.  \n- Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.  \n\nExploratory Endpoint:  \n- Cumulative dissipated energy between groups on the day of surgery.  \n\n\n### Assessments Schedule:\n- Preoperative: Eligibility evaluation, consent, visual acuity, slit lamp, and CCT measurement.  \n- Operative (two visits): Sequential bilateral cataract surgeries with standard surgical findings recorded.  \n- Postoperative Day 1: CCT measurement, slit lamp exam, VA testing, AE monitoring.  \n- Postoperative Week 1: CCT measurement, slit lamp exam, VA testing, AE monitoring. \n\n\n### Timeline\nStudy Start Date: March 1, 2025  \nFirst Patient In: March 15, 2025  \nLast Patient Out: December 15, 2025  \nData Analysis: January 2026  \nFinal Report Submission: February 28, 2026\n\n\n### Number of Sites:\nOne\n\n\n### Background:\nElevated bottle height (i.e., intraocular pressure, IOP) during cataract surgery impacts corneal tissue and the anterior chamber. Previous studies found Active Sentry at 44–50 mmHg as safe and efficacious as Ozil at 65–70 mmHg, but did not test Active Sentry at lower IOP levels (20 mmHg), which is its main advantage.\n\n\n### Primary Objective:\nTo assess the efficiency of the Active Sentry handpiece at low IOP compared with the Ozil handpiece at high IOP.\n\n\n### Hypothesis:\nThe Active Sentry handpiece at low IOP is non-inferior to the Ozil at high IOP in terms of surgical efficiency.\n\n"
+          },
+          {
+            "role": "assistant",
+            "content": "{\n  \"studyDesignLong\": \"This study is a single site, single-masked, randomized, prospective, contralateral eye study of the efficiency of the Active Sentry handpiece at low IOP compared with the Ozil at high IOP. Subjects will be assessed pre-operatively, operatively, and at 1 day and 1 week post-operatively. Clinical evaluations will include measurement of visual acuity and central corneal thickness (CCT).\\n\\nThe primary outcome measure will be the total aspiration time between groups on the day of surgery.\\n\\nSecondary outcome measures are as follows:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory outcome measures are as follows:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"methods\": \"As a randomized study there is no expected bias. Patient selection will be based on the patient’s interest and the surgeon’s opinion as to whether they are a suitable candidate for sequential bilateral cataract surgery. The data analyzer will be masked.\\n\\nThe measurement of visual acuity will be conducted in a systematic fashion to minimize bias. Individuals conducting visual acuity measures will be instructed to perform the same testing in the same fashion for all subjects, with the same level of encouragement to subjects.\\n\\nAll data collection will be completed through provided Case Report Forms (CRFs) or computer files generated by automated test equipment. All site personnel involved in the study will be trained in regard to conducting study-specific procedures.\",\n  \"masked\": \"The data analyzer will be masked.\",\n  \"variables\": \"Primary: The total aspiration time between groups on the day of surgery.\\n\\nSecondary:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"duration\": \"Preoperative (≤90 days) to 1 week postoperative\",\n  \"studyArm\": \"double arm\"\n}"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title: \nScheduled Screen Breaks and Eye Discomfort in Adults With Frequent Digital Screen Use: A Randomized Prospective Behavioral Study.\n\n\n### Study Design: \nStudy type for protocol selection: Prospective. Registry study classification: Interventional. Primary purpose: Supportive Care. Allocation: Randomized. Intervention model: Parallel Assignment. Two groups. Masking: Single, Outcomes Assessor. Participants and the training coordinator know assignment. The clinic vision assessor is masked. This is not a double-masked study; participant-reported symptoms cannot be masked. Number of sites: 2, both in the United States. Condition: Eye discomfort associated with frequent digital screen use. Intervention category: Behavioral. No study-assigned drug, device or surgery. The research assigns a break routine after consent and eligibility confirmation; it does not merely observe a routine chosen before enrollment. Group 1: Scheduled screen breaks, target 36 participants. Group 2: Usual screen-break habits, target 36 participants. Total enrollment: 72 unique people, target 36 per site and 36 per group overall. People, not eyes or diary entries, are the enrollment and primary analysis unit.\n\n\n### Endpoints:\n{\"primary\": [{\"analysis_method\": \"\", \"description\": \"0–10 scale. Day 56 minus Day 0; negative change is improvement, positive change is worsening.\", \"label\": \"Change in seven-day average eye-discomfort rating from Day 0 to Day 56\", \"time_frame\": \"Day 0 to Day 56 +/- 7 days after randomization\"}], \"secondary\": [{\"analysis_method\": \"\", \"description\": \"0–10; higher indicates greater satisfaction.\", \"label\": \"Near-task satisfaction rating\", \"time_frame\": \"Day 56 +/- 7 days after randomization\"}, {\"analysis_method\": \"\", \"description\": \"logMAR; lower indicates better acuity.\", \"label\": \"Binocular best-corrected distance visual acuity\", \"time_frame\": \"Day 56 +/- 7 days after randomization\"}, {\"analysis_method\": \"\", \"description\": \"Calculate 100 times completed prescribed breaks divided by eligible intervals recorded across observed diary days. With no eligible intervals adherence is not estimable, not zero. Report diary completeness and days with no screen use separately. Missing days are not zero adherence; no control-group intervention adherence.\", \"label\": \"Adherence to scheduled breaks in scheduled-break group only\", \"time_frame\": \"Days 1 through 56 after randomization\"}]}\n\n\n### Assessments Schedule:\n{\"assessments\": [\"No visual acuity test, satisfaction rating, new training or specimen collection occurs by telephone.\", \"No extra exit form or separate closeout contact is required.\", \"Both groups complete one paper diary entry each evening from the day after randomization (Day 1) through Day 56 inclusive, about two minutes per day. Each entry records total screen-use hours and whether screen use occurred. Scheduled-break participants additionally record the number of eligible 30-minute intervals and the number followed by a completed two-minute break. Usual-habits participants record the number of breaks they naturally took; they are not given adherence targets. An evening entry is not a clinic visit. Day 0 has no home-diary entry. Clinic visits are not multiplied by diary days. Do not invent daily symptom ratings: the diary does not collect symptom scores.\", \"There are no research blood draws, saliva, genetic testing, banking, imaging, dilation, home devices, study medicines or surgical procedures.\", \"No other or exploratory outcomes are authorized. Day 14/28 symptoms support descriptive trajectory summaries, without creating additional registry outcomes.\"], \"visit_schedule\": [{\"duration\": \"About 65 minutes total, including the ten-minute break explanation\", \"mode\": \"In person\", \"procedures\": \"Written informed consent before research; Eligibility confirmation; Demographics, current eye-care and screen-use history; Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Near-task satisfaction rating, 0 (not satisfied) to 10 (fully satisfied); higher is better; Binocular best-corrected distance visual acuity at 4 meters using a logMAR chart and current correction; Symptom enquiry; Randomization after baseline assessments; Allocation-specific instruction and paper-diary training\", \"timing\": \"Day 0 / randomization; no window\", \"visit\": \"Visit 1 — Day 0 / Enrollment and Randomization\"}, {\"duration\": \"About 15 minutes\", \"mode\": \"Telephone\", \"procedures\": \"Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Interval eye-care update; Assessment-related symptom enquiry; Questions about diary completion\", \"timing\": \"Day 14 +/- 3 days after randomization\", \"visit\": \"Visit 2 — Day 14\"}, {\"duration\": \"About 30 minutes\", \"mode\": \"In person\", \"procedures\": \"Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Near-task satisfaction rating, 0 (not satisfied) to 10 (fully satisfied); higher is better; Binocular best-corrected distance visual acuity at 4 meters using a logMAR chart and current correction; Interval eye-care and symptom updates; Review of diary completeness without changing assignment or prescribed routine\", \"timing\": \"Day 28 +/- 5 days after randomization\", \"visit\": \"Visit 3 — Day 28\"}, {\"duration\": \"About 35 minutes\", \"mode\": \"In person\", \"procedures\": \"Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Near-task satisfaction rating, 0 (not satisfied) to 10 (fully satisfied); higher is better; Binocular best-corrected distance visual acuity at 4 meters using a logMAR chart and current correction; Interval eye-care and symptom updates; Review of diary completeness without changing assignment or prescribed routine; Collection of completed diary; Confirmation of completion\", \"timing\": \"Day 56 +/- 7 days after randomization\", \"visit\": \"Visit 4 — Day 56 / Final Visit\"}], \"visit_schedule_table\": null}\n\n\n### Timeline\nRecruitment: 1 February 2027 through 30 June 2027. Final participant assessments, primary completion and study completion anticipated by 1 September 2027, allowing the final Day 56 window. Administrative closeout: 31 December 2027.\n\n\n### Number of Sites:\n2\n\n\n### Background:\nThe study asks whether a scheduled break routine changes eye discomfort during frequent screen use compared with usual break habits. A benefit is uncertain. No prior treatment-effect estimate or bibliography is supplied.\n\n\n### Primary Objective:\n[\"Estimate the between-group difference in change in average eye-discomfort rating from Day 0 to Day 56 after randomization.\"]\n\n\n### Hypothesis:\nThe scheduled-break group will have a greater reduction in eye discomfort than the usual-habits group. This is an exploratory feasibility study, not a confirmatory efficacy study; benefit is not established."
+          }
+        ]
+      },
+      {
+        "node": "Procedures & Assessments",
+        "targets": [
+          {
+            "section_id": "study-procedure.visits",
+            "legacy_fields": "visitSchedule + visitScheduleDetails"
+          },
+          {
+            "section_id": "study-procedure.measurements",
+            "legacy_fields": "measurements"
+          }
+        ],
+        "original_messages": [
+          {
+            "content": "You are a medical writer generating the Procedures and Assessments sections of clinical study protocols.",
+            "role": "system"
+          },
+          {
+            "content": "=### Context:\nWe are writing a clinical study protocol document.  \nYour task is to generate the **Procedures and Assessments** sections.  \n\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Timeline: Study dates\n\n\n### What you need to do:\n- Generate **visitSchedule**: a short narrative introduction summarizing the visit structure (screening, baseline/operative, follow-ups). This should serve as the overview.  \n- Generate **visitScheduleDetails**: subsections labeled 9.2.1, 9.2.2, etc., expanding on visitSchedule by describing what happens at each visit (assessments, procedures, exit).  \n- Generate **visitScheduleTable**: an array of structured objects with the fields:\n  - visitNumber  \n  - visitName  \n  - visitWindow  \n  - CRFnumber  \n- Generate **measurements**: a short narrative summary of the planned assessments.  \n- Generate **measurementsDetails**: subsections labeled 9.3.1, 9.3.2, etc., with expanded descriptions of how each assessment is conducted (standardized procedures, methodology, equipment).  \n- Generate Study Start Date in format yyyy-mm-dd\n- Generate Study End Date in format yyyy-mm-dd\n\n\n### Important notes:\n- Do not invent assessments or visits beyond what is provided.  \n- Follow the structure and tone of a clinical protocol (neutral, professional).  \n- Visit details must use numbered subsections (9.2.1, 9.2.2, …).  \n- Measurement details must use numbered subsections (9.3.1, 9.3.2, …).  \n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"visitSchedule\": \"narrative summary\",\n  \"visitScheduleDetails\": \"9.2.1. Preoperative ...\\n\\n9.2.2. Operative (Surgery) ...\\n\\n9.2.3. Postoperative 1 Day ...\\n\\n9.2.4. Postoperative 1 Week ...\\n\\n9.2.5. Exit Procedures ...\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Preoperative\",\n      \"visitWindow\": \"-90 to 0 days from surgery\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Operative\",\n      \"visitWindow\": \"0 from surgery\",\n      \"CRFnumber\": \"2\"\n    }\n  ],\n  \"measurements\": \"- CBC at screening and week 12\\n- ECG at baseline and week 6\\n- Quality of life survey at baseline and week 12\",\n  \"measurementsDetails\": \"9.3.1. Laboratory Testing ...\\n\\n9.3.2. ECG ...\\n\\n9.3.3. Quality of Life Survey ...\"\n  \"startDate\": \"2025-01-15\",\n  \"endDate\": \"2025-04-30\"\n}\n"
+          },
+          {
+            "content": "=### Study Title: \nA Randomized, Double-Blind, Placebo-Controlled Trial of CardioRelief in Patients with Stage II Hypertension\n\n\n### Study Design:\nThis study is a randomized, double-blind, placebo-controlled, parallel-group, multicenter clinical trial designed to evaluate the efficacy and safety of CardioRelief in patients with Stage II hypertension. The trial will involve multiple investigational sites, though the exact number is unspecified. Participants will be assessed for changes in systolic and diastolic blood pressure, incidence of treatment-emergent adverse events, and patient-reported quality of life over a 12-week period. Assessments will include vital signs at baseline, week 4, week 8, and week 12; laboratory tests and ECG at baseline and week 12; and a quality of life questionnaire at baseline and week 12.\n\n\n### Background:\nHypertension remains one of the leading causes of cardiovascular morbidity and mortality worldwide. Despite available treatments, many patients do not achieve adequate blood pressure control. CardioRelief is a novel calcium channel blocker that has shown promising results in early-phase studies, with the potential to improve outcomes and reduce side effects compared to standard therapy.\n\n\n### Primary Objective:\nTo evaluate the efficacy and safety of CardioRelief in reducing systolic blood pressure in adults with Stage II hypertension over a 12-week period.\n\n\n### Hypothesis:\nCardioRelief will result in a statistically significant reduction in systolic blood pressure compared to placebo, with fewer reported adverse events.\n\n\n### Endpoints:\nPrimary Endpoint: Change from baseline in systolic blood pressure at 12 weeks.\n\nSecondary Endpoints: Change in diastolic blood pressure, incidence of treatment-emergent adverse events, and patient-reported quality of life.\n\n\n### Assessments Schedule:\nVital Signs: Blood pressure and heart rate at baseline, week 4, week 8, and week 12.\n\nLab Tests: Complete blood count, serum electrolytes, liver function tests at baseline and week 12.\n\nECG: Baseline and week 12.\n\nQuality of Life Questionnaire: Baseline and week 12.\n\n### Timeline\nStudy Start Date: June 1, 2025 First Patient In: July 15, 2025 Last Patient Out: December 20, 2026 Data Analysis: January–February 2027 Final Report Submission: March 31, 2027\n\n### Number of Sites:\nOne"
+          },
+          {
+            "content": "={\n  \"visitSchedule\": \"Subjects will participate in five scheduled study visits over a 12-week period. These will include a screening/baseline visit, two interim follow-up visits at Week 4 and Week 8, a final evaluation at Week 12, and an exit visit if subjects discontinue prematurely. The visit schedule, complete with visit windows and associated CRF forms, is summarized in the table below. Details of each visit, including the specific testing to be conducted, are provided in subsections 9.2.1 through 9.2.5.\",\n  \"visitScheduleDetails\": \"9.2.1. Screening/Baseline\\nAt the baseline visit, subjects will undergo informed consent, eligibility confirmation, assignment of study ID, and collection of demographic and medical history. Baseline assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire.\\n\\n9.2.2. Week 4 Follow-up\\nSubjects will return for interim evaluation at Week 4 (±7 days). Assessments will include vital signs (blood pressure, heart rate) and monitoring for treatment-emergent adverse events. Compliance with study medication will also be reviewed.\\n\\n9.2.3. Week 8 Follow-up\\nAt Week 8 (±7 days), subjects will undergo vital signs measurement and review of adverse events. Ongoing medication compliance and safety will be evaluated.\\n\\n9.2.4. Week 12 Final Visit\\nAt Week 12 (±7 days), subjects will undergo final efficacy and safety evaluations. Assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire. Adverse events and medication compliance will also be recorded.\\n\\n9.2.5. Exit Procedures\\nSubjects who discontinue early will complete an exit visit as soon as possible. The exit visit will include safety evaluations, vital signs, review of adverse events, and return of study medication where applicable.\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Screening/Baseline\",\n      \"visitWindow\": \"Day 0\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Week 4 Follow-up\",\n      \"visitWindow\": \"Week 4 (±7 days)\",\n      \"CRFnumber\": \"2\"\n    },\n    {\n      \"visitNumber\": \"3\",\n      \"visitName\": \"Week 8 Follow-up\",\n      \"visitWindow\": \"Week 8 (±7 days)\",\n      \"CRFnumber\": \"3\"\n    },\n    {\n      \"visitNumber\": \"4\",\n      \"visitName\": \"Week 12 Final Visit\",\n      \"visitWindow\": \"Week 12 (±7 days)\",\n      \"CRFnumber\": \"4\"\n    },\n    {\n      \"visitNumber\": \"5\",\n      \"visitName\": \"Exit Visit\",\n      \"visitWindow\": \"At time of early discontinuation\",\n      \"CRFnumber\": \"5\"\n    }\n  ],\n  \"measurements\": \"All routine testing and planned study assessments will be conducted at each scheduled visit. Any abnormalities identified should be documented in the CRF 'Comment' section. Specific study examination procedures are outlined below.\",\n  \"measurementsDetails\": \"9.3.1. Vital Signs\\nBlood pressure and heart rate will be measured at each scheduled visit (baseline, week 4, week 8, week 12) using a calibrated sphygmomanometer. Measurements will be taken in a seated position after a minimum of 5 minutes rest.\\n\\n9.3.2. Laboratory Testing\\nComplete blood count, serum electrolytes, and liver function tests will be performed at baseline and week 12. Samples will be collected via venipuncture and analyzed at a certified central laboratory.\\n\\n9.3.3. ECG\\nA standard 12-lead electrocardiogram will be conducted at baseline and week 12. ECGs will be evaluated for any clinically significant abnormalities by a blinded cardiologist.\\n\\n9.3.4. Quality of Life Questionnaire\\nA validated hypertension-specific quality of life instrument will be administered at baseline and week 12. Questionnaires will be completed by subjects under the supervision of site personnel to ensure completeness and accuracy.\",\n  \"startDate\": \"2025-06-01\",\n  \"endDate\": \"2027-03-31\"\n}\n",
+            "role": "assistant"
+          },
+          {
+            "content": "=### Study Title: \n{{ $('Set Questions').item.json.whatIsTheFullTitleOfTheStudy }}\n\n\n### Study Design:\n{{ $('Set Questions').item.json.describeTheStudyDesign }}\n\n\n### Background:\n{{ $('Set Questions').item.json.provideTheBackgroundAndSignificanceOfTheStudy }}\n\n\n### Primary Objective:\n{{ $('Set Questions').item.json.whatAreThePrimaryObjectivesOfTheStudy }}\n\n\n### Hypothesis:\n{{ $('Set Questions').item.json.stateTheStudyHypothesis }}\n\n\n### Endpoints:\n{{ $('Set Questions').item.json.listThePrimaryAndSecondaryEndpoints }}\n\n\n### Assessments Schedule:\n{{ $('Set Questions').item.json.listAllPlannedAssessmentsAndTheirSchedule }}\n\n\n### Timeline\n{{ $('Set Questions').item.json.provideTheStudyTimeline }}\n\n\n### Number of Sites:\n{{ $('Set Questions').item.json.howManyInvestigationalSitesWillParticipateInTheStudy }}"
+          }
+        ],
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a medical writer generating the Procedures and Assessments sections of clinical study protocols."
+          },
+          {
+            "role": "user",
+            "content": "### Context:\nWe are writing a clinical study protocol document.  \nYour task is to generate the **Procedures and Assessments** sections.  \n\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Timeline: Study dates\n\n\n### What you need to do:\n- Generate **visitSchedule**: a short narrative introduction summarizing the visit structure (screening, baseline/operative, follow-ups). This should serve as the overview.  \n- Generate **visitScheduleDetails**: subsections labeled 9.2.1, 9.2.2, etc., expanding on visitSchedule by describing what happens at each visit (assessments, procedures, exit).  \n- Generate **visitScheduleTable**: an array of structured objects with the fields:\n  - visitNumber  \n  - visitName  \n  - visitWindow  \n  - CRFnumber  \n- Generate **measurements**: a short narrative summary of the planned assessments.  \n- Generate **measurementsDetails**: subsections labeled 9.3.1, 9.3.2, etc., with expanded descriptions of how each assessment is conducted (standardized procedures, methodology, equipment).  \n- Generate Study Start Date in format yyyy-mm-dd\n- Generate Study End Date in format yyyy-mm-dd\n\n\n### Important notes:\n- Do not invent assessments or visits beyond what is provided.  \n- Follow the structure and tone of a clinical protocol (neutral, professional).  \n- Visit details must use numbered subsections (9.2.1, 9.2.2, …).  \n- Measurement details must use numbered subsections (9.3.1, 9.3.2, …).  \n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"visitSchedule\": \"narrative summary\",\n  \"visitScheduleDetails\": \"9.2.1. Preoperative ...\\n\\n9.2.2. Operative (Surgery) ...\\n\\n9.2.3. Postoperative 1 Day ...\\n\\n9.2.4. Postoperative 1 Week ...\\n\\n9.2.5. Exit Procedures ...\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Preoperative\",\n      \"visitWindow\": \"-90 to 0 days from surgery\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Operative\",\n      \"visitWindow\": \"0 from surgery\",\n      \"CRFnumber\": \"2\"\n    }\n  ],\n  \"measurements\": \"- CBC at screening and week 12\\n- ECG at baseline and week 6\\n- Quality of life survey at baseline and week 12\",\n  \"measurementsDetails\": \"9.3.1. Laboratory Testing ...\\n\\n9.3.2. ECG ...\\n\\n9.3.3. Quality of Life Survey ...\"\n  \"startDate\": \"2025-01-15\",\n  \"endDate\": \"2025-04-30\"\n}\n"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title: \nA Randomized, Double-Blind, Placebo-Controlled Trial of CardioRelief in Patients with Stage II Hypertension\n\n\n### Study Design:\nThis study is a randomized, double-blind, placebo-controlled, parallel-group, multicenter clinical trial designed to evaluate the efficacy and safety of CardioRelief in patients with Stage II hypertension. The trial will involve multiple investigational sites, though the exact number is unspecified. Participants will be assessed for changes in systolic and diastolic blood pressure, incidence of treatment-emergent adverse events, and patient-reported quality of life over a 12-week period. Assessments will include vital signs at baseline, week 4, week 8, and week 12; laboratory tests and ECG at baseline and week 12; and a quality of life questionnaire at baseline and week 12.\n\n\n### Background:\nHypertension remains one of the leading causes of cardiovascular morbidity and mortality worldwide. Despite available treatments, many patients do not achieve adequate blood pressure control. CardioRelief is a novel calcium channel blocker that has shown promising results in early-phase studies, with the potential to improve outcomes and reduce side effects compared to standard therapy.\n\n\n### Primary Objective:\nTo evaluate the efficacy and safety of CardioRelief in reducing systolic blood pressure in adults with Stage II hypertension over a 12-week period.\n\n\n### Hypothesis:\nCardioRelief will result in a statistically significant reduction in systolic blood pressure compared to placebo, with fewer reported adverse events.\n\n\n### Endpoints:\nPrimary Endpoint: Change from baseline in systolic blood pressure at 12 weeks.\n\nSecondary Endpoints: Change in diastolic blood pressure, incidence of treatment-emergent adverse events, and patient-reported quality of life.\n\n\n### Assessments Schedule:\nVital Signs: Blood pressure and heart rate at baseline, week 4, week 8, and week 12.\n\nLab Tests: Complete blood count, serum electrolytes, liver function tests at baseline and week 12.\n\nECG: Baseline and week 12.\n\nQuality of Life Questionnaire: Baseline and week 12.\n\n### Timeline\nStudy Start Date: June 1, 2025 First Patient In: July 15, 2025 Last Patient Out: December 20, 2026 Data Analysis: January–February 2027 Final Report Submission: March 31, 2027\n\n### Number of Sites:\nOne"
+          },
+          {
+            "role": "assistant",
+            "content": "{\n  \"visitSchedule\": \"Subjects will participate in five scheduled study visits over a 12-week period. These will include a screening/baseline visit, two interim follow-up visits at Week 4 and Week 8, a final evaluation at Week 12, and an exit visit if subjects discontinue prematurely. The visit schedule, complete with visit windows and associated CRF forms, is summarized in the table below. Details of each visit, including the specific testing to be conducted, are provided in subsections 9.2.1 through 9.2.5.\",\n  \"visitScheduleDetails\": \"9.2.1. Screening/Baseline\\nAt the baseline visit, subjects will undergo informed consent, eligibility confirmation, assignment of study ID, and collection of demographic and medical history. Baseline assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire.\\n\\n9.2.2. Week 4 Follow-up\\nSubjects will return for interim evaluation at Week 4 (±7 days). Assessments will include vital signs (blood pressure, heart rate) and monitoring for treatment-emergent adverse events. Compliance with study medication will also be reviewed.\\n\\n9.2.3. Week 8 Follow-up\\nAt Week 8 (±7 days), subjects will undergo vital signs measurement and review of adverse events. Ongoing medication compliance and safety will be evaluated.\\n\\n9.2.4. Week 12 Final Visit\\nAt Week 12 (±7 days), subjects will undergo final efficacy and safety evaluations. Assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire. Adverse events and medication compliance will also be recorded.\\n\\n9.2.5. Exit Procedures\\nSubjects who discontinue early will complete an exit visit as soon as possible. The exit visit will include safety evaluations, vital signs, review of adverse events, and return of study medication where applicable.\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Screening/Baseline\",\n      \"visitWindow\": \"Day 0\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Week 4 Follow-up\",\n      \"visitWindow\": \"Week 4 (±7 days)\",\n      \"CRFnumber\": \"2\"\n    },\n    {\n      \"visitNumber\": \"3\",\n      \"visitName\": \"Week 8 Follow-up\",\n      \"visitWindow\": \"Week 8 (±7 days)\",\n      \"CRFnumber\": \"3\"\n    },\n    {\n      \"visitNumber\": \"4\",\n      \"visitName\": \"Week 12 Final Visit\",\n      \"visitWindow\": \"Week 12 (±7 days)\",\n      \"CRFnumber\": \"4\"\n    },\n    {\n      \"visitNumber\": \"5\",\n      \"visitName\": \"Exit Visit\",\n      \"visitWindow\": \"At time of early discontinuation\",\n      \"CRFnumber\": \"5\"\n    }\n  ],\n  \"measurements\": \"All routine testing and planned study assessments will be conducted at each scheduled visit. Any abnormalities identified should be documented in the CRF 'Comment' section. Specific study examination procedures are outlined below.\",\n  \"measurementsDetails\": \"9.3.1. Vital Signs\\nBlood pressure and heart rate will be measured at each scheduled visit (baseline, week 4, week 8, week 12) using a calibrated sphygmomanometer. Measurements will be taken in a seated position after a minimum of 5 minutes rest.\\n\\n9.3.2. Laboratory Testing\\nComplete blood count, serum electrolytes, and liver function tests will be performed at baseline and week 12. Samples will be collected via venipuncture and analyzed at a certified central laboratory.\\n\\n9.3.3. ECG\\nA standard 12-lead electrocardiogram will be conducted at baseline and week 12. ECGs will be evaluated for any clinically significant abnormalities by a blinded cardiologist.\\n\\n9.3.4. Quality of Life Questionnaire\\nA validated hypertension-specific quality of life instrument will be administered at baseline and week 12. Questionnaires will be completed by subjects under the supervision of site personnel to ensure completeness and accuracy.\",\n  \"startDate\": \"2025-06-01\",\n  \"endDate\": \"2027-03-31\"\n}\n"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title: \nScheduled Screen Breaks and Eye Discomfort in Adults With Frequent Digital Screen Use: A Randomized Prospective Behavioral Study.\n\n\n### Study Design:\nStudy type for protocol selection: Prospective. Registry study classification: Interventional. Primary purpose: Supportive Care. Allocation: Randomized. Intervention model: Parallel Assignment. Two groups. Masking: Single, Outcomes Assessor. Participants and the training coordinator know assignment. The clinic vision assessor is masked. This is not a double-masked study; participant-reported symptoms cannot be masked. Number of sites: 2, both in the United States. Condition: Eye discomfort associated with frequent digital screen use. Intervention category: Behavioral. No study-assigned drug, device or surgery. The research assigns a break routine after consent and eligibility confirmation; it does not merely observe a routine chosen before enrollment. Group 1: Scheduled screen breaks, target 36 participants. Group 2: Usual screen-break habits, target 36 participants. Total enrollment: 72 unique people, target 36 per site and 36 per group overall. People, not eyes or diary entries, are the enrollment and primary analysis unit.\n\n\n### Background:\nThe study asks whether a scheduled break routine changes eye discomfort during frequent screen use compared with usual break habits. A benefit is uncertain. No prior treatment-effect estimate or bibliography is supplied.\n\n\n### Primary Objective:\n[\"Estimate the between-group difference in change in average eye-discomfort rating from Day 0 to Day 56 after randomization.\"]\n\n\n### Hypothesis:\nThe scheduled-break group will have a greater reduction in eye discomfort than the usual-habits group. This is an exploratory feasibility study, not a confirmatory efficacy study; benefit is not established.\n\n\n### Endpoints:\n{\"primary\": [{\"analysis_method\": \"\", \"description\": \"0–10 scale. Day 56 minus Day 0; negative change is improvement, positive change is worsening.\", \"label\": \"Change in seven-day average eye-discomfort rating from Day 0 to Day 56\", \"time_frame\": \"Day 0 to Day 56 +/- 7 days after randomization\"}], \"secondary\": [{\"analysis_method\": \"\", \"description\": \"0–10; higher indicates greater satisfaction.\", \"label\": \"Near-task satisfaction rating\", \"time_frame\": \"Day 56 +/- 7 days after randomization\"}, {\"analysis_method\": \"\", \"description\": \"logMAR; lower indicates better acuity.\", \"label\": \"Binocular best-corrected distance visual acuity\", \"time_frame\": \"Day 56 +/- 7 days after randomization\"}, {\"analysis_method\": \"\", \"description\": \"Calculate 100 times completed prescribed breaks divided by eligible intervals recorded across observed diary days. With no eligible intervals adherence is not estimable, not zero. Report diary completeness and days with no screen use separately. Missing days are not zero adherence; no control-group intervention adherence.\", \"label\": \"Adherence to scheduled breaks in scheduled-break group only\", \"time_frame\": \"Days 1 through 56 after randomization\"}]}\n\n\n### Assessments Schedule:\n{\"assessments\": [\"No visual acuity test, satisfaction rating, new training or specimen collection occurs by telephone.\", \"No extra exit form or separate closeout contact is required.\", \"Both groups complete one paper diary entry each evening from the day after randomization (Day 1) through Day 56 inclusive, about two minutes per day. Each entry records total screen-use hours and whether screen use occurred. Scheduled-break participants additionally record the number of eligible 30-minute intervals and the number followed by a completed two-minute break. Usual-habits participants record the number of breaks they naturally took; they are not given adherence targets. An evening entry is not a clinic visit. Day 0 has no home-diary entry. Clinic visits are not multiplied by diary days. Do not invent daily symptom ratings: the diary does not collect symptom scores.\", \"There are no research blood draws, saliva, genetic testing, banking, imaging, dilation, home devices, study medicines or surgical procedures.\", \"No other or exploratory outcomes are authorized. Day 14/28 symptoms support descriptive trajectory summaries, without creating additional registry outcomes.\"], \"visit_schedule\": [{\"duration\": \"About 65 minutes total, including the ten-minute break explanation\", \"mode\": \"In person\", \"procedures\": \"Written informed consent before research; Eligibility confirmation; Demographics, current eye-care and screen-use history; Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Near-task satisfaction rating, 0 (not satisfied) to 10 (fully satisfied); higher is better; Binocular best-corrected distance visual acuity at 4 meters using a logMAR chart and current correction; Symptom enquiry; Randomization after baseline assessments; Allocation-specific instruction and paper-diary training\", \"timing\": \"Day 0 / randomization; no window\", \"visit\": \"Visit 1 — Day 0 / Enrollment and Randomization\"}, {\"duration\": \"About 15 minutes\", \"mode\": \"Telephone\", \"procedures\": \"Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Interval eye-care update; Assessment-related symptom enquiry; Questions about diary completion\", \"timing\": \"Day 14 +/- 3 days after randomization\", \"visit\": \"Visit 2 — Day 14\"}, {\"duration\": \"About 30 minutes\", \"mode\": \"In person\", \"procedures\": \"Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Near-task satisfaction rating, 0 (not satisfied) to 10 (fully satisfied); higher is better; Binocular best-corrected distance visual acuity at 4 meters using a logMAR chart and current correction; Interval eye-care and symptom updates; Review of diary completeness without changing assignment or prescribed routine\", \"timing\": \"Day 28 +/- 5 days after randomization\", \"visit\": \"Visit 3 — Day 28\"}, {\"duration\": \"About 35 minutes\", \"mode\": \"In person\", \"procedures\": \"Seven-day average eye-discomfort rating during digital screen use, 0 (no discomfort) to 10 (worst imaginable discomfort); higher is worse; Near-task satisfaction rating, 0 (not satisfied) to 10 (fully satisfied); higher is better; Binocular best-corrected distance visual acuity at 4 meters using a logMAR chart and current correction; Interval eye-care and symptom updates; Review of diary completeness without changing assignment or prescribed routine; Collection of completed diary; Confirmation of completion\", \"timing\": \"Day 56 +/- 7 days after randomization\", \"visit\": \"Visit 4 — Day 56 / Final Visit\"}], \"visit_schedule_table\": null}\n\n\n### Timeline\nRecruitment: 1 February 2027 through 30 June 2027. Final participant assessments, primary completion and study completion anticipated by 1 September 2027, allowing the final Day 56 window. Administrative closeout: 31 December 2027.\n\n\n### Number of Sites:\n2"
+          }
+        ]
+      }
+    ],
+    "current_instruction_targets": [],
+    "editorial_corrections": {
+      "study-procedure.visits": [
+        "Include a supplied missed-contact or rescheduling policy once alongside the relevant visit details, preserving its attempt limit and existing window. The drafted prose owns that rule; no second formal source sentence is needed."
+      ]
+    },
+    "consent_template_comments": [],
+    "adapter_instructions": [
+      "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
+      "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
+      "A list group may contain a nonempty label alongside items. That label renders as an unbulleted paragraph immediately before the group's items; use it to separate endpoint categories without turning introductions into bullets.",
+      "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
+      "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
+      "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
+      "Use the current section ownership instructions to tighten the retained prompts: keep Protocol synopses brief, explain each operational rule fully in its owning section and use brief heading references elsewhere. Endpoint definitions and analysis calculations remain complete where needed; ICF explanations remain self-contained for participants. Preserve every material quantity, window, exception and safety qualification.",
+      "Write final study prose, not commentary about drafting. Translate source directions into the applicable study fact: for example, 'Day 30 ratings are descriptive only' rather than an explanation about inventing registry outcomes. Omit empty category labels when no endpoint belongs to that category.",
+      "For evaluation-procedures, inspect the supplied assessment_presentation notes against the approved table. When an edit is needed, return the existing source_text/display_text/rationale shape to retain unique information without repeating the matrix. This is part of drafting, not a separate review task.",
+      "For ICF requests also follow consent_template_comments. Assess applicability from the approved source and selected family, preserving supplied conditions and existing family-owned sections. Template comments do not establish new study facts or authorization.",
+      "Use only the approved comparator, endpoints, visits, risks, benefits, statistical methods and regulatory facts. Omit legacy defaults that invent placebo, standard-of-care comparators, extra outcomes, inferred side-effect lists, dates or significance levels.",
+      "For current_instruction_targets, draft study-specific content from the approved source and current section instructions, retaining applicable fixed client language.",
+      "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses."
+    ]
+  }
+}

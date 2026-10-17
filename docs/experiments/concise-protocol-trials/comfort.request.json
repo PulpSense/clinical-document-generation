@@ -1,0 +1,871 @@
+{
+  "case": "comfort",
+  "purpose": "Controlled Codex writing trial; no Hermes execution or separate model API. Source copied from retained approved run; no source changes approved here.",
+  "source": {
+    "meta": {
+      "document_set": [
+        "protocol_docx",
+        "icf_docx",
+        "xml"
+      ],
+      "study_type": "Ambispective",
+      "protocol_number": "COMFORT-26-03",
+      "version": "1.0",
+      "date": "16 October 2026",
+      "icf_template": "Advarra"
+    },
+    "source": {
+      "source_of_truth_file": "reference/source-of-truth.md",
+      "input_files": [
+        "input/COMFORT-26-03-study-input.txt"
+      ],
+      "field_candidates": {
+        "study.title": [
+          {
+            "value": "Historical Ocular Care, Current Symptoms and Prospective Comfort After Routine Bilateral Cataract Surgery: An Ambispective Observational Study With Research Saliva Genotyping.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "study.background": [
+          {
+            "value": "Current comfort after cataract surgery may vary between people with different documented ocular-care histories. This study links historical clinic records with newly collected symptoms and vision assessments. Research genotyping is included to explore possible associations with symptom variation. No prior effect estimates or bibliographic references are supplied.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "objectives.primary": [
+          {
+            "value": [
+              "Describe change in patient-reported ocular comfort from enrollment to Day 90 after enrollment."
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "study.hypothesis": [
+          {
+            "value": "Greater historical use of clinician-documented ocular surface treatment will be associated with lower Day 90 comfort scores. This is an exploratory association hypothesis, not a claim of a treatment effect.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "design.study_design": [
+          {
+            "value": "Study type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other — ambispective, combining retrospective record abstraction and prospective follow-up in the same consenting participants. Condition: Pseudophakia following bilateral cataract surgery. Number of sites: 3, all in the United States. One observational cohort; no treatment arms or comparator product. Intervention/exposure name: Prior routine bilateral cataract surgery and its documented ocular-care history. Exposure category: Procedure/Surgery, observed retrospectively, not assigned or performed by this study. Research activities: medical-record abstraction, noninvasive vision testing, symptom questionnaires and one saliva collection for research genotyping. The study does not assign surgery, an IOL type, medication or other treatment. It has no randomization, masking, placebo or investigational product.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "design.intervention_name": [
+          {
+            "value": "Prior routine bilateral cataract surgery and its documented ocular-care history.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "design.intervention_type": [
+          {
+            "value": "Procedure/Surgery",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "design.number_of_sites": [
+          {
+            "value": 3,
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "endpoints.primary": [
+          {
+            "value": [
+              {
+                "label": "Change in ocular comfort score from Day 0 to Day 90",
+                "time_frame": "Day 0 to Day 90 +/- 10 days after enrollment",
+                "description": "0–10 rating; positive change means improved reported comfort."
+              }
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "procedures.assessments": [
+          {
+            "value": [
+              "Historical data are whatever was recorded in routine care. There is no assumed historical questionnaire, saliva collection, consent visit or standardized research assessment. An absent historical value is recorded as missing. The record-abstraction task is performed by staff after Day 0; it is not an extra participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic.",
+              "No visual acuity test or saliva collection takes place by telephone.",
+              "Confirm completion after these activities. No exit form, fourth visit or second saliva sample is required.",
+              "No blood draws, pupil dilation, imaging, study medication or research surgery. The saliva specimen is mandatory for this study's eligibility; there is no optional genetic substudy or separate future-use opt-in. Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits."
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "population.inclusion_criteria": [
+          {
+            "value": [
+              "Age 55 to 85 at written consent.",
+              "Bilateral cataract surgery completed before enrollment; second-eye surgery occurred between 3 and 18 months before Day 0.",
+              "Both surgeries occurred between 1 January 2025 and 30 September 2026, with records accessible at the enrolling clinic.",
+              "Able to consent, complete English-language questionnaires, provide a saliva sample and attend the specified future visits.",
+              "Willing to authorize access to the historical records described below."
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "population.exclusion_criteria": [
+          {
+            "value": [
+              "Participation in an interventional research study in the 60 days before screening, or planned interventional research participation during follow-up.",
+              "Planned ocular surgery during the 90-day prospective period.",
+              "An ocular condition that prevents reliable completion of the specified visual acuity assessments, as determined by the site investigator.",
+              "Inability to consent personally or need for a proxy questionnaire respondent."
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "procedures.minimum_days_before_screening_without_participation": [
+          {
+            "value": "60",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "population.sample_size": [
+          {
+            "value": "90 participants total; target 30 per site.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "population.sample_justification": [
+          {
+            "value": "Ninety participants is a practical exploratory sample, with up to 15% loss to prospective follow-up anticipated. The study has no formal power calculation or assumed treatment effect. The target is 90 people, not 90 eyes or 90 historical records. Both eyes may contribute descriptive vision data, but participant-reported endpoints use one record per person.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "risks_benefits.compensation_or_reimbursement": [
+          {
+            "value": "Compensation: $40 for attended Day 0, $15 for completed Day 30 telephone visit and $40 for attended Day 90, maximum $95. No completion bonus. Earned payments remain payable after withdrawal. Payment is by check within 30 days of each completed contact. No parking, mileage, transit or other travel reimbursement.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "statistics.analysis_plan": [
+          {
+            "value": "Summarize participant flow, historical-record availability, completion and baseline characteristics overall and by site. For the primary outcome, report the observed paired mean change, standard deviation and 95% confidence interval among participants with Day 0 and Day 90 ratings; also report median and range. Describe Day 30 comfort and unscheduled visits using counts and appropriate continuous summaries. Report historical-treatment proportions with an explicit denominator of people with relevant records. Summarize visual acuity by eye; any pooled-eye exploratory model uses a participant-level random intercept to account for paired eyes. Explore the association of historical treatment documentation with Day 90 comfort using linear regression adjusted for Day 0 comfort, age and site. Exploratory genetic associations are reported descriptively; no causal or clinically actionable interpretation and no confirmatory significance claims. Report missing values and reasons separately for historical and prospective data. Do not impute unrecorded historical care or missing questionnaire values.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "study.timeline": [
+          {
+            "value": "Historical data window: 1 January 2025 through 30 September 2026. Prospective recruitment: 1 November 2026 through 31 January 2027. Last prospective participant assessment expected by 11 May 2027, allowing the final visit window. Anticipated primary completion and study completion: 11 May 2027. Analysis and administrative closeout: by 30 June 2027.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ]
+      },
+      "provenance": {
+        "input_sha256": "768acadedfe91a5f9429e49af46ff882324821a03a4d12d0523f5aa1ac46b757",
+        "intake_note": "New input; all facts extracted from supplied synopsis and operational supplement. Template family Sterling does not identify the reviewing IRB."
+      }
+    },
+    "approval": {
+      "status": "approved",
+      "approved_by": "client",
+      "approved_at": "2026-10-16T22:17:51.244852+00:00",
+      "review_file": "reference/source-of-truth.md",
+      "source_sha256": "d257557cddeb4f78c54c0d0eeab16761bf4027225375d0efc8deae71468166a6",
+      "revision_id": "r-b3f2e1829cad",
+      "source_approval_identity": "b3f2e1829cad27c3d36f26a7525313c27a308831ebc09f08aefd4546f24ac5c3",
+      "generation_authority_sha256": "c44aaea374bc07fe916df1381952d8bb6e6a6d9521b053d0f8136d754daf22b6",
+      "governing_sha256": "c44aaea374bc07fe916df1381952d8bb6e6a6d9521b053d0f8136d754daf22b6"
+    },
+    "study": {
+      "title": "Historical Ocular Care, Current Symptoms and Prospective Comfort After Routine Bilateral Cataract Surgery: An Ambispective Observational Study With Research Saliva Genotyping.",
+      "short_title": "Comfort After Cataract Surgery.",
+      "condition": "Pseudophakia following bilateral cataract surgery",
+      "background": "Current comfort after cataract surgery may vary between people with different documented ocular-care histories. This study links historical clinic records with newly collected symptoms and vision assessments. Research genotyping is included to explore possible associations with symptom variation. No prior effect estimates or bibliographic references are supplied.",
+      "hypothesis": "Greater historical use of clinician-documented ocular surface treatment will be associated with lower Day 90 comfort scores. This is an exploratory association hypothesis, not a claim of a treatment effect.",
+      "participation_duration": "Prospective participation lasts 90 days after enrollment, with two in-person visits and one telephone visit. Day counts are measured from enrollment, not from cataract surgery. Each participant finishes after Day 90, or earlier withdrawal/discontinuation; historical-record years and administrative closeout do not extend participation.",
+      "timeline": "Historical data window: 1 January 2025 through 30 September 2026. Prospective recruitment: 1 November 2026 through 31 January 2027. Last prospective participant assessment expected by 11 May 2027, allowing the final visit window. Anticipated primary completion and study completion: 11 May 2027. Analysis and administrative closeout: by 30 June 2027.",
+      "completion": "Each participant finishes after Day 90, or earlier withdrawal/discontinuation; historical-record years and administrative closeout do not extend participation. At closeout, reconcile disposition and payments, resolve data queries, confirm specimen destruction, lock/analyze coded data and archive retained records."
+    },
+    "parties": {
+      "sponsor": {
+        "name": "Harbor Patient Outcomes Research",
+        "address": "510 Research Lane, Suite 400, Baltimore, MD 21202, United States",
+        "contact": {
+          "name": "Taylor Morgan",
+          "first_name": "Taylor",
+          "last_name": "Morgan",
+          "degrees": null,
+          "title": "Research Director",
+          "phone": "+1 202-555-0160",
+          "email": "taylor.morgan@example.org"
+        }
+      },
+      "principal_investigator": {
+        "name": "Dr. Cameron Ellis",
+        "first_name": "Cameron",
+        "last_name": "Ellis",
+        "degrees": "MD",
+        "title": "Principal Investigator"
+      },
+      "study_coordinator": {
+        "name": "Alex Rivera",
+        "first_name": "Alex",
+        "last_name": "Rivera",
+        "degrees": "CCRC",
+        "title": "Lead Study Coordinator",
+        "email": "alex.rivera@example.org",
+        "business_phone": "+1 202-555-0161",
+        "office_phone": "+1 202-555-0162",
+        "address": "620 Harbor Street, Suite 120, Baltimore, MD 21203, United States"
+      },
+      "sub_investigators": [
+        {
+          "degrees": "MD",
+          "email": "jamie.parker@example.org",
+          "first_name": "Jamie",
+          "last_name": "Parker",
+          "name": "Dr. Jamie Parker",
+          "phone": "+1 202-555-0163",
+          "title": "Sub-Investigator"
+        }
+      ],
+      "irb": {
+        "name": "Harbor Independent Research Review Board",
+        "affiliation": "Independent IRB, unaffiliated with the sponsor and study clinics",
+        "address": "950 Review Avenue, Suite 450, Baltimore, MD 21204, United States",
+        "phone": "+1 202-555-0168",
+        "email": "participant.rights@example.org",
+        "contact_scope": "This contact handles participant-rights questions and research concerns. Selected consent layout: Sterling. The study-specific reviewing IRB is the one named above; template-family selection does not replace it with an IRB or contacts from another study. No actual study approval is represented here."
+      }
+    },
+    "sites": [
+      {
+        "contact": {
+          "address": "620 Harbor Street, Suite 120, Baltimore, MD 21203, United States",
+          "business_phone": "+1 202-555-0161",
+          "degrees": "CCRC",
+          "email": "alex.rivera@example.org",
+          "first_name": "Alex",
+          "last_name": "Rivera",
+          "name": "Alex Rivera",
+          "office_phone": "+1 202-555-0162",
+          "title": "Lead Study Coordinator"
+        },
+        "facility": {
+          "address": "620 Harbor Street, Suite 120, Baltimore, MD 21203, United States",
+          "city": "Baltimore",
+          "country": "United States",
+          "name": "Harbor Eye Research Clinic",
+          "state": "MD",
+          "zip": "21203"
+        },
+        "id": "site-1",
+        "investigators": [
+          {
+            "degrees": "MD",
+            "first_name": "Cameron",
+            "last_name": "Ellis",
+            "name": "Dr. Cameron Ellis",
+            "title": "Principal Investigator"
+          },
+          {
+            "degrees": "MD",
+            "email": "jamie.parker@example.org",
+            "first_name": "Jamie",
+            "last_name": "Parker",
+            "name": "Dr. Jamie Parker",
+            "phone": "+1 202-555-0163",
+            "title": "Sub-Investigator"
+          }
+        ]
+      },
+      {
+        "contact": {
+          "address": "730 Capitol Avenue, Suite 230, Washington, DC 20004, United States",
+          "business_phone": "+1 202-555-0164",
+          "degrees": "CCRC",
+          "email": "sam.carter@example.org",
+          "first_name": "Sam",
+          "last_name": "Carter",
+          "name": "Sam Carter",
+          "office_phone": "+1 202-555-0165",
+          "title": "Site Study Coordinator"
+        },
+        "facility": {
+          "address": "730 Capitol Avenue, Suite 230, Washington, DC 20004, United States",
+          "city": "Washington",
+          "country": "United States",
+          "name": "Capitol Vision Research Clinic",
+          "state": "DC",
+          "zip": "20004"
+        },
+        "id": "site-2",
+        "investigators": [
+          {
+            "degrees": "MD",
+            "first_name": "Drew",
+            "last_name": "Bennett",
+            "name": "Dr. Drew Bennett",
+            "title": "Site Investigator"
+          },
+          {
+            "degrees": "",
+            "email": "",
+            "first_name": "",
+            "last_name": "",
+            "name": "",
+            "phone": "",
+            "title": ""
+          }
+        ]
+      },
+      {
+        "contact": {
+          "address": "840 Bayview Road, Suite 340, Annapolis, MD 21401, United States",
+          "business_phone": "+1 202-555-0166",
+          "degrees": "CCRC",
+          "email": "robin.hayes@example.org",
+          "first_name": "Robin",
+          "last_name": "Hayes",
+          "name": "Robin Hayes",
+          "office_phone": "+1 202-555-0167",
+          "title": "Site Study Coordinator"
+        },
+        "facility": {
+          "address": "840 Bayview Road, Suite 340, Annapolis, MD 21401, United States",
+          "city": "Annapolis",
+          "country": "United States",
+          "name": "Bayview Ophthalmology Research Center",
+          "state": "MD",
+          "zip": "21401"
+        },
+        "id": "site-3",
+        "investigators": [
+          {
+            "degrees": "MD",
+            "first_name": "Quinn",
+            "last_name": "Foster",
+            "name": "Dr. Quinn Foster",
+            "title": "Site Investigator"
+          },
+          {
+            "degrees": "",
+            "email": "",
+            "first_name": "",
+            "last_name": "",
+            "name": "",
+            "phone": "",
+            "title": ""
+          }
+        ]
+      }
+    ],
+    "population": {
+      "study_population": "Planned enrollment: 90 participants, targeting 30 per site. Age: 55 through 85 years, inclusive. All sexes eligible. Healthy volunteers: No. Sampling: Non-probability, consecutive eligible clinic patients invited during routine contact. Only patients who give written consent enter this study; there is no separate records-only cohort or waiver-of-consent population.",
+      "sample_size": "90 participants total; target 30 per site.",
+      "sample_justification": "Ninety participants is a practical exploratory sample, with up to 15% loss to prospective follow-up anticipated. The study has no formal power calculation or assumed treatment effect. The target is 90 people, not 90 eyes or 90 historical records. Both eyes may contribute descriptive vision data, but participant-reported endpoints use one record per person.",
+      "minimum_age": "55 Years",
+      "maximum_age": "85 Years",
+      "sex": "All",
+      "healthy_volunteers": "No",
+      "inclusion_criteria": [
+        "Age 55 to 85 at written consent.",
+        "Bilateral cataract surgery completed before enrollment; second-eye surgery occurred between 3 and 18 months before Day 0.",
+        "Both surgeries occurred between 1 January 2025 and 30 September 2026, with records accessible at the enrolling clinic.",
+        "Able to consent, complete English-language questionnaires, provide a saliva sample and attend the specified future visits.",
+        "Willing to authorize access to the historical records described below."
+      ],
+      "exclusion_criteria": [
+        "Participation in an interventional research study in the 60 days before screening, or planned interventional research participation during follow-up.",
+        "Planned ocular surgery during the 90-day prospective period.",
+        "An ocular condition that prevents reliable completion of the specified visual acuity assessments, as determined by the site investigator.",
+        "Inability to consent personally or need for a proxy questionnaire respondent."
+      ],
+      "eligibility_notes": "Minimum period without interventional-study participation before screening: 60 days. Screening and enrollment occur at the same Day 0 visit. Pregnancy is not an exclusion criterion. There are no study pregnancy tests, contraception requirements, radiation, drugs or reproductive interventions. Children and adults unable to consent are not enrolled. No representative or witness signature is required under this study plan. formal power calculation or assumed treatment effect. The target is 90 people, not 90 eyes or 90 historical records. Both eyes may contribute descriptive vision data, but participant-reported endpoints use one record per person. The saliva specimen is mandatory for this study's eligibility; there is no optional genetic substudy or separate future-use opt-in."
+    },
+    "design": {
+      "study_design": "Study type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other — ambispective, combining retrospective record abstraction and prospective follow-up in the same consenting participants. Condition: Pseudophakia following bilateral cataract surgery. Number of sites: 3, all in the United States. One observational cohort; no treatment arms or comparator product. Intervention/exposure name: Prior routine bilateral cataract surgery and its documented ocular-care history. Exposure category: Procedure/Surgery, observed retrospectively, not assigned or performed by this study. Research activities: medical-record abstraction, noninvasive vision testing, symptom questionnaires and one saliva collection for research genotyping. The study does not assign surgery, an IOL type, medication or other treatment. It has no randomization, masking, placebo or investigational product.",
+      "study_design_summary": "Three-site ambispective observational cohort of consenting adults after routine bilateral cataract surgery, combining historical record abstraction after consent with prospective 90-day follow-up. No treatment assignment or comparator.",
+      "number_of_sites": "3",
+      "intervention_name": "Prior routine bilateral cataract surgery and its documented ocular-care history.",
+      "intervention_type": "Procedure/Surgery",
+      "intervention_description": "Intervention/exposure name: Prior routine bilateral cataract surgery and its documented ocular-care history. Exposure category: Procedure/Surgery, observed retrospectively, not assigned or performed by this study. Research activities: medical-record abstraction, noninvasive vision testing, symptom questionnaires and one saliva collection for research genotyping. The study does not assign surgery, an IOL type, medication or other treatment. It has no randomization, masking, placebo or investigational product.",
+      "masking": "None",
+      "randomization": "None",
+      "sampling_method": "Non-Probability Sample",
+      "arms": [
+        {
+          "description": "Single observational cohort of 90 consenting participants; no treatment arms or comparator product.",
+          "name": "Prior routine bilateral cataract surgery cohort"
+        }
+      ],
+      "data_sources": "Historical record period: 1 January 2025 through 30 September 2026, inclusive. After consent, staff abstract relevant existing records within that fixed period: surgery dates, implanted lens categories, documented ocular diagnoses, clinician-recorded ocular surface treatments, best-corrected distance visual acuity, and documented unscheduled ocular visits. Historical data are whatever was recorded in routine care. There is no assumed historical questionnaire, saliva collection, consent visit or standardized research assessment. An absent historical value is recorded as missing. The record-abstraction task is performed by staff after Day 0; it is not an extra participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic."
+    },
+    "objectives": {
+      "primary": [
+        "Describe change in patient-reported ocular comfort from enrollment to Day 90 after enrollment."
+      ],
+      "secondary": [
+        "Describe historical ocular-care patterns, current and follow-up visual acuity, symptom-related unscheduled visits and associations between historical care characteristics and prospective comfort."
+      ],
+      "exploratory": [
+        "Examine associations between selected research genetic variants and Day 90 comfort; these analyses do not establish clinical utility."
+      ]
+    },
+    "endpoints": {
+      "primary": [
+        {
+          "analysis_method": "",
+          "description": "0–10 rating; positive change means improved reported comfort.",
+          "label": "Change in ocular comfort score from Day 0 to Day 90",
+          "time_frame": "Day 0 to Day 90 +/- 10 days after enrollment"
+        }
+      ],
+      "secondary": [
+        {
+          "analysis_method": "",
+          "description": "0–10 rating.",
+          "label": "Ocular comfort score",
+          "time_frame": "Day 30 +/- 5 days after enrollment"
+        },
+        {
+          "analysis_method": "",
+          "description": "logMAR; lower values indicate better visual acuity.",
+          "label": "Best-corrected distance visual acuity for each eye",
+          "time_frame": "Day 90 +/- 10 days after enrollment"
+        },
+        {
+          "analysis_method": "",
+          "description": "A visit reported at both contacts is counted once.",
+          "label": "Number of participant-reported unscheduled ocular-care visits",
+          "time_frame": "Day 0 to Day 90 after enrollment; collected at Day 30 and Day 90"
+        },
+        {
+          "analysis_method": "",
+          "description": "Explicit denominator of people with relevant records.",
+          "label": "Proportion with clinician-documented ocular surface treatment",
+          "time_frame": "Available records from 1 January 2025 through 30 September 2026"
+        }
+      ],
+      "other": [
+        {
+          "analysis_method": "",
+          "description": "Variant selection is specified in a laboratory analysis plan before the coded outcome dataset is released; no clinical risk score is made. No additional outcomes are specified.",
+          "label": "Association of coded research genotype groups with Day 90 comfort score",
+          "time_frame": "Day 90 after enrollment"
+        }
+      ]
+    },
+    "procedures": {
+      "minimum_days_before_screening_without_participation": "60",
+      "consent": "Written informed consent before any research activities; historical records accessed only after consent and authorization. Sampling: Non-probability, consecutive eligible clinic patients invited during routine contact. Only patients who give written consent enter this study; there is no separate records-only cohort or waiver-of-consent population. Children and adults unable to consent are not enrolled. No representative or witness signature is required under this study plan. No IRB approval has been obtained. Sterling IRB-managed merge fields remain under the template process; study-specific contacts are supplied separately.",
+      "visit_schedule": [
+        {
+          "duration": "",
+          "mode": "Existing record review",
+          "procedures": "Surgery dates; Implanted lens categories; Documented ocular diagnoses; Clinician-recorded ocular surface treatments; Recorded best-corrected distance visual acuity; Documented unscheduled ocular visits",
+          "timing": "Records from 1 January 2025 through 30 September 2026; abstracted after Day 0 consent",
+          "visit": "Historical record abstraction — staff task, not a participant visit"
+        },
+        {
+          "duration": "Approximately 70 minutes",
+          "mode": "In person",
+          "procedures": "Written informed consent before research activities; Eligibility confirmation; Authorization for historical records; Demographics and current ocular-care update; Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and current correction; Ocular comfort questionnaire: preceding 7 days, 0 extremely uncomfortable to 10 fully comfortable; One approximately 2 mL saliva collection by passive drool into a labeled tube; Enquiry about symptoms during research assessments",
+          "timing": "Day 0 after enrollment; screening and enrollment at the same visit",
+          "visit": "Visit 1 — Day 0 / Enrollment"
+        },
+        {
+          "duration": "Approximately 15 minutes",
+          "mode": "Telephone",
+          "procedures": "Ocular comfort questionnaire: preceding 7 days, 0 extremely uncomfortable to 10 fully comfortable; Interval ocular-care update; Enquiry about unscheduled ocular visits since enrollment; Assessment-related symptom enquiry",
+          "timing": "Day 30 +/- 5 days after enrollment",
+          "visit": "Visit 2 — Day 30"
+        },
+        {
+          "duration": "Approximately 40 minutes",
+          "mode": "In person",
+          "procedures": "Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and current correction; Ocular comfort questionnaire: preceding 7 days, 0 extremely uncomfortable to 10 fully comfortable; Interval ocular-care update; Unscheduled ocular-visit enquiry; Assessment-related symptom enquiry; Confirmation of research completion",
+          "timing": "Day 90 +/- 10 days after enrollment",
+          "visit": "Visit 3 — Day 90 / Final Visit"
+        }
+      ],
+      "assessments": [
+        "Historical data are whatever was recorded in routine care. There is no assumed historical questionnaire, saliva collection, consent visit or standardized research assessment. An absent historical value is recorded as missing. The record-abstraction task is performed by staff after Day 0; it is not an extra participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic.",
+        "No visual acuity test or saliva collection takes place by telephone.",
+        "Confirm completion after these activities. No exit form, fourth visit or second saliva sample is required.",
+        "No blood draws, pupil dilation, imaging, study medication or research surgery. The saliva specimen is mandatory for this study's eligibility; there is no optional genetic substudy or separate future-use opt-in. Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits."
+      ],
+      "methods": "Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and the participant's current correction, at Day 0 and Day 90. One approximately 2 mL saliva sample is collected by passive drool into a labeled tube at Day 0 only. Questionnaire: A study-specific ocular comfort rating for the preceding 7 days, 0 to 10, where 0 means extremely uncomfortable and 10 means fully comfortable. This is not presented as a validated instrument. The same wording is used at Day 0, Day 30 and Day 90.",
+      "retention": "If a telephone visit is missed, staff may make up to two further scheduling attempts within its existing window. No substituted home vision testing.",
+      "evaluation": "Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits.",
+      "pregnancy_testing": "Pregnancy is not an exclusion criterion. There are no study pregnancy tests, contraception requirements, radiation, drugs or reproductive interventions. Children and adults unable to consent are not enrolled. No representative or witness signature is required under this study plan.",
+      "specimens": "The saliva specimen is mandatory for this study's eligibility; there is no optional genetic substudy or separate future-use opt-in. Each saliva tube carries only a study ID. The clinic ships coded tubes to the sponsor's contracted research laboratory. The laboratory performs targeted genotyping and returns coded research data to the study statistician. The lab receives no participant names, contacts or clinic ID key. The original saliva and extracted DNA are destroyed within 90 days after completion of laboratory testing, and no later than 30 June 2027. Specimens are not banked for future research, shared for other studies or sold. No commercial development or participant share of commercial proceeds is planned. The coded genetic data remain part of the retained study dataset. Genetic testing is research-only, is not validated for individual clinical decisions and produces no clinical report. Individual genetic results and incidental genetic findings are not returned. The study does not search for clinically actionable incidental findings. Consent must clearly distinguish",
+      "return_of_results": "Genetic testing is research-only, is not validated for individual clinical decisions and produces no clinical report. Individual genetic results and incidental genetic findings are not returned. The study does not search for clinically actionable incidental findings. Consent must clearly distinguish Individual visual acuity results are offered at each in-person visit. Clinical concerns observed during testing are explained and referred to ordinary care. An aggregate plain-language study summary is available on request after study analysis is complete. There is no treatment assignment to disclose or unmask.",
+      "discontinuation": "Participants may leave at any time without penalty or loss of usual benefits. They can tell or write to the site coordinator. A final discussion of symptoms and ordinary-care needs is offered but optional; no mandatory final research visit, saliva collection or examination is required after withdrawal. The investigator may discontinue participation for participant request, inability to complete assessments, additional ocular surgery or study closure. Record the reason when available. Leaving research does not stop routine care.",
+      "completion": "Each participant finishes after Day 90, or earlier withdrawal/discontinuation; historical-record years and administrative closeout do not extend participation. At closeout, reconcile disposition and payments, resolve data queries, confirm specimen destruction, lock/analyze coded data and archive retained records.",
+      "adverse_events": "Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. For possible research injury or persistent discomfort, contact the enrolling site's study doctor via the coordinator; the clinic arranges evaluation. Emergency care uses ordinary emergency services. No fund for free injury treatment or additional injury compensation is established; ordinary treatment may be billed to the participant or insurer. Legal rights are not waived.",
+      "unscheduled_visits": null,
+      "termination": null,
+      "study_termination": null
+    },
+    "statistics": {
+      "analysis_plan": "Summarize participant flow, historical-record availability, completion and baseline characteristics overall and by site. For the primary outcome, report the observed paired mean change, standard deviation and 95% confidence interval among participants with Day 0 and Day 90 ratings; also report median and range. Describe Day 30 comfort and unscheduled visits using counts and appropriate continuous summaries. Report historical-treatment proportions with an explicit denominator of people with relevant records. Summarize visual acuity by eye; any pooled-eye exploratory model uses a participant-level random intercept to account for paired eyes. Explore the association of historical treatment documentation with Day 90 comfort using linear regression adjusted for Day 0 comfort, age and site. Exploratory genetic associations are reported descriptively; no causal or clinically actionable interpretation and no confirmatory significance claims. Report missing values and reasons separately for historical and prospective data. Do not impute unrecorded historical care or missing questionnaire values.",
+      "sample_size_justification": "Ninety participants is a practical exploratory sample, with up to 15% loss to prospective follow-up anticipated. The study has no formal power calculation or assumed treatment effect. The target is 90 people, not 90 eyes or 90 historical records. Both eyes may contribute descriptive vision data, but participant-reported endpoints use one record per person.",
+      "missing_data_handling": "Report missing values and reasons separately for historical and prospective data. Do not impute unrecorded historical care or missing questionnaire values.",
+      "methodology": null,
+      "analysis_populations": null
+    },
+    "safety": {
+      "general_information": "Potential research risks: temporary eye fatigue or headache during vision testing; dry mouth, mild nausea or embarrassment while providing saliva; discomfort answering symptom questions; inconvenience and travel; and loss of privacy involving medical or genetic information. Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care and are not new research risks. Genetic information may reveal information about a participant or biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and does not perform whole genome sequencing. Genetic information is collected: Yes. The applicable Sterling genetic-information/GINA section is needed.",
+      "monitoring": "Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care and are not new research risks.",
+      "adverse_events": "For possible research injury or persistent discomfort, contact the enrolling site's study doctor via the coordinator; the clinic arranges evaluation. Emergency care uses ordinary emergency services. No fund for free injury treatment or additional injury compensation is established; ordinary treatment may be billed to the participant or insurer. Legal rights are not waived.",
+      "roles": "Site contacts handle scheduling, research questions and referral to the site doctor for possible research injury, Monday–Friday, 9 a.m.–5 p.m. local time. These numbers are not emergency or 24-hour contact lines.",
+      "follow_up": null
+    },
+    "ethics": {
+      "approval_status": "Not yet submitted; no IRB approval obtained or approval identifier/date issued.",
+      "consent": "Sampling: Non-probability, consecutive eligible clinic patients invited during routine contact. Only patients who give written consent enter this study; there is no separate records-only cohort or waiver-of-consent population. Children and adults unable to consent are not enrolled. No representative or witness signature is required under this study plan.",
+      "genetic_information": "Genetic information may reveal information about a participant or biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and does not perform whole genome sequencing. Genetic information is collected: Yes. The applicable Sterling genetic-information/GINA section is needed.",
+      "registry_disclosure": "Under the supplied study plan, mandatory ClinicalTrials.gov consent disclosure does not apply; generating study XML does not itself create that requirement. No FDA-regulated investigational drug or device study. No investigational product, randomization, masking, radiation or pregnancy testing."
+    },
+    "confidentiality": {
+      "data_handling": "Collected identifiers: name, contact information, date of birth and signed consent, used for scheduling, eligibility, records linkage and payment. Coded study data: age, sex, surgery dates, lens categories, ocular history, care history, acuity, questionnaire responses, unscheduled visits and genotype. Each clinic keeps its ID key separately on an encrypted access-controlled drive; paper consent forms are in locked cabinets. Only authorized site investigators and coordinators access identifying records for their duties. The sponsor, laboratory and statistician receive coded information only. Authorized study monitors, the IRB and legally authorized oversight bodies may review relevant original records for oversight. No public individual-data sharing, sale, unrelated future research or identifiable publication is planned. Identifying records, keys and coded datasets are retained securely for seven years after administrative closeout on 30 June 2027, then securely destroyed, unless a binding retention requirement requires longer storage. Authorization duration: Permission to collect new research health information ends after the participant's final Day 90 assessment, or earlier upon written withdrawal. Already collected data may be retained and used for study integrity and required oversight under the retention policy above. This is a finite authorization; it does not expire only when all retained records are destroyed. To withdraw authorization, write to the enrolling site's coordinator at the site mailing address below. New research collection stops upon withdrawal. If a specimen has not been analyzed, the site requests its destruction; data already generated or incorporated into analyses may continue to be used.",
+      "publication": "The sponsor, laboratory and statistician receive coded information only. Authorized study monitors, the IRB and legally authorized oversight bodies may review relevant original records for oversight. No public individual-data sharing, sale, unrelated future research or identifiable publication is planned. Identifying records, keys and coded datasets are retained securely for seven years after administrative closeout on 30 June 2027, then securely destroyed, unless a binding retention requirement requires longer storage.",
+      "authorization_duration": "Authorization duration: Permission to collect new research health information ends after the participant's final Day 90 assessment, or earlier upon written withdrawal. Already collected data may be retained and used for study integrity and required oversight under the retention policy above. This is a finite authorization; it does not expire only when all retained records are destroyed.",
+      "authorization_withdrawal": "To withdraw authorization, write to the enrolling site's coordinator at the site mailing address below. New research collection stops upon withdrawal. If a specimen has not been analyzed, the site requests its destruction; data already generated or incorporated into analyses may continue to be used."
+    },
+    "risks_benefits": {
+      "risks": "Potential research risks: temporary eye fatigue or headache during vision testing; dry mouth, mild nausea or embarrassment while providing saliva; discomfort answering symptom questions; inconvenience and travel; and loss of privacy involving medical or genetic information. Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care and are not new research risks. Genetic information may reveal information about a participant or biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and does not perform whole genome sequencing. Genetic information is collected: Yes. The applicable Sterling genetic-information/GINA section is needed.",
+      "risk_mitigation": "Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care and are not new research risks.",
+      "benefits": "No direct benefit is promised. The research may improve understanding of reported comfort and documented care patterns.",
+      "alternatives": "Ordinary eye care without joining the study. Care and benefits are unaffected by refusal.",
+      "privacy": "Genetic information may reveal information about a participant or biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and does not perform whole genome sequencing. Genetic information is collected: Yes. The applicable Sterling genetic-information/GINA section is needed. Collected identifiers: name, contact information, date of birth and signed consent, used for scheduling, eligibility, records linkage and payment. Coded study data: age, sex, surgery dates, lens categories, ocular history, care history, acuity, questionnaire responses, unscheduled visits and genotype. Each clinic keeps its ID key separately on an encrypted access-controlled drive; paper consent forms are in locked cabinets. Only authorized site investigators and coordinators access identifying records for their duties. The sponsor, laboratory and statistician receive coded information only. Authorized study monitors, the IRB and legally authorized oversight bodies may review relevant original records for oversight. No public individual-data sharing, sale, unrelated future research or identifiable publication is planned. Identifying records, keys and coded datasets are retained securely for seven years after administrative closeout on 30 June 2027, then securely destroyed, unless a binding retention requirement requires longer storage. Authorization duration: Permission to collect new research health information ends after the participant's final Day 90 assessment, or earlier upon written withdrawal. Already collected data may be retained and used for study integrity and required oversight under the retention policy above. This is a finite authorization; it does not expire only when all retained records are destroyed. To withdraw authorization, write to the enrolling site's coordinator at the site mailing address below. New research collection stops upon withdrawal. If a specimen has not been analyzed, the site requests its destruction; data already generated or incorporated into analyses may continue to be used.",
+      "compensation_or_reimbursement": "Compensation: $40 for attended Day 0, $15 for completed Day 30 telephone visit and $40 for attended Day 90, maximum $95. No completion bonus. Earned payments remain payable after withdrawal. Payment is by check within 30 days of each completed contact. No parking, mileage, transit or other travel reimbursement.",
+      "costs": "The sponsor pays for all research testing, saliva collection, research laboratory work and questionnaires. Routine clinical care remains payable by the participant or insurer under ordinary arrangements. No research charges are billed to insurance; the study does not pay for ordinary future treatment.",
+      "injury_handling": "For possible research injury or persistent discomfort, contact the enrolling site's study doctor via the coordinator; the clinic arranges evaluation. Emergency care uses ordinary emergency services. No fund for free injury treatment or additional injury compensation is established; ordinary treatment may be billed to the participant or insurer. Legal rights are not waived."
+    },
+    "regulatory": {
+      "prs": {
+        "study_type": "Observational",
+        "observational_study_design": "Cohort",
+        "time_perspective": "Other",
+        "overall_status": "Not yet recruiting",
+        "enrollment": "90",
+        "enrollment_type": "Anticipated",
+        "verification_date": "October 2026",
+        "start_date": "1 November 2026",
+        "start_date_type": "Anticipated",
+        "primary_completion_date": "11 May 2027",
+        "primary_completion_date_type": "Anticipated",
+        "study_completion_date": "11 May 2027",
+        "study_completion_date_type": "Anticipated",
+        "fda_regulated_drug": "No",
+        "fda_regulated_device": "No",
+        "patient_registry": "No",
+        "ipd_sharing": "No",
+        "provider_study_id": "COMFORT-26-03",
+        "target_duration_quantity": null,
+        "target_duration_units": null
+      },
+      "genetic_information_collected": "Yes",
+      "future_specimen_use": "No",
+      "clinicaltrials_consent_disclosure_applies": "No",
+      "sponsor_receives_identifiable_information": "No"
+    }
+  },
+  "section_contracts": [
+    {
+      "section_id": "study-design.bias",
+      "number": "8.2.",
+      "title": "Methods Used to Minimize Bias",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft",
+        "fixed_boilerplate"
+      ],
+      "minimum_evidence": [
+        "design.study_design"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [
+        {
+          "boilerplate_id": "bias",
+          "text": "Potential sources of selection, measurement, and analysis bias will be addressed through consistent eligibility criteria, predefined assessments, and the approved analysis plan.",
+          "sha256": "52a1c44db10ce81e78401f0d22f6fa95bdf25be4e7d8b40d379523925978ed70"
+        }
+      ],
+      "content_expectations": [
+        "State the source-supported bias controls directly, including supplied common testing conditions, predefined outcomes and analysis methods, and limits on interpreting nonrandomized cohort differences. If none are supplied, use the listed concise boilerplate. Do not repeat the design, setting, arms, or masking account already given in Study Design.",
+        "Do not replace supplied detail with generic clinical prose."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_evidence",
+      "evidence_scopes": [],
+      "approved_source_word_count": 113,
+      "reference_detail_target_words": 0,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [],
+        "brief_reference_only": [],
+        "do_not_restate": []
+      }
+    },
+    {
+      "section_id": "study-procedure.visits",
+      "number": "9.2.",
+      "title": "Visits and Examinations",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft"
+      ],
+      "minimum_evidence": [
+        "procedures.assessments",
+        "procedures.visit_schedule",
+        "procedures.visit_schedule_table",
+        "procedures.assessment_details",
+        "procedures.intervention_management",
+        "procedures.retention"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [],
+      "content_expectations": [
+        "Account for every approved visit, time point, and visit-specific procedure.",
+        "Do not replace supplied detail with generic clinical prose."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_items",
+      "evidence_scopes": [],
+      "approved_source_word_count": 404,
+      "reference_detail_target_words": 262,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [
+          "complete-visit-schedule"
+        ],
+        "brief_reference_only": [],
+        "do_not_restate": []
+      }
+    },
+    {
+      "section_id": "study-procedure.measurements",
+      "number": "9.3.",
+      "title": "Study Methods and Measurements",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft"
+      ],
+      "minimum_evidence": [
+        "procedures.methods",
+        "procedures.assessment_details",
+        "procedures.specimens",
+        "procedures.return_of_results",
+        "endpoints.primary",
+        "endpoints.secondary",
+        "endpoints.other"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [],
+      "content_expectations": [
+        "Explain the approved measurement activities in operational language. Connect each measure to the source-supplied assessment activities and relevant time point, such as chart abstraction, score review, device download, or questionnaire when those activities are approved. When the source gives no instrument, scoring rule, denominator, or detailed method, state only the observable activity; an endpoint restatement such as 'the endpoint will be evaluated' is not a measurement method. Group related measures without repeating the complete visit schedule or inventing details.",
+        "Do not replace supplied detail with generic clinical prose.",
+        "This section owns supplied specimen handling and results-return policies. Preserve collection/coding, transfer recipients and access limits, testing purpose, specimen destruction timing and any absolute deadline, future-use/sharing/sale/commercial restrictions, and the distinction between specimen retention and derived-data retention. Distinguish individual clinical results, research/genetic results, incidental findings and aggregate summaries, including any limits, preferences, recipients and timing. Keep routine-care referral arrangements when supplied. Preserve uncertainty; absent optional policies remain absent. For records-only research, describe only the approved existing records/specimens and results policies without adding collection or participant contact."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_evidence",
+      "evidence_scopes": [],
+      "approved_source_word_count": 490,
+      "reference_detail_target_words": 294,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [
+          "endpoint-measurement-methods",
+          "specimen-handling",
+          "return-of-results"
+        ],
+        "brief_reference_only": [
+          "complete-visit-schedule",
+          "endpoint-inventory"
+        ],
+        "do_not_restate": [
+          "complete-visit-schedule",
+          "endpoint-inventory"
+        ]
+      }
+    }
+  ],
+  "constraints": [
+    "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+    "Use only supplied approved evidence and applicable template/Fixed Clinical Boilerplate. Align shared population, groups, quantities, timing, procedures and outcomes across the Protocol, selected ICF and PRS narratives; preserve relationships and qualifications rather than copying wording.",
+    "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+    "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
+    "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
+    "Preserve supplied numbered citations next to the Protocol claims they support and their bibliography linkage. Do not invent citations; ICF explanations use plain language.",
+    "Return exactly one result for every requested section ID.",
+    "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
+    "Return structured section content, not a whole document or document markup.",
+    "Write to each section's purpose and ownership. Explain each operational rule fully in its owning section; elsewhere give only the fact needed for that section and a brief reference to the owning heading. Preserve necessary identifiers, endpoint definitions, quantities, timing anchors/windows, conditions, exceptions, safety information and client consent language. Compress repeated explanations, not clinical meaning.",
+    "Use participant-facing language for ICF sections.",
+    "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",
+    "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+    "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+    "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
+    "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+    "Protocol General Information is a compact synopsis; Objectives states the study purpose and objectives; Study Design owns the design, comparisons and grouped endpoint inventory. Study Methods and Measurements owns detailed measurement, exposure-counting, study-eye and historical-record selection rules; Visits and Examinations owns contact mode, timing and scheduled activities. Bias describes the purpose of controls with brief references to their methods, rather than repeating those instructions. Analysis Data Sets owns which observations enter analyses; Statistical Methodology owns calculations, models and interpretation. Retain complete methods once, using the actual owning headings for references.",
+    "Satisfy every section's content_expectations and cover every material value named by minimum_evidence, except that Section 15's source-derived table and notes carry its detailed inventory. Its adjacent prose should briefly introduce the table without restating its rows or notes.",
+    "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
+    "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+    "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+    "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+    "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+    "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays."
+  ],
+  "generation_only_prompts": {
+    "profile": "n8n-with-brad-corrections/v1",
+    "source": {
+      "filename": "Form Fill Fillout -_ Generate Protocol + Send Gmail.json",
+      "sha256": "15b20d12597b6f0fc8829650771302fb9161d8718a96c1c631b93d0154b55b1a"
+    },
+    "prompts": [
+      {
+        "node": "Study Design & Methods1",
+        "targets": [
+          {
+            "section_id": "study-design.bias",
+            "legacy_fields": "methods"
+          }
+        ],
+        "original_messages": [
+          {
+            "content": "You are a medical writer generating the Study Design and Methods sections of clinical study protocols.",
+            "role": "system"
+          },
+          {
+            "content": "=### Context:\nWe are writing an ambispective clinical study protocol document.\nYour task is to generate the **Study Design and Methods** sections.\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n\n### What you need to do:\n- Generate **studyDesignLong**: an expanded paragraph that integrates studyDesign, numberOfSites, endpoints, and assessmentsSchedule. Mention timepoints only if they are explicitly present in the inputs.\n- Generate **methods**: describe bias minimization procedures consistent with the design. \nFor retrospective/ambispective components, include standardized data abstraction, predefined endpoints/timepoints, consistent measurement definitions, and handling of missing data, but do not add procedures not described in the inputs.\n- Generate **masked**: extract masking or blinding details.\n- Generate **variables**: present the endpoints grouped as Primary, Secondary, and Exploratory exactly as provided in the Endpoints input.\n- Generate **duration**: a very short description of the follow-up duration or observation window based only on explicit timepoints in Assessments Schedule and/or Timeline. If not specified, return \"Not specified\".\n- Determine **studyArm**: Return \"double arm\" if the Endpoints or Study Design describe a comparator/group comparison (e.g., \"between groups\", contralateral, treated vs control). Otherwise return \"single arm\".\n\n### Important notes:\n- Do not invent outcomes, procedures, masking, timepoints, or measurements beyond what is provided.\n- Keep the tone professional, neutral, and consistent with clinical protocol style.\n- Use language consistent with an ambispective design. If retrospective components are present, describe them as review/extraction of existing records.\n- Do not imply randomization, masking, or prospective visits unless explicitly stated in the Study Design or Assessments Schedule.\n- If the study includes only a single follow-up visit/timepoint, do not describe additional visits beyond what is provided.\n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"studyDesignLong\": \"expanded description paragraph\",\n  \"methods\": \"bias minimization methods\",\n  \"masked\": \"masking/blinding details\",\n  \"variables\": \"endpoints in structured text\",\n  \"duration\": \"duration in a very short text\",\n  \"studyArm\": \"single arm or double arm\"\n}\n"
+          },
+          {
+            "content": "=### Study Title:\nAmbispective Analysis of Patient Reported Outcomes and Visual Acuity in Patients with Bilateral Implantation of Odyssey Intraocular Lenses\n\n### Study Design:\nSingle-center, ambispective observational study. Eligible subjects who previously underwent bilateral uncomplicated cataract surgery with implantation of the TECNIS Odyssey intraocular lens will be identified retrospectively. Each subject will participate in a single prospective postoperative study visit conducted at least three months after surgery. Cataract surgery itself is not part of the study.\n\n### Endpoints:\nPrimary Endpoint:\n- Photopic and mesopic visual acuity at distance (6 m), intermediate (66 cm), and near (40 cm and 33 cm) assessed at the postoperative study visit.\n\nSecondary Endpoint:\n- Patient-reported outcomes assessed using the Assessment of Intraocular Lens Implant Symptoms (AIOLIS) questionnaire.\n\nExploratory Endpoints:\n- Correlation of postoperative quality-of-vision concerns with corneal performance index.\n- Correlation of pupil size with patient satisfaction.\n\n### Assessments Schedule:\n- Retrospective Component:\n  Identification of eligible subjects through medical record review confirming prior bilateral cataract surgery with Odyssey IOL implantation.\n\n- Prospective Study Visit (≥ 3 months postoperatively):\n  - Informed consent\n  - Medical history\n  - Manifest refraction\n  - Photopic and mesopic visual acuity testing at distance, intermediate, and near\n  - Assessment of Intraocular Lens Implant Symptoms (AIOLIS)\n  - Ocular Surface Disease Index (OSDI)\n  - iTrace assessment\n  - Pupil size measurement\n  - Adverse event assessment\n\nAll study procedures are non-interventional and consistent with standard ophthalmic evaluations.\n\n### Timeline:\nStudy Start Date: March 1, 2025  \nFirst Patient Enrolled: March 15, 2025  \nLast Patient Completed: December 15, 2025  \nData Analysis: January 2026  \nFinal Report Submission: February 28, 2026\n\n### Number of Sites:\nOne\n\n### Background:\nMultifocal and extended range of vision intraocular lenses have improved spectacle independence following cataract surgery; however, earlier designs have been associated with visual disturbances such as halos, glare, and reduced contrast sensitivity. The TECNIS Odyssey intraocular lens was developed to provide a broader range of vision while maintaining visual quality. Although the Odyssey IOL is FDA approved and used in routine clinical practice, limited data are available regarding postoperative visual acuity and patient-reported outcomes following bilateral implantation. This study aims to evaluate visual performance and patient satisfaction at least three months after surgery.\n\n### Primary Objective:\nTo evaluate postoperative visual acuity outcomes following bilateral implantation of the TECNIS Odyssey intraocular lens.\n\n### Hypothesis:\nBilateral implantation of the TECNIS Odyssey intraocular lens provides good visual acuity at distance, intermediate, and near, with acceptable patient-reported visual quality and satisfaction.\n"
+          },
+          {
+            "content": "={\n  \"studyDesignLong\": \"This study is a single site, single-masked, randomized, prospective, contralateral eye study of the efficiency of the Active Sentry handpiece at low IOP compared with the Ozil at high IOP. Subjects will be assessed pre-operatively, operatively, and at 1 day and 1 week post-operatively. Clinical evaluations will include measurement of visual acuity and central corneal thickness (CCT).\\n\\nThe primary outcome measure will be the total aspiration time between groups on the day of surgery.\\n\\nSecondary outcome measures are as follows:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory outcome measures are as follows:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"methods\": \"As a randomized study there is no expected bias. Patient selection will be based on the patient’s interest and the surgeon’s opinion as to whether they are a suitable candidate for sequential bilateral cataract surgery. The data analyzer will be masked.\\n\\nThe measurement of visual acuity will be conducted in a systematic fashion to minimize bias. Individuals conducting visual acuity measures will be instructed to perform the same testing in the same fashion for all subjects, with the same level of encouragement to subjects.\\n\\nAll data collection will be completed through provided Case Report Forms (CRFs) or computer files generated by automated test equipment. All site personnel involved in the study will be trained in regard to conducting study-specific procedures.\",\n  \"masked\": \"The data analyzer will be masked.\",\n  \"variables\": \"Primary: The total aspiration time between groups on the day of surgery.\\n\\nSecondary:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"duration\": \"Preoperative (≤90 days) to 1 week postoperative\",\n  \"studyArm\": \"double arm\"\n}",
+            "role": "assistant"
+          },
+          {
+            "content": "=### Study Title: \n{{ $('Set Questions').first().json.whatIsTheFullTitleOfTheStudy }}\n\n\n### Study Design: \n{{ $('Set Questions').first().json.describeTheStudyDesign }}\n\n\n### Endpoints:\n{{ $('Set Questions').first().json.listThePrimaryAndSecondaryEndpoints }}\n\n\n### Assessments Schedule:\n{{ $('Set Questions').first().json.listAllPlannedAssessmentsAndTheirSchedule }}\n\n\n### Timeline\n{{ $('Set Questions').first().json.provideTheStudyTimeline }}\n\n\n### Number of Sites:\n{{ $('Set Questions').first().json.howManyInvestigationalSitesWillParticipateInTheStudy }}\n\n\n### Background:\n{{ $('Set Questions').first().json.provideTheBackgroundAndSignificanceOfTheStudy }}\n\n\n### Primary Objective:\n{{ $('Set Questions').first().json.whatAreThePrimaryObjectivesOfTheStudy }}\n\n\n### Hypothesis:\n{{ $('Set Questions').first().json.stateTheStudyHypothesis }}"
+          }
+        ],
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a medical writer generating the Study Design and Methods sections of clinical study protocols."
+          },
+          {
+            "role": "user",
+            "content": "### Context:\nWe are writing an ambispective clinical study protocol document.\nYour task is to generate the **Study Design and Methods** sections.\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n\n### What you need to do:\n- Generate **studyDesignLong**: an expanded paragraph that integrates studyDesign, numberOfSites, endpoints, and assessmentsSchedule. Mention timepoints only if they are explicitly present in the inputs.\n- Generate **methods**: describe bias minimization procedures consistent with the design. \nFor retrospective/ambispective components, include standardized data abstraction, predefined endpoints/timepoints, consistent measurement definitions, and handling of missing data, but do not add procedures not described in the inputs.\n- Generate **masked**: extract masking or blinding details.\n- Generate **variables**: present the endpoints grouped as Primary, Secondary, and Exploratory exactly as provided in the Endpoints input.\n- Generate **duration**: a very short description of the follow-up duration or observation window based only on explicit timepoints in Assessments Schedule and/or Timeline. If not specified, return \"Not specified\".\n- Determine **studyArm**: Return \"double arm\" if the Endpoints or Study Design describe a comparator/group comparison (e.g., \"between groups\", contralateral, treated vs control). Otherwise return \"single arm\".\n\n### Important notes:\n- Do not invent outcomes, procedures, masking, timepoints, or measurements beyond what is provided.\n- Keep the tone professional, neutral, and consistent with clinical protocol style.\n- Use language consistent with an ambispective design. If retrospective components are present, describe them as review/extraction of existing records.\n- Do not imply randomization, masking, or prospective visits unless explicitly stated in the Study Design or Assessments Schedule.\n- If the study includes only a single follow-up visit/timepoint, do not describe additional visits beyond what is provided.\n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"studyDesignLong\": \"expanded description paragraph\",\n  \"methods\": \"bias minimization methods\",\n  \"masked\": \"masking/blinding details\",\n  \"variables\": \"endpoints in structured text\",\n  \"duration\": \"duration in a very short text\",\n  \"studyArm\": \"single arm or double arm\"\n}\n"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title:\nAmbispective Analysis of Patient Reported Outcomes and Visual Acuity in Patients with Bilateral Implantation of Odyssey Intraocular Lenses\n\n### Study Design:\nSingle-center, ambispective observational study. Eligible subjects who previously underwent bilateral uncomplicated cataract surgery with implantation of the TECNIS Odyssey intraocular lens will be identified retrospectively. Each subject will participate in a single prospective postoperative study visit conducted at least three months after surgery. Cataract surgery itself is not part of the study.\n\n### Endpoints:\nPrimary Endpoint:\n- Photopic and mesopic visual acuity at distance (6 m), intermediate (66 cm), and near (40 cm and 33 cm) assessed at the postoperative study visit.\n\nSecondary Endpoint:\n- Patient-reported outcomes assessed using the Assessment of Intraocular Lens Implant Symptoms (AIOLIS) questionnaire.\n\nExploratory Endpoints:\n- Correlation of postoperative quality-of-vision concerns with corneal performance index.\n- Correlation of pupil size with patient satisfaction.\n\n### Assessments Schedule:\n- Retrospective Component:\n  Identification of eligible subjects through medical record review confirming prior bilateral cataract surgery with Odyssey IOL implantation.\n\n- Prospective Study Visit (≥ 3 months postoperatively):\n  - Informed consent\n  - Medical history\n  - Manifest refraction\n  - Photopic and mesopic visual acuity testing at distance, intermediate, and near\n  - Assessment of Intraocular Lens Implant Symptoms (AIOLIS)\n  - Ocular Surface Disease Index (OSDI)\n  - iTrace assessment\n  - Pupil size measurement\n  - Adverse event assessment\n\nAll study procedures are non-interventional and consistent with standard ophthalmic evaluations.\n\n### Timeline:\nStudy Start Date: March 1, 2025  \nFirst Patient Enrolled: March 15, 2025  \nLast Patient Completed: December 15, 2025  \nData Analysis: January 2026  \nFinal Report Submission: February 28, 2026\n\n### Number of Sites:\nOne\n\n### Background:\nMultifocal and extended range of vision intraocular lenses have improved spectacle independence following cataract surgery; however, earlier designs have been associated with visual disturbances such as halos, glare, and reduced contrast sensitivity. The TECNIS Odyssey intraocular lens was developed to provide a broader range of vision while maintaining visual quality. Although the Odyssey IOL is FDA approved and used in routine clinical practice, limited data are available regarding postoperative visual acuity and patient-reported outcomes following bilateral implantation. This study aims to evaluate visual performance and patient satisfaction at least three months after surgery.\n\n### Primary Objective:\nTo evaluate postoperative visual acuity outcomes following bilateral implantation of the TECNIS Odyssey intraocular lens.\n\n### Hypothesis:\nBilateral implantation of the TECNIS Odyssey intraocular lens provides good visual acuity at distance, intermediate, and near, with acceptable patient-reported visual quality and satisfaction.\n"
+          },
+          {
+            "role": "assistant",
+            "content": "{\n  \"studyDesignLong\": \"This study is a single site, single-masked, randomized, prospective, contralateral eye study of the efficiency of the Active Sentry handpiece at low IOP compared with the Ozil at high IOP. Subjects will be assessed pre-operatively, operatively, and at 1 day and 1 week post-operatively. Clinical evaluations will include measurement of visual acuity and central corneal thickness (CCT).\\n\\nThe primary outcome measure will be the total aspiration time between groups on the day of surgery.\\n\\nSecondary outcome measures are as follows:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory outcome measures are as follows:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"methods\": \"As a randomized study there is no expected bias. Patient selection will be based on the patient’s interest and the surgeon’s opinion as to whether they are a suitable candidate for sequential bilateral cataract surgery. The data analyzer will be masked.\\n\\nThe measurement of visual acuity will be conducted in a systematic fashion to minimize bias. Individuals conducting visual acuity measures will be instructed to perform the same testing in the same fashion for all subjects, with the same level of encouragement to subjects.\\n\\nAll data collection will be completed through provided Case Report Forms (CRFs) or computer files generated by automated test equipment. All site personnel involved in the study will be trained in regard to conducting study-specific procedures.\",\n  \"masked\": \"The data analyzer will be masked.\",\n  \"variables\": \"Primary: The total aspiration time between groups on the day of surgery.\\n\\nSecondary:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"duration\": \"Preoperative (≤90 days) to 1 week postoperative\",\n  \"studyArm\": \"double arm\"\n}"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title: \nHistorical Ocular Care, Current Symptoms and Prospective Comfort After Routine Bilateral Cataract Surgery: An Ambispective Observational Study With Research Saliva Genotyping.\n\n\n### Study Design: \nStudy type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other — ambispective, combining retrospective record abstraction and prospective follow-up in the same consenting participants. Condition: Pseudophakia following bilateral cataract surgery. Number of sites: 3, all in the United States. One observational cohort; no treatment arms or comparator product. Intervention/exposure name: Prior routine bilateral cataract surgery and its documented ocular-care history. Exposure category: Procedure/Surgery, observed retrospectively, not assigned or performed by this study. Research activities: medical-record abstraction, noninvasive vision testing, symptom questionnaires and one saliva collection for research genotyping. The study does not assign surgery, an IOL type, medication or other treatment. It has no randomization, masking, placebo or investigational product.\n\n\n### Endpoints:\n{\"primary\": [{\"analysis_method\": \"\", \"description\": \"0–10 rating; positive change means improved reported comfort.\", \"label\": \"Change in ocular comfort score from Day 0 to Day 90\", \"time_frame\": \"Day 0 to Day 90 +/- 10 days after enrollment\"}], \"secondary\": [{\"analysis_method\": \"\", \"description\": \"0–10 rating.\", \"label\": \"Ocular comfort score\", \"time_frame\": \"Day 30 +/- 5 days after enrollment\"}, {\"analysis_method\": \"\", \"description\": \"logMAR; lower values indicate better visual acuity.\", \"label\": \"Best-corrected distance visual acuity for each eye\", \"time_frame\": \"Day 90 +/- 10 days after enrollment\"}, {\"analysis_method\": \"\", \"description\": \"A visit reported at both contacts is counted once.\", \"label\": \"Number of participant-reported unscheduled ocular-care visits\", \"time_frame\": \"Day 0 to Day 90 after enrollment; collected at Day 30 and Day 90\"}, {\"analysis_method\": \"\", \"description\": \"Explicit denominator of people with relevant records.\", \"label\": \"Proportion with clinician-documented ocular surface treatment\", \"time_frame\": \"Available records from 1 January 2025 through 30 September 2026\"}], \"other\": [{\"analysis_method\": \"\", \"description\": \"Variant selection is specified in a laboratory analysis plan before the coded outcome dataset is released; no clinical risk score is made. No additional outcomes are specified.\", \"label\": \"Association of coded research genotype groups with Day 90 comfort score\", \"time_frame\": \"Day 90 after enrollment\"}]}\n\n\n### Assessments Schedule:\n{\"assessments\": [\"Historical data are whatever was recorded in routine care. There is no assumed historical questionnaire, saliva collection, consent visit or standardized research assessment. An absent historical value is recorded as missing. The record-abstraction task is performed by staff after Day 0; it is not an extra participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic.\", \"No visual acuity test or saliva collection takes place by telephone.\", \"Confirm completion after these activities. No exit form, fourth visit or second saliva sample is required.\", \"No blood draws, pupil dilation, imaging, study medication or research surgery. The saliva specimen is mandatory for this study's eligibility; there is no optional genetic substudy or separate future-use opt-in. Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits.\"], \"visit_schedule\": [{\"duration\": \"\", \"mode\": \"Existing record review\", \"procedures\": \"Surgery dates; Implanted lens categories; Documented ocular diagnoses; Clinician-recorded ocular surface treatments; Recorded best-corrected distance visual acuity; Documented unscheduled ocular visits\", \"timing\": \"Records from 1 January 2025 through 30 September 2026; abstracted after Day 0 consent\", \"visit\": \"Historical record abstraction — staff task, not a participant visit\"}, {\"duration\": \"Approximately 70 minutes\", \"mode\": \"In person\", \"procedures\": \"Written informed consent before research activities; Eligibility confirmation; Authorization for historical records; Demographics and current ocular-care update; Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and current correction; Ocular comfort questionnaire: preceding 7 days, 0 extremely uncomfortable to 10 fully comfortable; One approximately 2 mL saliva collection by passive drool into a labeled tube; Enquiry about symptoms during research assessments\", \"timing\": \"Day 0 after enrollment; screening and enrollment at the same visit\", \"visit\": \"Visit 1 — Day 0 / Enrollment\"}, {\"duration\": \"Approximately 15 minutes\", \"mode\": \"Telephone\", \"procedures\": \"Ocular comfort questionnaire: preceding 7 days, 0 extremely uncomfortable to 10 fully comfortable; Interval ocular-care update; Enquiry about unscheduled ocular visits since enrollment; Assessment-related symptom enquiry\", \"timing\": \"Day 30 +/- 5 days after enrollment\", \"visit\": \"Visit 2 — Day 30\"}, {\"duration\": \"Approximately 40 minutes\", \"mode\": \"In person\", \"procedures\": \"Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and current correction; Ocular comfort questionnaire: preceding 7 days, 0 extremely uncomfortable to 10 fully comfortable; Interval ocular-care update; Unscheduled ocular-visit enquiry; Assessment-related symptom enquiry; Confirmation of research completion\", \"timing\": \"Day 90 +/- 10 days after enrollment\", \"visit\": \"Visit 3 — Day 90 / Final Visit\"}], \"visit_schedule_table\": null}\n\n\n### Timeline\nHistorical data window: 1 January 2025 through 30 September 2026. Prospective recruitment: 1 November 2026 through 31 January 2027. Last prospective participant assessment expected by 11 May 2027, allowing the final visit window. Anticipated primary completion and study completion: 11 May 2027. Analysis and administrative closeout: by 30 June 2027.\n\n\n### Number of Sites:\n3\n\n\n### Background:\nCurrent comfort after cataract surgery may vary between people with different documented ocular-care histories. This study links historical clinic records with newly collected symptoms and vision assessments. Research genotyping is included to explore possible associations with symptom variation. No prior effect estimates or bibliographic references are supplied.\n\n\n### Primary Objective:\n[\"Describe change in patient-reported ocular comfort from enrollment to Day 90 after enrollment.\"]\n\n\n### Hypothesis:\nGreater historical use of clinician-documented ocular surface treatment will be associated with lower Day 90 comfort scores. This is an exploratory association hypothesis, not a claim of a treatment effect."
+          }
+        ]
+      },
+      {
+        "node": "Procedures & Assessments1",
+        "targets": [
+          {
+            "section_id": "study-procedure.visits",
+            "legacy_fields": "visitSchedule + visitScheduleDetails"
+          },
+          {
+            "section_id": "study-procedure.measurements",
+            "legacy_fields": "measurements"
+          }
+        ],
+        "original_messages": [
+          {
+            "content": "You are a medical writer generating the Procedures and Assessments sections of clinical study protocols.",
+            "role": "system"
+          },
+          {
+            "content": "=### Context:\nWe are writing an ambispective clinical study protocol document. \nYour task is to generate the **Procedures and Assessments** sections.  \n\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Timeline: Study dates\n\n\n### What you need to do:\nGenerate **visitSchedule**: a short narrative introduction summarizing the visit or data collection structure (e.g., retrospective data review, operative data, and/or follow-up assessments as applicable).\nGenerate **visitScheduleDetails**: numbered subsections starting at 9.2.1.\nInclude only as many subsections as are supported by the Assessments Schedule and Timeline.\n- Generate **visitScheduleTable**: an array of structured objects with the fields:\n  - visitNumber  \n  - visitName  \n  - visitWindow  \n  - CRFnumber  \n- Generate **measurements**: a short narrative summary of the planned assessments.  \n- Generate **measurementsDetails**: subsections labeled 9.3.1, 9.3.2, etc., with expanded descriptions of how each assessment is conducted (standardized procedures, methodology, equipment).  \n- Generate Study Start Date in format yyyy-mm-dd\n- Generate Study End Date in format yyyy-mm-dd\n\n\n### Important notes:\n- Do not invent assessments or visits beyond what is explicitly provided.\n- For ambispective studies, describe visits as data collection timepoints or record review when applicable.\n- Do not imply screening, baseline, follow-up, or exit visits unless they are explicitly described in the Assessments Schedule or Timeline.\n- If the study includes a single visit or retrospective data extraction, reflect this accurately.  \n- Visit details must use numbered subsections (9.2.1, 9.2.2, …).  \n- Measurement details must use numbered subsections (9.3.1, 9.3.2, …).  \n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"visitSchedule\": \"narrative summary\",\n  \"visitScheduleDetails\": \"9.2.1. Preoperative ...\\n\\n9.2.2. Operative (Surgery) ...\\n\\n9.2.3. Postoperative 1 Day ...\\n\\n9.2.4. Postoperative 1 Week ...\\n\\n9.2.5. Exit Procedures ...\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Preoperative\",\n      \"visitWindow\": \"-90 to 0 days from surgery\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Operative\",\n      \"visitWindow\": \"0 from surgery\",\n      \"CRFnumber\": \"2\"\n    }\n  ],\n  \"measurements\": \"- CBC at screening and week 12\\n- ECG at baseline and week 6\\n- Quality of life survey at baseline and week 12\",\n  \"measurementsDetails\": \"9.3.1. Laboratory Testing ...\\n\\n9.3.2. ECG ...\\n\\n9.3.3. Quality of Life Survey ...\"\n  \"startDate\": \"2025-01-15\",\n  \"endDate\": \"2025-04-30\"\n}\n"
+          },
+          {
+            "content": "=### Study Title:\nAmbispective Analysis of Patient Reported Outcomes and Visual Acuity in Patients with Bilateral Implantation of Odyssey Intraocular Lenses\n\n### Study Design:\nSingle-center, ambispective observational study. Subjects who previously underwent bilateral uncomplicated cataract surgery with implantation of the TECNIS Odyssey intraocular lens will be identified retrospectively through medical record review. Each eligible subject will participate in a single prospective postoperative study visit conducted at least three months after surgery. Cataract surgery itself is not part of the study.\n\n### Background:\nMultifocal and extended range of vision intraocular lenses have improved spectacle independence following cataract surgery; however, earlier designs have been associated with visual disturbances such as halos, glare, and reduced contrast sensitivity. The TECNIS Odyssey intraocular lens was developed to provide a broader range of vision while maintaining visual quality. Although the Odyssey IOL is FDA approved and used in routine clinical practice, limited data are available regarding postoperative visual acuity and patient-reported outcomes following bilateral implantation. This study aims to further characterize visual performance and patient satisfaction at least three months after surgery.\n\n### Primary Objective:\nTo evaluate postoperative visual acuity outcomes following bilateral implantation of the TECNIS Odyssey intraocular lens.\n\n### Hypothesis:\nBilateral implantation of the TECNIS Odyssey intraocular lens provides good visual acuity at distance, intermediate, and near, with acceptable patient-reported visual quality and satisfaction.\n\n### Endpoints:\nPrimary Endpoint:\n- Photopic and mesopic visual acuity at distance (6 m), intermediate (66 cm), and near (40 cm and 33 cm) assessed at the postoperative study visit.\n\nSecondary Endpoint:\n- Patient-reported outcomes assessed using the Assessment of Intraocular Lens Implant Symptoms (AIOLIS) questionnaire.\n\nExploratory Endpoints:\n- Correlation of postoperative quality-of-vision concerns with corneal performance index.\n- Correlation of pupil size with patient satisfaction.\n\n### Assessments Schedule:\n- Retrospective Component:\n  Identification of eligible subjects via medical record review confirming prior bilateral cataract surgery with Odyssey IOL implantation.\n\n- Prospective Study Visit (≥ 3 months postoperatively):\n  - Informed consent\n  - Medical history\n  - Manifest refraction\n  - Photopic and mesopic visual acuity testing at distance, intermediate, and near\n  - Assessment of Intraocular Lens Implant Symptoms (AIOLIS)\n  - Ocular Surface Disease Index (OSDI)\n  - iTrace assessment\n  - Pupil size measurement\n  - Adverse event assessment\n\nAll study procedures are non-interventional and consistent with standard ophthalmic evaluations.\n\n### Timeline:\nStudy Start Date: June 1, 2025  \nFirst Patient Enrolled: July 15, 2025  \nLast Patient Completed: December 20, 2026  \nData Analysis: January–February 2027  \nFinal Report Submission: March 31, 2027\n\n### Number of Sites:\nOne\n"
+          },
+          {
+            "content": "={\n  \"visitSchedule\": \"Subjects will participate in five scheduled study visits over a 12-week period. These will include a screening/baseline visit, two interim follow-up visits at Week 4 and Week 8, a final evaluation at Week 12, and an exit visit if subjects discontinue prematurely. The visit schedule, complete with visit windows and associated CRF forms, is summarized in the table below. Details of each visit, including the specific testing to be conducted, are provided in subsections 9.2.1 through 9.2.5.\",\n  \"visitScheduleDetails\": \"9.2.1. Screening/Baseline\\nAt the baseline visit, subjects will undergo informed consent, eligibility confirmation, assignment of study ID, and collection of demographic and medical history. Baseline assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire.\\n\\n9.2.2. Week 4 Follow-up\\nSubjects will return for interim evaluation at Week 4 (±7 days). Assessments will include vital signs (blood pressure, heart rate) and monitoring for treatment-emergent adverse events. Compliance with study medication will also be reviewed.\\n\\n9.2.3. Week 8 Follow-up\\nAt Week 8 (±7 days), subjects will undergo vital signs measurement and review of adverse events. Ongoing medication compliance and safety will be evaluated.\\n\\n9.2.4. Week 12 Final Visit\\nAt Week 12 (±7 days), subjects will undergo final efficacy and safety evaluations. Assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire. Adverse events and medication compliance will also be recorded.\\n\\n9.2.5. Exit Procedures\\nSubjects who discontinue early will complete an exit visit as soon as possible. The exit visit will include safety evaluations, vital signs, review of adverse events, and return of study medication where applicable.\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Screening/Baseline\",\n      \"visitWindow\": \"Day 0\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Week 4 Follow-up\",\n      \"visitWindow\": \"Week 4 (±7 days)\",\n      \"CRFnumber\": \"2\"\n    },\n    {\n      \"visitNumber\": \"3\",\n      \"visitName\": \"Week 8 Follow-up\",\n      \"visitWindow\": \"Week 8 (±7 days)\",\n      \"CRFnumber\": \"3\"\n    },\n    {\n      \"visitNumber\": \"4\",\n      \"visitName\": \"Week 12 Final Visit\",\n      \"visitWindow\": \"Week 12 (±7 days)\",\n      \"CRFnumber\": \"4\"\n    },\n    {\n      \"visitNumber\": \"5\",\n      \"visitName\": \"Exit Visit\",\n      \"visitWindow\": \"At time of early discontinuation\",\n      \"CRFnumber\": \"5\"\n    }\n  ],\n  \"measurements\": \"All routine testing and planned study assessments will be conducted at each scheduled visit. Any abnormalities identified should be documented in the CRF 'Comment' section. Specific study examination procedures are outlined below.\",\n  \"measurementsDetails\": \"9.3.1. Vital Signs\\nBlood pressure and heart rate will be measured at each scheduled visit (baseline, week 4, week 8, week 12) using a calibrated sphygmomanometer. Measurements will be taken in a seated position after a minimum of 5 minutes rest.\\n\\n9.3.2. Laboratory Testing\\nComplete blood count, serum electrolytes, and liver function tests will be performed at baseline and week 12. Samples will be collected via venipuncture and analyzed at a certified central laboratory.\\n\\n9.3.3. ECG\\nA standard 12-lead electrocardiogram will be conducted at baseline and week 12. ECGs will be evaluated for any clinically significant abnormalities by a blinded cardiologist.\\n\\n9.3.4. Quality of Life Questionnaire\\nA validated hypertension-specific quality of life instrument will be administered at baseline and week 12. Questionnaires will be completed by subjects under the supervision of site personnel to ensure completeness and accuracy.\",\n  \"startDate\": \"2025-06-01\",\n  \"endDate\": \"2027-03-31\"\n}\n",
+            "role": "assistant"
+          },
+          {
+            "content": "=### Study Title: \n{{ $('Set Questions').first().json.whatIsTheFullTitleOfTheStudy }}\n\n\n### Study Design:\n{{ $('Set Questions').first().json.describeTheStudyDesign }}\n\n\n### Background:\n{{ $('Set Questions').first().json.provideTheBackgroundAndSignificanceOfTheStudy }}\n\n\n### Primary Objective:\n{{ $('Set Questions').first().json.whatAreThePrimaryObjectivesOfTheStudy }}\n\n\n### Hypothesis:\n{{ $('Set Questions').first().json.stateTheStudyHypothesis }}\n\n\n### Endpoints:\n{{ $('Set Questions').first().json.listThePrimaryAndSecondaryEndpoints }}\n\n\n### Assessments Schedule:\n{{ $('Set Questions').first().json.listAllPlannedAssessmentsAndTheirSchedule }}\n\n\n### Timeline\n{{ $('Set Questions').first().json.provideTheStudyTimeline }}\n\n\n### Number of Sites:\n{{ $('Set Questions').first().json.howManyInvestigationalSitesWillParticipateInTheStudy }}"
+          }
+        ],
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a medical writer generating the Procedures and Assessments sections of clinical study protocols."
+          },
+          {
+            "role": "user",
+            "content": "### Context:\nWe are writing an ambispective clinical study protocol document. \nYour task is to generate the **Procedures and Assessments** sections.  \n\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Timeline: Study dates\n\n\n### What you need to do:\nGenerate **visitSchedule**: a short narrative introduction summarizing the visit or data collection structure (e.g., retrospective data review, operative data, and/or follow-up assessments as applicable).\nGenerate **visitScheduleDetails**: numbered subsections starting at 9.2.1.\nInclude only as many subsections as are supported by the Assessments Schedule and Timeline.\n- Generate **visitScheduleTable**: an array of structured objects with the fields:\n  - visitNumber  \n  - visitName  \n  - visitWindow  \n  - CRFnumber  \n- Generate **measurements**: a short narrative summary of the planned assessments.  \n- Generate **measurementsDetails**: subsections labeled 9.3.1, 9.3.2, etc., with expanded descriptions of how each assessment is conducted (standardized procedures, methodology, equipment).  \n- Generate Study Start Date in format yyyy-mm-dd\n- Generate Study End Date in format yyyy-mm-dd\n\n\n### Important notes:\n- Do not invent assessments or visits beyond what is explicitly provided.\n- For ambispective studies, describe visits as data collection timepoints or record review when applicable.\n- Do not imply screening, baseline, follow-up, or exit visits unless they are explicitly described in the Assessments Schedule or Timeline.\n- If the study includes a single visit or retrospective data extraction, reflect this accurately.  \n- Visit details must use numbered subsections (9.2.1, 9.2.2, …).  \n- Measurement details must use numbered subsections (9.3.1, 9.3.2, …).  \n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"visitSchedule\": \"narrative summary\",\n  \"visitScheduleDetails\": \"9.2.1. Preoperative ...\\n\\n9.2.2. Operative (Surgery) ...\\n\\n9.2.3. Postoperative 1 Day ...\\n\\n9.2.4. Postoperative 1 Week ...\\n\\n9.2.5. Exit Procedures ...\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Preoperative\",\n      \"visitWindow\": \"-90 to 0 days from surgery\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Operative\",\n      \"visitWindow\": \"0 from surgery\",\n      \"CRFnumber\": \"2\"\n    }\n  ],\n  \"measurements\": \"- CBC at screening and week 12\\n- ECG at baseline and week 6\\n- Quality of life survey at baseline and week 12\",\n  \"measurementsDetails\": \"9.3.1. Laboratory Testing ...\\n\\n9.3.2. ECG ...\\n\\n9.3.3. Quality of Life Survey ...\"\n  \"startDate\": \"2025-01-15\",\n  \"endDate\": \"2025-04-30\"\n}\n"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title:\nAmbispective Analysis of Patient Reported Outcomes and Visual Acuity in Patients with Bilateral Implantation of Odyssey Intraocular Lenses\n\n### Study Design:\nSingle-center, ambispective observational study. Subjects who previously underwent bilateral uncomplicated cataract surgery with implantation of the TECNIS Odyssey intraocular lens will be identified retrospectively through medical record review. Each eligible subject will participate in a single prospective postoperative study visit conducted at least three months after surgery. Cataract surgery itself is not part of the study.\n\n### Background:\nMultifocal and extended range of vision intraocular lenses have improved spectacle independence following cataract surgery; however, earlier designs have been associated with visual disturbances such as halos, glare, and reduced contrast sensitivity. The TECNIS Odyssey intraocular lens was developed to provide a broader range of vision while maintaining visual quality. Although the Odyssey IOL is FDA approved and used in routine clinical practice, limited data are available regarding postoperative visual acuity and patient-reported outcomes following bilateral implantation. This study aims to further characterize visual performance and patient satisfaction at least three months after surgery.\n\n### Primary Objective:\nTo evaluate postoperative visual acuity outcomes following bilateral implantation of the TECNIS Odyssey intraocular lens.\n\n### Hypothesis:\nBilateral implantation of the TECNIS Odyssey intraocular lens provides good visual acuity at distance, intermediate, and near, with acceptable patient-reported visual quality and satisfaction.\n\n### Endpoints:\nPrimary Endpoint:\n- Photopic and mesopic visual acuity at distance (6 m), intermediate (66 cm), and near (40 cm and 33 cm) assessed at the postoperative study visit.\n\nSecondary Endpoint:\n- Patient-reported outcomes assessed using the Assessment of Intraocular Lens Implant Symptoms (AIOLIS) questionnaire.\n\nExploratory Endpoints:\n- Correlation of postoperative quality-of-vision concerns with corneal performance index.\n- Correlation of pupil size with patient satisfaction.\n\n### Assessments Schedule:\n- Retrospective Component:\n  Identification of eligible subjects via medical record review confirming prior bilateral cataract surgery with Odyssey IOL implantation.\n\n- Prospective Study Visit (≥ 3 months postoperatively):\n  - Informed consent\n  - Medical history\n  - Manifest refraction\n  - Photopic and mesopic visual acuity testing at distance, intermediate, and near\n  - Assessment of Intraocular Lens Implant Symptoms (AIOLIS)\n  - Ocular Surface Disease Index (OSDI)\n  - iTrace assessment\n  - Pupil size measurement\n  - Adverse event assessment\n\nAll study procedures are non-interventional and consistent with standard ophthalmic evaluations.\n\n### Timeline:\nStudy Start Date: June 1, 2025  \nFirst Patient Enrolled: July 15, 2025  \nLast Patient Completed: December 20, 2026  \nData Analysis: January–February 2027  \nFinal Report Submission: March 31, 2027\n\n### Number of Sites:\nOne\n"
+          },
+          {
+            "role": "assistant",
+            "content": "{\n  \"visitSchedule\": \"Subjects will participate in five scheduled study visits over a 12-week period. These will include a screening/baseline visit, two interim follow-up visits at Week 4 and Week 8, a final evaluation at Week 12, and an exit visit if subjects discontinue prematurely. The visit schedule, complete with visit windows and associated CRF forms, is summarized in the table below. Details of each visit, including the specific testing to be conducted, are provided in subsections 9.2.1 through 9.2.5.\",\n  \"visitScheduleDetails\": \"9.2.1. Screening/Baseline\\nAt the baseline visit, subjects will undergo informed consent, eligibility confirmation, assignment of study ID, and collection of demographic and medical history. Baseline assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire.\\n\\n9.2.2. Week 4 Follow-up\\nSubjects will return for interim evaluation at Week 4 (±7 days). Assessments will include vital signs (blood pressure, heart rate) and monitoring for treatment-emergent adverse events. Compliance with study medication will also be reviewed.\\n\\n9.2.3. Week 8 Follow-up\\nAt Week 8 (±7 days), subjects will undergo vital signs measurement and review of adverse events. Ongoing medication compliance and safety will be evaluated.\\n\\n9.2.4. Week 12 Final Visit\\nAt Week 12 (±7 days), subjects will undergo final efficacy and safety evaluations. Assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire. Adverse events and medication compliance will also be recorded.\\n\\n9.2.5. Exit Procedures\\nSubjects who discontinue early will complete an exit visit as soon as possible. The exit visit will include safety evaluations, vital signs, review of adverse events, and return of study medication where applicable.\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Screening/Baseline\",\n      \"visitWindow\": \"Day 0\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Week 4 Follow-up\",\n      \"visitWindow\": \"Week 4 (±7 days)\",\n      \"CRFnumber\": \"2\"\n    },\n    {\n      \"visitNumber\": \"3\",\n      \"visitName\": \"Week 8 Follow-up\",\n      \"visitWindow\": \"Week 8 (±7 days)\",\n      \"CRFnumber\": \"3\"\n    },\n    {\n      \"visitNumber\": \"4\",\n      \"visitName\": \"Week 12 Final Visit\",\n      \"visitWindow\": \"Week 12 (±7 days)\",\n      \"CRFnumber\": \"4\"\n    },\n    {\n      \"visitNumber\": \"5\",\n      \"visitName\": \"Exit Visit\",\n      \"visitWindow\": \"At time of early discontinuation\",\n      \"CRFnumber\": \"5\"\n    }\n  ],\n  \"measurements\": \"All routine testing and planned study assessments will be conducted at each scheduled visit. Any abnormalities identified should be documented in the CRF 'Comment' section. Specific study examination procedures are outlined below.\",\n  \"measurementsDetails\": \"9.3.1. Vital Signs\\nBlood pressure and heart rate will be measured at each scheduled visit (baseline, week 4, week 8, week 12) using a calibrated sphygmomanometer. Measurements will be taken in a seated position after a minimum of 5 minutes rest.\\n\\n9.3.2. Laboratory Testing\\nComplete blood count, serum electrolytes, and liver function tests will be performed at baseline and week 12. Samples will be collected via venipuncture and analyzed at a certified central laboratory.\\n\\n9.3.3. ECG\\nA standard 12-lead electrocardiogram will be conducted at baseline and week 12. ECGs will be evaluated for any clinically significant abnormalities by a blinded cardiologist.\\n\\n9.3.4. Quality of Life Questionnaire\\nA validated hypertension-specific quality of life instrument will be administered at baseline and week 12. Questionnaires will be completed by subjects under the supervision of site personnel to ensure completeness and accuracy.\",\n  \"startDate\": \"2025-06-01\",\n  \"endDate\": \"2027-03-31\"\n}\n"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title: \nHistorical Ocular Care, Current Symptoms and Prospective Comfort After Routine Bilateral Cataract Surgery: An Ambispective Observational Study With Research Saliva Genotyping.\n\n\n### Study Design:\nStudy type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other — ambispective, combining retrospective record abstraction and prospective follow-up in the same consenting participants. Condition: Pseudophakia following bilateral cataract surgery. Number of sites: 3, all in the United States. One observational cohort; no treatment arms or comparator product. Intervention/exposure name: Prior routine bilateral cataract surgery and its documented ocular-care history. Exposure category: Procedure/Surgery, observed retrospectively, not assigned or performed by this study. Research activities: medical-record abstraction, noninvasive vision testing, symptom questionnaires and one saliva collection for research genotyping. The study does not assign surgery, an IOL type, medication or other treatment. It has no randomization, masking, placebo or investigational product.\n\n\n### Background:\nCurrent comfort after cataract surgery may vary between people with different documented ocular-care histories. This study links historical clinic records with newly collected symptoms and vision assessments. Research genotyping is included to explore possible associations with symptom variation. No prior effect estimates or bibliographic references are supplied.\n\n\n### Primary Objective:\n[\"Describe change in patient-reported ocular comfort from enrollment to Day 90 after enrollment.\"]\n\n\n### Hypothesis:\nGreater historical use of clinician-documented ocular surface treatment will be associated with lower Day 90 comfort scores. This is an exploratory association hypothesis, not a claim of a treatment effect.\n\n\n### Endpoints:\n{\"primary\": [{\"analysis_method\": \"\", \"description\": \"0–10 rating; positive change means improved reported comfort.\", \"label\": \"Change in ocular comfort score from Day 0 to Day 90\", \"time_frame\": \"Day 0 to Day 90 +/- 10 days after enrollment\"}], \"secondary\": [{\"analysis_method\": \"\", \"description\": \"0–10 rating.\", \"label\": \"Ocular comfort score\", \"time_frame\": \"Day 30 +/- 5 days after enrollment\"}, {\"analysis_method\": \"\", \"description\": \"logMAR; lower values indicate better visual acuity.\", \"label\": \"Best-corrected distance visual acuity for each eye\", \"time_frame\": \"Day 90 +/- 10 days after enrollment\"}, {\"analysis_method\": \"\", \"description\": \"A visit reported at both contacts is counted once.\", \"label\": \"Number of participant-reported unscheduled ocular-care visits\", \"time_frame\": \"Day 0 to Day 90 after enrollment; collected at Day 30 and Day 90\"}, {\"analysis_method\": \"\", \"description\": \"Explicit denominator of people with relevant records.\", \"label\": \"Proportion with clinician-documented ocular surface treatment\", \"time_frame\": \"Available records from 1 January 2025 through 30 September 2026\"}], \"other\": [{\"analysis_method\": \"\", \"description\": \"Variant selection is specified in a laboratory analysis plan before the coded outcome dataset is released; no clinical risk score is made. No additional outcomes are specified.\", \"label\": \"Association of coded research genotype groups with Day 90 comfort score\", \"time_frame\": \"Day 90 after enrollment\"}]}\n\n\n### Assessments Schedule:\n{\"assessments\": [\"Historical data are whatever was recorded in routine care. There is no assumed historical questionnaire, saliva collection, consent visit or standardized research assessment. An absent historical value is recorded as missing. The record-abstraction task is performed by staff after Day 0; it is not an extra participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic.\", \"No visual acuity test or saliva collection takes place by telephone.\", \"Confirm completion after these activities. No exit form, fourth visit or second saliva sample is required.\", \"No blood draws, pupil dilation, imaging, study medication or research surgery. The saliva specimen is mandatory for this study's eligibility; there is no optional genetic substudy or separate future-use opt-in. Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits.\"], \"visit_schedule\": [{\"duration\": \"\", \"mode\": \"Existing record review\", \"procedures\": \"Surgery dates; Implanted lens categories; Documented ocular diagnoses; Clinician-recorded ocular surface treatments; Recorded best-corrected distance visual acuity; Documented unscheduled ocular visits\", \"timing\": \"Records from 1 January 2025 through 30 September 2026; abstracted after Day 0 consent\", \"visit\": \"Historical record abstraction — staff task, not a participant visit\"}, {\"duration\": \"Approximately 70 minutes\", \"mode\": \"In person\", \"procedures\": \"Written informed consent before research activities; Eligibility confirmation; Authorization for historical records; Demographics and current ocular-care update; Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and current correction; Ocular comfort questionnaire: preceding 7 days, 0 extremely uncomfortable to 10 fully comfortable; One approximately 2 mL saliva collection by passive drool into a labeled tube; Enquiry about symptoms during research assessments\", \"timing\": \"Day 0 after enrollment; screening and enrollment at the same visit\", \"visit\": \"Visit 1 — Day 0 / Enrollment\"}, {\"duration\": \"Approximately 15 minutes\", \"mode\": \"Telephone\", \"procedures\": \"Ocular comfort questionnaire: preceding 7 days, 0 extremely uncomfortable to 10 fully comfortable; Interval ocular-care update; Enquiry about unscheduled ocular visits since enrollment; Assessment-related symptom enquiry\", \"timing\": \"Day 30 +/- 5 days after enrollment\", \"visit\": \"Visit 2 — Day 30\"}, {\"duration\": \"Approximately 40 minutes\", \"mode\": \"In person\", \"procedures\": \"Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and current correction; Ocular comfort questionnaire: preceding 7 days, 0 extremely uncomfortable to 10 fully comfortable; Interval ocular-care update; Unscheduled ocular-visit enquiry; Assessment-related symptom enquiry; Confirmation of research completion\", \"timing\": \"Day 90 +/- 10 days after enrollment\", \"visit\": \"Visit 3 — Day 90 / Final Visit\"}], \"visit_schedule_table\": null}\n\n\n### Timeline\nHistorical data window: 1 January 2025 through 30 September 2026. Prospective recruitment: 1 November 2026 through 31 January 2027. Last prospective participant assessment expected by 11 May 2027, allowing the final visit window. Anticipated primary completion and study completion: 11 May 2027. Analysis and administrative closeout: by 30 June 2027.\n\n\n### Number of Sites:\n3"
+          }
+        ]
+      }
+    ],
+    "current_instruction_targets": [],
+    "editorial_corrections": {
+      "study-procedure.visits": [
+        "Include a supplied missed-contact or rescheduling policy once alongside the relevant visit details, preserving its attempt limit and existing window. The drafted prose owns that rule; no second formal source sentence is needed."
+      ]
+    },
+    "consent_template_comments": [],
+    "adapter_instructions": [
+      "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
+      "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
+      "A list group may contain a nonempty label alongside items. That label renders as an unbulleted paragraph immediately before the group's items; use it to separate endpoint categories without turning introductions into bullets.",
+      "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
+      "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
+      "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
+      "Use the current section ownership instructions to tighten the retained prompts: keep Protocol synopses brief, explain each operational rule fully in its owning section and use brief heading references elsewhere. Endpoint definitions and analysis calculations remain complete where needed; ICF explanations remain self-contained for participants. Preserve every material quantity, window, exception and safety qualification.",
+      "Write final study prose, not commentary about drafting. Translate source directions into the applicable study fact: for example, 'Day 30 ratings are descriptive only' rather than an explanation about inventing registry outcomes. Omit empty category labels when no endpoint belongs to that category.",
+      "For evaluation-procedures, inspect the supplied assessment_presentation notes against the approved table. When an edit is needed, return the existing source_text/display_text/rationale shape to retain unique information without repeating the matrix. This is part of drafting, not a separate review task.",
+      "For ICF requests also follow consent_template_comments. Assess applicability from the approved source and selected family, preserving supplied conditions and existing family-owned sections. Template comments do not establish new study facts or authorization.",
+      "Use only the approved comparator, endpoints, visits, risks, benefits, statistical methods and regulatory facts. Omit legacy defaults that invent placebo, standard-of-care comparators, extra outcomes, inferred side-effect lists, dates or significance levels.",
+      "For current_instruction_targets, draft study-specific content from the approved source and current section instructions, retaining applicable fixed client language.",
+      "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses."
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "glide": {
+    "request_sha256": "ab26beeb1e0543279945eeb108203585ba1acbba32b58a00c23250bcfb411b0f",
+    "response_sha256": "7f97bf471fec8fa94ca89ad27faa5cf0449db10f549730bbf952afd8259836f6",
+    "sections": 3,
+    "manual_source_review": "completed; same Codex agent; not independent model validation"
+  },
+  "break": {
+    "request_sha256": "1784e4c2e7670ffcab00e6bba08d7876f677296487bf7f1d705e68aa186a4210",
+    "response_sha256": "fc9ffe1cde86a862745862c38ae6ef88016d6ab71ef35fa58c3e97c5f0cbb4ff",
+    "sections": 3,
+    "manual_source_review": "completed; same Codex agent; not independent model validation"
+  },
+  "comfort": {
+    "request_sha256": "c2d42da17fffa0aafcba07720e1685e5da0941c80f25fca850cfa5952fdfd5a0",
+    "response_sha256": "335bcfabcc902c15295eb173cbb2bd8fd92c16c540e262d50780049749db96a4",
+    "sections": 3,
+    "manual_source_review": "completed; same Codex agent; not independent model validation"
+  },
+  "original_n8n_library_unchanged": true
+}

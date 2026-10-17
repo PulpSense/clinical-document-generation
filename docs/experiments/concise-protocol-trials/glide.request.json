@@ -1,0 +1,1028 @@
+{
+  "case": "glide",
+  "purpose": "Controlled Codex writing trial; no Hermes execution or separate model API. Source copied from retained approved run; no source changes approved here.",
+  "source": {
+    "meta": {
+      "document_set": [
+        "protocol_docx",
+        "icf_docx",
+        "xml"
+      ],
+      "study_type": "Ambispective",
+      "protocol_number": "GLIDE-27-06",
+      "version": "1.0",
+      "date": "16 Oct 2026",
+      "icf_template": "Advarra"
+    },
+    "source": {
+      "files": [
+        {
+          "path": "input/GLIDE-27-06-study-input.txt",
+          "description": "GLIDE-27-06 STUDY SYNOPSIS AND OPERATIONAL SUPPLEMENT, Version 1.0, 16 October 2026; complete 304-line supplied source",
+          "sha256": "0131451e3968e91554c104cd6d435e38228f45f114d8443ced067aff733f0cfe"
+        }
+      ],
+      "field_candidates": {
+        "study.title": [
+          {
+            "value": "Historical Glaucoma Drop Burden and Prospective Daily Visual Function.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "study.background": [
+          {
+            "value": "The study links existing glaucoma care records to newly collected daily-function ratings and eye-pressure measurements. People using different numbers of drug ingredients may differ in disease severity and other characteristics; the study does not establish whether drops cause a change in daily function. No prior effect estimate, bibliography or validated questionnaire reference is supplied.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "objectives.primary": [
+          {
+            "value": "Estimate the difference between baseline medication-burden groups in change in daily visual-function rating from Day 0 to Day 60.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "study.hypothesis": [
+          {
+            "value": "Hypothesis: The group prescribed two or more active ingredients at enrollment will have a smaller improvement in daily function than the one-ingredient group. This is an exploratory association hypothesis, not an established effect or a claim of comparative treatment efficacy.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "design.study_design": [
+          {
+            "value": "Protocol study type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other, combining retrospective record abstraction and prospective research follow-up in the same consenting participants. Condition: Primary open-angle glaucoma treated with topical pressure-lowering medication. Healthy volunteers: No. All sexes eligible. Number of sites: 2, both in the United States. Enrollment target: 120 unique adults, aiming for 60 per site. These are people, not eyes, visits, prescriptions or historical records. No treatment, drug, device, surgery or drop schedule is assigned by research. There is no randomization, masking, placebo or investigational product. The exposure is the number of active topical glaucoma drug ingredients already prescribed in ordinary care at enrollment. Category: Drug, observed only. Research staff do not start, stop, switch, withhold or supply glaucoma drops. EXPOSURE GROUPS AND STUDY EYE All 120 people form one observational study population with two exposure groups: 1. One active topical glaucoma drug ingredient prescribed at Day 0. 2. Two or more active topical glaucoma drug ingredients prescribed at Day 0. A fixed-combination bottle counts as its number of active ingredients, not one ingredient merely because it is one bottle. Count each distinct ingredient once across both eyes; do not double-count the same ingredient used in both eyes. Classify from the clinician's current prescription list before any Day 0 change. No group size or balance is guaranteed. Recruitment is consecutive, not allocation to a medication regimen. Record later ordinary-care changes without changing the baseline exposure group or automatically removing the participant. One eye contributes pressure outcomes. At Day 0 select the eligible glaucoma eye with higher measured pressure; if tied, select the right eye. If only one eye is eligible, select that eye. Keep this eye for all pressure outcomes and historical eye-specific abstraction. A missing later measurement does not justify switching eyes. Participant function ratings remain one response per person.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "design.intervention_name": [
+          {
+            "value": "Existing prescribed topical glaucoma medication ingredients (observed ordinary care only)",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "design.intervention_type": [
+          {
+            "value": "Drug",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "design.number_of_sites": [
+          {
+            "value": 2,
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "endpoints.primary": [
+          {
+            "value": [
+              {
+                "measure": "Change in daily visual-function rating",
+                "time_frame": "Day 0 to Day 60 +/- 7 days after enrollment",
+                "description": "Primary outcome: Change in daily visual-function rating from Day 0 to Day 60 +/- 7 days after enrollment. Calculate Day 60 minus Day 0 on the 0-to-100 scale. Positive change means improvement; negative change means worsening.",
+                "analysis_method": "Day 60 minus Day 0, 0-to-100 scale; adjusted linear model by baseline exposure group."
+              }
+            ],
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "procedures.visit_schedule": [
+          {
+            "value": [
+              {
+                "visit": "Visit 1: Day 0",
+                "timing": "Day 0 enrollment; no window",
+                "mode": "In person",
+                "duration": "About 50 minutes total",
+                "participant_visit": true,
+                "procedures": [
+                  "Written consent and authorization before research",
+                  "Confirm eligibility",
+                  "Record age",
+                  "Record sex",
+                  "Record glaucoma history",
+                  "Record current prescription list before any Day 0 change",
+                  "Classify baseline ingredient-burden group",
+                  "Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.",
+                  "Goldmann applanation pressure in both eligible glaucoma eyes, mmHg: two readings per eye and arithmetic mean. select higher-pressure eligible eye, right eye if tied, or only eligible eye.",
+                  "Record study-eye selection",
+                  "Ask about assessment-related symptoms",
+                  "Explain telephone follow-up"
+                ]
+              },
+              {
+                "visit": "Visit 2: Day 30",
+                "timing": "Day 30 +/- 5 days after enrollment",
+                "mode": "Telephone",
+                "duration": "About 10 minutes",
+                "participant_visit": true,
+                "procedures": [
+                  "Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.",
+                  "Ask about ordinary-care medication changes",
+                  "Ask about ordinary-care glaucoma encounters",
+                  "Ask about assessment-related symptoms"
+                ]
+              },
+              {
+                "visit": "Visit 3: Day 60",
+                "timing": "Day 60 +/- 7 days after enrollment",
+                "mode": "In person",
+                "duration": "About 25 minutes",
+                "participant_visit": true,
+                "procedures": [
+                  "Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.",
+                  "Goldmann applanation pressure in the same fixed selected study eye, mmHg: two readings and arithmetic mean. no switching for missing measurement.",
+                  "Update prescriptions",
+                  "Ask about ordinary-care medication changes",
+                  "Ask about ordinary-care glaucoma encounters",
+                  "Ask about assessment-related symptoms",
+                  "Confirm completion"
+                ]
+              },
+              {
+                "visit": "Historical record abstraction (staff task; not a participant visit)",
+                "timing": "After written consent and authorization; records dated 1 January through 31 December 2026 inclusive only",
+                "participant_visit": false,
+                "mode": "Staff review of accessible enrolling-site records",
+                "procedures": [
+                  "Abstract encounter dates",
+                  "Abstract documented glaucoma diagnoses",
+                  "Abstract prescribed topical drug ingredients",
+                  "Abstract pressure measurements with eye, measurement date and recorded method. select latest historical study-eye value using supplied tie rules",
+                  "Abstract documented glaucoma surgery. preserve not documented versus established absence",
+                  "Count glaucoma encounters per person with person/date/encounter-identifier deduplication",
+                  "Report historical record completeness"
+                ]
+              }
+            ],
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "population.inclusion_criteria": [
+          {
+            "value": [
+              "Age 40 through 80 years inclusive at consent.",
+              "Clinician-documented primary open-angle glaucoma in at least one eye.",
+              "At least one active topical glaucoma drug ingredient prescribed at Day 0.",
+              "At least one accessible glaucoma encounter at the enrolling clinic during 1 January through 31 December 2026, inclusive.",
+              "Able to give personal written consent, answer English-language questions without a proxy, attend two clinic visits and complete one telephone contact."
+            ],
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "population.exclusion_criteria": [
+          {
+            "value": [
+              "Glaucoma surgery within 90 days before Day 0 or already planned during follow-up.",
+              "An active ocular infection preventing the specified pressure measurement.",
+              "Another interventional research study within 45 days before screening or planned participation in one during the 60-day prospective period.",
+              "Inability to consent personally or need for a proxy questionnaire respondent."
+            ],
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "procedures.minimum_days_before_screening_without_participation": [
+          {
+            "value": 45,
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "population.sample_size": [
+          {
+            "value": 120,
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "population.sample_justification": [
+          {
+            "value": "Sample justification: 120 people is a feasible exploratory sample, allowing about 10% failure to complete prospective follow-up. No formal power calculation, assumed effect size, confirmatory threshold or guaranteed exposure-group ratio is supplied. Neither missing historical pressure nor a later ordinary-care medication change is an additional exclusion criterion.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "risks_benefits.compensation_or_reimbursement": [
+          {
+            "value": "Compensation: $30 after completion of Day 0, $10 after the Day 30 telephone contact and $30 after the Day 60 visit, maximum $70. Each completed contact is paid separately in cash by the enrolling clinic before departure or, for the phone contact, at the next clinic visit or by arranged pickup within 14 days. If a participant withdraws after the phone contact, offer pickup within 14 days; no further research visit is required to collect payment already earned. There is no completion bonus and no requirement to complete all contacts to retain earned compensation. A started but unfinished contact earns half that contact's amount. No parking, transit, mileage or other expense reimbursement is provided. Compensation is not a clinical benefit.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "statistics.analysis_plan": [
+          {
+            "value": "Analysis populations: all consented eligible enrolled people with relevant observed data. The primary change analysis needs both Day 0 and Day 60 function ratings; people missing that pair may contribute other observed summaries. Use baseline medication-burden groups even when ordinary care changes later. Primary analysis: linear model of Day 60 minus Day 0 function including baseline exposure group, Day 0 function, age and site. Report adjusted mean change by group and the two-or-more minus one-ingredient adjusted difference, with a 95% confidence interval. A negative difference means less improvement in the higher-burden group, not proof of harm caused by drops. Confounding by indication remains possible. Summarize secondary outcomes descriptively by baseline group. Report pressure once per person from the fixed study eye; no paired-eye model or per-eye enrollment. Describe continuous data with count, mean, standard deviation, median and range; categorical data with counts, percentages and explicit observed denominators. Use available observations. Do not impute function, pressure, encounters or medication changes. Unknown change status is not zero changes. Describe missing data, historical completeness and disposition by site and exposure group. No multiplicity-adjusted confirmatory or causal claims are authorized.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "study.timeline": [
+          {
+            "value": "Recruitment and enrollment: 1 February through 31 May 2027. Final participant assessments, primary completion and study completion: anticipated by 15 August 2027, allowing the final Day 60 window. Historical abstraction period: 1 January through 31 December 2026 inclusive. Administrative closeout: 31 December 2027.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.irb.name": [
+          {
+            "value": "Harborview Independent Research Ethics Board",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.irb.affiliation": [
+          {
+            "value": "Independent IRB, unaffiliated with sponsor and study clinics.",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.irb.phone": [
+          {
+            "value": "+1 202-555-0145",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.irb.email": [
+          {
+            "value": "participant.rights.harborview@example.org",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.irb.address": [
+          {
+            "value": "600 Review Plaza, Suite 400, Baltimore, MD 21203, United States",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.sponsor.name": [
+          {
+            "value": "Cedarbridge Outcomes Research Foundation",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.sponsor.address": [
+          {
+            "value": "1800 Research Commons Drive, Suite 240, Baltimore, MD 21201, United States",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.principal_investigator.name": [
+          {
+            "value": "Dr. Jordan Hale, MD",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.principal_investigator.title": [
+          {
+            "value": "Principal Investigator",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.name": [
+          {
+            "value": "Morgan Ellis, CCRC",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.title": [
+          {
+            "value": "Lead Study Coordinator",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.business_phone": [
+          {
+            "value": "+1 202-555-0141",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.office_phone": [
+          {
+            "value": "+1 202-555-0142",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.email": [
+          {
+            "value": "morgan.ellis@example.org",
+            "source": "input/GLIDE-27-06-study-input.txt"
+          }
+        ],
+        "sites.facilities": [
+          {
+            "value": [
+              {
+                "name": "Cedarbridge Glaucoma and Vision Research Clinic",
+                "address": "2400 Clinic Lane, Suite 120, Baltimore, MD 21202, United States",
+                "city": "Baltimore",
+                "state": "MD",
+                "zip": "21202",
+                "country": "United States"
+              },
+              {
+                "name": "Westhaven Ophthalmology Outcomes Center",
+                "address": "750 Westhaven Boulevard, Suite 310, Arlington, VA 22201, United States",
+                "city": "Arlington",
+                "state": "VA",
+                "zip": "22201",
+                "country": "United States"
+              }
+            ],
+            "source": "input/GLIDE-27-06-study-input.txt lines 269-278"
+          }
+        ],
+        "sites.contacts": [
+          {
+            "value": [
+              {
+                "name": "Morgan Ellis, CCRC",
+                "first_name": "Morgan",
+                "last_name": "Ellis",
+                "title": "Lead Study Coordinator",
+                "degrees": "CCRC",
+                "business_phone": "+1 202-555-0141",
+                "office_phone": "+1 202-555-0142",
+                "email": "morgan.ellis@example.org",
+                "address": "2400 Clinic Lane, Suite 120, Baltimore, MD 21202, United States"
+              },
+              {
+                "name": "Riley Brooks, CCRC",
+                "first_name": "Riley",
+                "last_name": "Brooks",
+                "title": "Site Study Coordinator",
+                "degrees": "CCRC",
+                "business_phone": "+1 202-555-0143",
+                "office_phone": "+1 202-555-0144",
+                "email": "riley.brooks@example.org",
+                "address": "750 Westhaven Boulevard, Suite 310, Arlington, VA 22201, United States"
+              }
+            ],
+            "source": "input/GLIDE-27-06-study-input.txt lines 269-278"
+          }
+        ],
+        "sites.investigators": [
+          {
+            "value": [
+              {
+                "name": "Dr. Jordan Hale, MD",
+                "first_name": "Jordan",
+                "last_name": "Hale",
+                "title": "Principal Investigator",
+                "degrees": "MD",
+                "honorific": "Dr."
+              },
+              {
+                "name": "Dr. Casey Rowan, MD",
+                "first_name": "Casey",
+                "last_name": "Rowan",
+                "title": "Site Investigator",
+                "degrees": "MD",
+                "honorific": "Dr."
+              }
+            ],
+            "source": "input/GLIDE-27-06-study-input.txt lines 269-278"
+          }
+        ]
+      },
+      "source_of_truth_file": "reference/source-of-truth--glide-27-06--historical-glaucoma-drop-burden-and-prospective-daily-visual.md"
+    },
+    "approval": {
+      "status": "approved",
+      "approved_by": "client",
+      "approved_at": "2026-10-17T12:31:30.432899+00:00",
+      "review_file": "reference/source-of-truth--glide-27-06--historical-glaucoma-drop-burden-and-prospective-daily-visual.md",
+      "source_sha256": "6ca75890eb2c588c034885f5f20b045a5fa7fc88e1d51708fd743b768e013b46",
+      "revision_id": "r-d49898c78a1a",
+      "source_approval_identity": "d49898c78a1aff6ad864de367fa0cdafe75b18253412b20f10b24772f567a51b",
+      "generation_authority_sha256": "41a68787e20e36f872961a038f97fbe40e21f0b0fccc8381d3ee726bfff6e904",
+      "governing_sha256": "41a68787e20e36f872961a038f97fbe40e21f0b0fccc8381d3ee726bfff6e904"
+    },
+    "study": {
+      "title": "Historical Glaucoma Drop Burden and Prospective Daily Visual Function.",
+      "short_title": "Glaucoma Drops and Daily Function.",
+      "background": "The study links existing glaucoma care records to newly collected daily-function ratings and eye-pressure measurements. People using different numbers of drug ingredients may differ in disease severity and other characteristics; the study does not establish whether drops cause a change in daily function. No prior effect estimate, bibliography or validated questionnaire reference is supplied.",
+      "hypothesis": "Hypothesis: The group prescribed two or more active ingredients at enrollment will have a smaller improvement in daily function than the one-ingredient group. This is an exploratory association hypothesis, not an established effect or a claim of comparative treatment efficacy.",
+      "participation_duration": "Follow-up lasts 60 days from Day 0 enrollment, not from diagnosis or medication initiation. There are three scheduled research contacts: two in person and one by telephone. Historical encounters are not added to this count.",
+      "timeline": "Recruitment and enrollment: 1 February through 31 May 2027. Final participant assessments, primary completion and study completion: anticipated by 15 August 2027, allowing the final Day 60 window. Historical abstraction period: 1 January through 31 December 2026 inclusive. Administrative closeout: 31 December 2027.",
+      "completion": "Final participant assessments, primary completion and study completion: anticipated by 15 August 2027, allowing the final Day 60 window. Administrative closeout: 31 December 2027. Staff reconciliation, dataset lock, analysis, aggregate reporting and archiving do not extend individual follow-up. No additional participant visit is required for administrative closeout.",
+      "condition": "Primary open-angle glaucoma treated with topical pressure-lowering medication"
+    },
+    "parties": {
+      "sponsor": {
+        "name": "Cedarbridge Outcomes Research Foundation",
+        "address": "1800 Research Commons Drive, Suite 240, Baltimore, MD 21201, United States",
+        "contact": {
+          "name": "Avery Chen",
+          "first_name": "Avery",
+          "last_name": "Chen",
+          "title": "Research Program Director",
+          "degrees": null,
+          "phone": "+1 202-555-0140",
+          "email": "avery.chen@example.org"
+        }
+      },
+      "principal_investigator": {
+        "name": "Dr. Jordan Hale, MD",
+        "first_name": "Jordan",
+        "last_name": "Hale",
+        "title": "Principal Investigator",
+        "degrees": "MD",
+        "honorific": "Dr."
+      },
+      "study_coordinator": {
+        "name": "Morgan Ellis, CCRC",
+        "first_name": "Morgan",
+        "last_name": "Ellis",
+        "title": "Lead Study Coordinator",
+        "degrees": "CCRC",
+        "business_phone": "+1 202-555-0141",
+        "office_phone": "+1 202-555-0142",
+        "email": "morgan.ellis@example.org",
+        "address": "2400 Clinic Lane, Suite 120, Baltimore, MD 21202, United States"
+      },
+      "irb": {
+        "name": "Harborview Independent Research Ethics Board",
+        "affiliation": "Independent IRB, unaffiliated with sponsor and study clinics.",
+        "address": "600 Review Plaza, Suite 400, Baltimore, MD 21203, United States",
+        "phone": "+1 202-555-0145",
+        "email": "participant.rights.harborview@example.org"
+      }
+    },
+    "sites": [
+      {
+        "contact": {
+          "address": "2400 Clinic Lane, Suite 120, Baltimore, MD 21202, United States",
+          "business_phone": "+1 202-555-0141",
+          "degrees": "CCRC",
+          "email": "morgan.ellis@example.org",
+          "first_name": "Morgan",
+          "last_name": "Ellis",
+          "name": "Morgan Ellis, CCRC",
+          "office_phone": "+1 202-555-0142",
+          "title": "Lead Study Coordinator"
+        },
+        "facility": {
+          "address": "2400 Clinic Lane, Suite 120, Baltimore, MD 21202, United States",
+          "city": "Baltimore",
+          "country": "United States",
+          "name": "Cedarbridge Glaucoma and Vision Research Clinic",
+          "state": "MD",
+          "zip": "21202"
+        },
+        "investigator": {
+          "degrees": "MD",
+          "first_name": "Jordan",
+          "honorific": "Dr.",
+          "last_name": "Hale",
+          "name": "Dr. Jordan Hale, MD",
+          "title": "Principal Investigator"
+        }
+      },
+      {
+        "contact": {
+          "address": "750 Westhaven Boulevard, Suite 310, Arlington, VA 22201, United States",
+          "business_phone": "+1 202-555-0143",
+          "degrees": "CCRC",
+          "email": "riley.brooks@example.org",
+          "first_name": "Riley",
+          "last_name": "Brooks",
+          "name": "Riley Brooks, CCRC",
+          "office_phone": "+1 202-555-0144",
+          "title": "Site Study Coordinator"
+        },
+        "facility": {
+          "address": "750 Westhaven Boulevard, Suite 310, Arlington, VA 22201, United States",
+          "city": "Arlington",
+          "country": "United States",
+          "name": "Westhaven Ophthalmology Outcomes Center",
+          "state": "VA",
+          "zip": "22201"
+        },
+        "investigator": {
+          "degrees": "MD",
+          "first_name": "Casey",
+          "honorific": "Dr.",
+          "last_name": "Rowan",
+          "name": "Dr. Casey Rowan, MD",
+          "title": "Site Investigator"
+        }
+      }
+    ],
+    "population": {
+      "study_population": "120 unique adults with clinician-documented primary open-angle glaucoma treated with at least one prescribed topical glaucoma ingredient; people, not eyes, visits, prescriptions or historical records. Consecutive recruitment, aiming for 60 per site; no guaranteed exposure-group balance.",
+      "sample_size": "120",
+      "sample_justification": "Sample justification: 120 people is a feasible exploratory sample, allowing about 10% failure to complete prospective follow-up. No formal power calculation, assumed effect size, confirmatory threshold or guaranteed exposure-group ratio is supplied. Neither missing historical pressure nor a later ordinary-care medication change is an additional exclusion criterion.",
+      "minimum_age": "40 Years",
+      "maximum_age": "80 Years",
+      "sex": "All",
+      "healthy_volunteers": "False",
+      "inclusion_criteria": [
+        "Age 40 through 80 years inclusive at consent.",
+        "Clinician-documented primary open-angle glaucoma in at least one eye.",
+        "At least one active topical glaucoma drug ingredient prescribed at Day 0.",
+        "At least one accessible glaucoma encounter at the enrolling clinic during 1 January through 31 December 2026, inclusive.",
+        "Able to give personal written consent, answer English-language questions without a proxy, attend two clinic visits and complete one telephone contact."
+      ],
+      "exclusion_criteria": [
+        "Glaucoma surgery within 90 days before Day 0 or already planned during follow-up.",
+        "An active ocular infection preventing the specified pressure measurement.",
+        "Another interventional research study within 45 days before screening or planned participation in one during the 60-day prospective period.",
+        "Inability to consent personally or need for a proxy questionnaire respondent."
+      ],
+      "eligibility_notes": "The minimum period without another interventional-study participation before screening is 45 days. Screening and enrollment occur together at Day 0. Pregnancy is not excluded. There are no research pregnancy tests, contraception requirements, radiation, specimens or study drugs. Adults unable to consent and children are not enrolled. No LAR, proxy or witness signature is required. Neither missing historical pressure nor a later ordinary-care medication change is an additional exclusion criterion. One eye contributes pressure outcomes. At Day 0 select the eligible glaucoma eye with higher measured pressure; if tied, select the right eye. If only one eye is eligible, select that eye. Keep this eye for all pressure outcomes and historical eye-specific abstraction. A missing later measurement does not justify switching eyes. Participant function ratings remain one response per person.",
+      "recruitment": "Recruit consecutive eligible clinic patients expressing interest after routine clinic notices. Declining does not affect ordinary care."
+    },
+    "design": {
+      "study_design_summary": "Two-site observational ambispective cohort of 120 consenting adults, comparing baseline one-ingredient versus two-or-more-ingredient ordinary-care exposure groups without research assignment; historical 2026 records and 60-day prospective follow-up.",
+      "study_design": "Protocol study type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other, combining retrospective record abstraction and prospective research follow-up in the same consenting participants. Condition: Primary open-angle glaucoma treated with topical pressure-lowering medication. Healthy volunteers: No. All sexes eligible. Number of sites: 2, both in the United States. Enrollment target: 120 unique adults, aiming for 60 per site. These are people, not eyes, visits, prescriptions or historical records. No treatment, drug, device, surgery or drop schedule is assigned by research. There is no randomization, masking, placebo or investigational product. The exposure is the number of active topical glaucoma drug ingredients already prescribed in ordinary care at enrollment. Category: Drug, observed only. Research staff do not start, stop, switch, withhold or supply glaucoma drops. EXPOSURE GROUPS AND STUDY EYE All 120 people form one observational study population with two exposure groups: 1. One active topical glaucoma drug ingredient prescribed at Day 0. 2. Two or more active topical glaucoma drug ingredients prescribed at Day 0. A fixed-combination bottle counts as its number of active ingredients, not one ingredient merely because it is one bottle. Count each distinct ingredient once across both eyes; do not double-count the same ingredient used in both eyes. Classify from the clinician's current prescription list before any Day 0 change. No group size or balance is guaranteed. Recruitment is consecutive, not allocation to a medication regimen. Record later ordinary-care changes without changing the baseline exposure group or automatically removing the participant. One eye contributes pressure outcomes. At Day 0 select the eligible glaucoma eye with higher measured pressure; if tied, select the right eye. If only one eye is eligible, select that eye. Keep this eye for all pressure outcomes and historical eye-specific abstraction. A missing later measurement does not justify switching eyes. Participant function ratings remain one response per person.",
+      "number_of_sites": "2",
+      "masking": "None",
+      "treatment_assignment": "None; consecutive recruitment, no randomization, allocation, masking, placebo or investigational product. Research staff do not start, stop, switch, withhold or supply glaucoma drops.",
+      "intervention_name": "Existing prescribed topical glaucoma medication ingredients (observed ordinary care only)",
+      "intervention_type": "Drug",
+      "intervention_description": "No treatment, drug, device, surgery or drop schedule is assigned by research. There is no randomization, masking, placebo or investigational product. The exposure is the number of active topical glaucoma drug ingredients already prescribed in ordinary care at enrollment. Category: Drug, observed only. Research staff do not start, stop, switch, withhold or supply glaucoma drops. Measure research eye pressure with clinic Goldmann applanation tonometry under the clinic's usual safety procedures, in mmHg. At each research measurement take two readings in the relevant eye and use their arithmetic mean. Day 0 uses both eligible eyes for selection; Day 60 measures only the selected study eye. Routine topical anesthetic and fluorescein used for tonometry are part of the assessment, not a randomized intervention or take-home study treatment.",
+      "arms": [
+        {
+          "description": "One active topical glaucoma drug ingredient prescribed at Day 0; group size not guaranteed.",
+          "label": "One active ingredient",
+          "type": "Observational exposure group"
+        },
+        {
+          "description": "Two or more active topical glaucoma drug ingredients prescribed at Day 0; group size not guaranteed.",
+          "label": "Two or more active ingredients",
+          "type": "Observational exposure group"
+        }
+      ],
+      "exposure_classification": "A fixed-combination bottle counts as its number of active ingredients, not one ingredient merely because it is one bottle. Count each distinct ingredient once across both eyes; do not double-count the same ingredient used in both eyes. Classify from the clinician's current prescription list before any Day 0 change. No group size or balance is guaranteed. Recruitment is consecutive, not allocation to a medication regimen. Record later ordinary-care changes without changing the baseline exposure group or automatically removing the participant.",
+      "study_eye": "One eye contributes pressure outcomes. At Day 0 select the eligible glaucoma eye with higher measured pressure; if tied, select the right eye. If only one eye is eligible, select that eye. Keep this eye for all pressure outcomes and historical eye-specific abstraction. A missing later measurement does not justify switching eyes. Participant function ratings remain one response per person.",
+      "data_sources": "RETROSPECTIVE COMPONENT After written consent and authorization, staff abstract existing records only within 1 January through 31 December 2026 inclusive. No unconsented records-only cohort and no waiver of consent or authorization are requested. Abstract encounter dates, documented glaucoma diagnoses, prescribed topical drug ingredients, pressure measurements with eye and measurement date, and documented glaucoma surgery. Records are those accessible at the enrolling site. Do not obtain outside records or extend the historical period to fill gaps. Historical encounters were ordinary care, not historical research visits. Their frequency, testing and timing were irregular; do not manufacture a common visit schedule, historical function score or retrospective symptom questionnaire. For the descriptive historical pressure value, use the selected study eye's latest documented pressure in the historical period. If more than one is recorded on that date, use the last time-stamped value. If times are absent, use the first value in the clinical entry and document that selection. Preserve the measurement method as recorded; do not assume all historical values used the research method. An absent historical value is missing, not normal, zero or a reason to exclude. Count documented glaucoma encounters per person within the fixed period; deduplicate entries with the same person, date and encounter identifier. Report record completeness. No documented surgery is reported as 'not documented' unless the record explicitly establishes absence; missing records do not establish none.",
+      "controls": "No placebo, assigned control or investigational product; comparison is between two baseline observed exposure groups."
+    },
+    "objectives": {
+      "primary": "Estimate the difference between baseline medication-burden groups in change in daily visual-function rating from Day 0 to Day 60.",
+      "secondary": [
+        "Describe Day 60 eye pressure in the selected study eye, historical documented glaucoma encounters and prospective ordinary-care changes."
+      ]
+    },
+    "endpoints": {
+      "primary": [
+        {
+          "analysis_method": "Day 60 minus Day 0, 0-to-100 scale; adjusted linear model by baseline exposure group.",
+          "description": "Primary outcome: Change in daily visual-function rating from Day 0 to Day 60 +/- 7 days after enrollment. Calculate Day 60 minus Day 0 on the 0-to-100 scale. Positive change means improvement; negative change means worsening.",
+          "measure": "Change in daily visual-function rating",
+          "time_frame": "Day 0 to Day 60 +/- 7 days after enrollment"
+        }
+      ],
+      "secondary": [
+        {
+          "analysis_method": "",
+          "description": "Secondary outcome 1: Selected study-eye pressure at Day 60 +/- 7 days, in mmHg. Lower pressure is a lower measured value; no target-pressure threshold or definition of clinical success is supplied. This endpoint is a level, not change.",
+          "measure": "Selected study-eye pressure",
+          "time_frame": "Day 60 +/- 7 days after enrollment"
+        },
+        {
+          "analysis_method": "",
+          "description": "Secondary outcome 2: Number of documented glaucoma encounters per participant during 1 January through 31 December 2026, using the deduplication rule above. Count documented glaucoma encounters per person within the fixed period; deduplicate entries with the same person, date and encounter identifier. Report record completeness. No documented surgery is reported as 'not documented' unless the record explicitly establishes absence; missing records do not establish none.",
+          "measure": "Number of documented glaucoma encounters per participant",
+          "time_frame": "1 January through 31 December 2026 inclusive"
+        },
+        {
+          "analysis_method": "",
+          "description": "Secondary outcome 3: Number of ordinary-care topical glaucoma regimen changes per participant from enrollment through Day 60 +/- 7 days. A change is a clinician-directed start, stop or dose-frequency change; a refill alone is not a change. Count a same-day coordinated regimen adjustment as one event, even if more than one ingredient changes. Use accessible records and scheduled-contact updates, reconcile duplicates and retain unknown status when information is absent.",
+          "measure": "Number of ordinary-care topical glaucoma regimen changes per participant",
+          "time_frame": "Enrollment through Day 60 +/- 7 days"
+        }
+      ]
+    },
+    "procedures": {
+      "minimum_days_before_screening_without_participation": "45",
+      "consent": [
+        "Able to give personal written consent, answer English-language questions without a proxy, attend two clinic visits and complete one telephone contact. The minimum period without another interventional-study participation before screening is 45 days. Screening and enrollment occur together at Day 0. Pregnancy is not excluded. There are no research pregnancy tests, contraception requirements, radiation, specimens or study drugs. Adults unable to consent and children are not enrolled. No LAR, proxy or witness signature is required. After written consent and authorization, staff abstract existing records only within 1 January through 31 December 2026 inclusive. No unconsented records-only cohort and no waiver of consent or authorization are requested."
+      ],
+      "enrollment": "Recruit consecutive eligible clinic patients expressing interest after routine clinic notices. Declining does not affect ordinary care. Screening and enrollment occur together at Day 0.",
+      "visit_schedule": [
+        {
+          "duration": "About 50 minutes total",
+          "mode": "In person",
+          "participant_visit": "True",
+          "procedures": "Written consent and authorization before research; Confirm eligibility; Record age; Record sex; Record glaucoma history; Record current prescription list before any Day 0 change; Classify baseline ingredient-burden group; Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.; Goldmann applanation pressure in both eligible glaucoma eyes, mmHg: two readings per eye and arithmetic mean. select higher-pressure eligible eye, right eye if tied, or only eligible eye.; Record study-eye selection; Ask about assessment-related symptoms; Explain telephone follow-up",
+          "timing": "Day 0 enrollment; no window",
+          "visit": "Visit 1: Day 0"
+        },
+        {
+          "duration": "About 10 minutes",
+          "mode": "Telephone",
+          "participant_visit": "True",
+          "procedures": "Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.; Ask about ordinary-care medication changes; Ask about ordinary-care glaucoma encounters; Ask about assessment-related symptoms",
+          "timing": "Day 30 +/- 5 days after enrollment",
+          "visit": "Visit 2: Day 30"
+        },
+        {
+          "duration": "About 25 minutes",
+          "mode": "In person",
+          "participant_visit": "True",
+          "procedures": "Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.; Goldmann applanation pressure in the same fixed selected study eye, mmHg: two readings and arithmetic mean. no switching for missing measurement.; Update prescriptions; Ask about ordinary-care medication changes; Ask about ordinary-care glaucoma encounters; Ask about assessment-related symptoms; Confirm completion",
+          "timing": "Day 60 +/- 7 days after enrollment",
+          "visit": "Visit 3: Day 60"
+        },
+        {
+          "duration": "",
+          "mode": "Staff review of accessible enrolling-site records",
+          "participant_visit": "False",
+          "procedures": "Abstract encounter dates; Abstract documented glaucoma diagnoses; Abstract prescribed topical drug ingredients; Abstract pressure measurements with eye, measurement date and recorded method. select latest historical study-eye value using supplied tie rules; Abstract documented glaucoma surgery. preserve not documented versus established absence; Count glaucoma encounters per person with person/date/encounter-identifier deduplication; Report historical record completeness",
+          "timing": "After written consent and authorization; records dated 1 January through 31 December 2026 inclusive only",
+          "visit": "Historical record abstraction (staff task; not a participant visit)"
+        }
+      ],
+      "assessments": [
+        "Visit 1: Day 0 is in person, no window, about 50 minutes total. Historical abstraction is later staff work, not another participant visit or extra time added to the 50-minute visit total.",
+        "Visit 2: Day 30 +/- 5 days after enrollment is by telephone, about 10 minutes. No eye-pressure test, new drug instruction, specimen collection or device assessment occurs by telephone.",
+        "Visit 3: Day 60 +/- 7 days after enrollment is in person, about 25 minutes. There is no extra exit form or closeout contact.",
+        "There are no home diaries, adherence targets, app logs, home devices, daily symptom scores, visual acuity tests, imaging, dilation, blood draws, saliva, genetic tests, specimen storage or future specimen use."
+      ],
+      "assessment_details": "Measure research eye pressure with clinic Goldmann applanation tonometry under the clinic's usual safety procedures, in mmHg. At each research measurement take two readings in the relevant eye and use their arithmetic mean. Day 0 uses both eligible eyes for selection; Day 60 measures only the selected study eye. Routine topical anesthetic and fluorescein used for tonometry are part of the assessment, not a randomized intervention or take-home study treatment. Ask at Day 0, Day 30 and Day 60: 'Over the past seven days, how well could you perform your usual daily visual tasks?' Record a single study-specific rating from 0, unable to perform usual tasks, through 100, able to perform all usual tasks without difficulty. Higher is better. No validation claim is supplied.",
+      "methods": "RETROSPECTIVE COMPONENT After written consent and authorization, staff abstract existing records only within 1 January through 31 December 2026 inclusive. No unconsented records-only cohort and no waiver of consent or authorization are requested. Abstract encounter dates, documented glaucoma diagnoses, prescribed topical drug ingredients, pressure measurements with eye and measurement date, and documented glaucoma surgery. Records are those accessible at the enrolling site. Do not obtain outside records or extend the historical period to fill gaps. Historical encounters were ordinary care, not historical research visits. Their frequency, testing and timing were irregular; do not manufacture a common visit schedule, historical function score or retrospective symptom questionnaire. For the descriptive historical pressure value, use the selected study eye's latest documented pressure in the historical period. If more than one is recorded on that date, use the last time-stamped value. If times are absent, use the first value in the clinical entry and document that selection. Preserve the measurement method as recorded; do not assume all historical values used the research method. An absent historical value is missing, not normal, zero or a reason to exclude. Count documented glaucoma encounters per person within the fixed period; deduplicate entries with the same person, date and encounter identifier. Report record completeness. No documented surgery is reported as 'not documented' unless the record explicitly establishes absence; missing records do not establish none. Measure research eye pressure with clinic Goldmann applanation tonometry under the clinic's usual safety procedures, in mmHg. At each research measurement take two readings in the relevant eye and use their arithmetic mean. Day 0 uses both eligible eyes for selection; Day 60 measures only the selected study eye. Routine topical anesthetic and fluorescein used for tonometry are part of the assessment, not a randomized intervention or take-home study treatment. Ask at Day 0, Day 30 and Day 60: 'Over the past seven days, how well could you perform your usual daily visual tasks?' Record a single study-specific rating from 0, unable to perform usual tasks, through 100, able to perform all usual tasks without difficulty. Higher is better. No validation claim is supplied. Secondary outcome 3: Number of ordinary-care topical glaucoma regimen changes per participant from enrollment through Day 60 +/- 7 days. A change is a clinician-directed start, stop or dose-frequency change; a refill alone is not a change. Count a same-day coordinated regimen adjustment as one event, even if more than one ingredient changes. Use accessible records and scheduled-contact updates, reconcile duplicates and retain unknown status when information is absent. Day 30 function and the selected historical pressure support descriptive context; they are not extra registry outcomes. No exploratory or genetic outcome is defined.",
+      "intervention_management": "No treatment, drug, device, surgery or drop schedule is assigned by research. There is no randomization, masking, placebo or investigational product. The exposure is the number of active topical glaucoma drug ingredients already prescribed in ordinary care at enrollment. Category: Drug, observed only. Research staff do not start, stop, switch, withhold or supply glaucoma drops. A fixed-combination bottle counts as its number of active ingredients, not one ingredient merely because it is one bottle. Count each distinct ingredient once across both eyes; do not double-count the same ingredient used in both eyes. Classify from the clinician's current prescription list before any Day 0 change. No group size or balance is guaranteed. Recruitment is consecutive, not allocation to a medication regimen. Record later ordinary-care changes without changing the baseline exposure group or automatically removing the participant. One eye contributes pressure outcomes. At Day 0 select the eligible glaucoma eye with higher measured pressure; if tied, select the right eye. If only one eye is eligible, select that eye. Keep this eye for all pressure outcomes and historical eye-specific abstraction. A missing later measurement does not justify switching eyes. Participant function ratings remain one response per person.",
+      "retention": "For a missed contact, make up to two scheduling attempts inside its existing window. Do not replace a clinic pressure test with a telephone or home test. An unscheduled clinical visit is ordinary care, not an automatically added research contact. Record reported ordinary-care events at the scheduled contacts.",
+      "unscheduled_visits": "An unscheduled clinical visit is ordinary care, not an automatically added research contact. Record reported ordinary-care events at the scheduled contacts.",
+      "discontinued_subjects": "WITHDRAWAL, RESULTS AND DATES Participants may decline or stop without penalty or loss of ordinary benefits by telling or writing to their site coordinator. A final clinical discussion is optional; no final research measurement or extra contact is mandatory. The investigator may discontinue participation at the participant's request, if assessments cannot be completed, or if the study closes. Record reasons when available; later medication changes alone are not discontinuation criteria.",
+      "return_of_results": "Offer individual pressure results at attended clinic visits, explain clinical concerns and refer to ordinary care. An aggregate plain-language summary is available on request after analysis. No research genetic result is promised.",
+      "specimens": "There are no home diaries, adherence targets, app logs, home devices, daily symptom scores, visual acuity tests, imaging, dilation, blood draws, saliva, genetic tests, specimen storage or future specimen use. No public individual-data sharing, data sale, unrelated future research, commercial specimen use, specimen banking or optional genetic participation is planned. No genetic-discrimination or future-specimen consent choice is needed.",
+      "contacts": "Both coordinators handle study questions, scheduling and access to the local study doctor Monday through Friday, 8:30 a.m. to 4:30 p.m. local time. These numbers are not emergency or 24-hour services.",
+      "discontinuation": null,
+      "termination": null,
+      "study_termination": null
+    },
+    "statistics": {
+      "analysis_plan": "Analysis populations: all consented eligible enrolled people with relevant observed data. The primary change analysis needs both Day 0 and Day 60 function ratings; people missing that pair may contribute other observed summaries. Use baseline medication-burden groups even when ordinary care changes later. Primary analysis: linear model of Day 60 minus Day 0 function including baseline exposure group, Day 0 function, age and site. Report adjusted mean change by group and the two-or-more minus one-ingredient adjusted difference, with a 95% confidence interval. A negative difference means less improvement in the higher-burden group, not proof of harm caused by drops. Confounding by indication remains possible. Summarize secondary outcomes descriptively by baseline group. Report pressure once per person from the fixed study eye; no paired-eye model or per-eye enrollment. Describe continuous data with count, mean, standard deviation, median and range; categorical data with counts, percentages and explicit observed denominators. Use available observations. Do not impute function, pressure, encounters or medication changes. Unknown change status is not zero changes. Describe missing data, historical completeness and disposition by site and exposure group. No multiplicity-adjusted confirmatory or causal claims are authorized.",
+      "analysis_populations": "Analysis populations: all consented eligible enrolled people with relevant observed data. The primary change analysis needs both Day 0 and Day 60 function ratings; people missing that pair may contribute other observed summaries. Use baseline medication-burden groups even when ordinary care changes later.",
+      "methodology": "Primary analysis: linear model of Day 60 minus Day 0 function including baseline exposure group, Day 0 function, age and site. Report adjusted mean change by group and the two-or-more minus one-ingredient adjusted difference, with a 95% confidence interval. A negative difference means less improvement in the higher-burden group, not proof of harm caused by drops. Confounding by indication remains possible. Summarize secondary outcomes descriptively by baseline group. Report pressure once per person from the fixed study eye; no paired-eye model or per-eye enrollment. Describe continuous data with count, mean, standard deviation, median and range; categorical data with counts, percentages and explicit observed denominators.",
+      "missing_data": "Use available observations. Do not impute function, pressure, encounters or medication changes. Unknown change status is not zero changes. Describe missing data, historical completeness and disposition by site and exposure group. No multiplicity-adjusted confirmatory or causal claims are authorized.",
+      "sample_size_justification": "Sample justification: 120 people is a feasible exploratory sample, allowing about 10% failure to complete prospective follow-up. No formal power calculation, assumed effect size, confirmatory threshold or guaranteed exposure-group ratio is supplied. Neither missing historical pressure nor a later ordinary-care medication change is an additional exclusion criterion.",
+      "descriptive_context": "Day 30 function and the selected historical pressure support descriptive context; they are not extra registry outcomes. No exploratory or genetic outcome is defined.",
+      "missing_data_handling": null
+    },
+    "safety": {
+      "general_information": "Risks include brief discomfort, tearing, irritation or blurred vision during tonometry; rare corneal abrasion or reaction to routine assessment drops; frustration with questions; travel/time burden; and loss of confidentiality. Participants may pause or stop testing. The clinic uses its usual infection control and assessment safety procedures. Persistent symptoms or clinical concerns go to the study doctor and ordinary care. No direct benefit is promised.",
+      "monitoring": "Ask about assessment-related symptoms at Day 0, Day 30 telephone contact and Day 60. Participants may pause or stop testing. The clinic uses its usual infection control and assessment safety procedures. Persistent symptoms or clinical concerns go to the study doctor and ordinary care. No direct benefit is promised.",
+      "follow_up": "Participants may pause or stop testing. The clinic uses its usual infection control and assessment safety procedures. Persistent symptoms or clinical concerns go to the study doctor and ordinary care. No direct benefit is promised.",
+      "research_injury": "For possible research injury contact the enrolling site's coordinator to reach its study doctor; the clinic arranges evaluation. Use emergency services for emergencies. There is no sponsor fund for free injury care or additional injury compensation. Ordinary treatment may be billed to the participant or insurer. Do not promise free treatment or waive legal rights.",
+      "adverse_events": null
+    },
+    "ethics": {
+      "approval_status": "IRB status: Not yet submitted. No approval, approval number or date obtained.",
+      "consent_template_selection": "Advarra is the selected consent layout; populate its opening study fields using these facts. Template selection does not replace the named reviewing IRB or establish approval. Rights questions use the Harborview IRB contact above.",
+      "consent": [
+        "Able to give personal written consent, answer English-language questions without a proxy, attend two clinic visits and complete one telephone contact. Pregnancy is not excluded. There are no research pregnancy tests, contraception requirements, radiation, specimens or study drugs. Adults unable to consent and children are not enrolled. No LAR, proxy or witness signature is required."
+      ],
+      "voluntary_participation": "WITHDRAWAL, RESULTS AND DATES Participants may decline or stop without penalty or loss of ordinary benefits by telling or writing to their site coordinator. A final clinical discussion is optional; no final research measurement or extra contact is mandatory. The investigator may discontinue participation at the participant's request, if assessments cannot be completed, or if the study closes. Record reasons when available; later medication changes alone are not discontinuation criteria.",
+      "authorization": "Authorization permits the specified historical abstraction and new study data collection and expires on 31 August 2027, or earlier written revocation. Expiry does not extend the participant's planned 60-day research follow-up. Revoke authorization by writing to the coordinator at the enrolling site's mailing address below. Stop new abstraction and collection after revocation; already collected information may remain in analyses and required oversight records. Ordinary care continues. Withdrawal does not erase earned compensation."
+    },
+    "confidentiality": {
+      "data_collection": "Collect name, contact information, signed consent, age, sex, relevant glaucoma records, prescriptions, study-eye selection, pressure values, function ratings, reported care updates and compensation receipts. No date of birth, Social Security number, genetic information or specimens are collected.",
+      "privacy": "Each site keeps contact details and its identity-to-code key separately on an encrypted access-controlled drive; consent and signed cash receipts are in locked research cabinets. Research assessments carry the study ID. The sponsor and statistician receive coded study data only, without names, contact details, identity keys, consent signatures or payment receipts. Cash is paid locally; the sponsor receives aggregate payment totals, not participant identities. Authorized site investigators/coordinators may access identifiable records for study duties. Authorized monitors, the reviewing IRB and legally authorized oversight bodies may inspect relevant original records for oversight. Sponsor analysts do not receive identifiers through those review arrangements.",
+      "authorization": "Authorization permits the specified historical abstraction and new study data collection and expires on 31 August 2027, or earlier written revocation. Expiry does not extend the participant's planned 60-day research follow-up. Revoke authorization by writing to the coordinator at the enrolling site's mailing address below. Stop new abstraction and collection after revocation; already collected information may remain in analyses and required oversight records. Ordinary care continues. Withdrawal does not erase earned compensation.",
+      "retention": "Retain study records, keys and receipts securely for ten years after the 31 December 2027 administrative closeout, then destroy them unless a binding requirement requires longer retention. Retention does not permit new collection.",
+      "publication": "No public individual-data sharing, data sale, unrelated future research, commercial specimen use, specimen banking or optional genetic participation is planned. No genetic-discrimination or future-specimen consent choice is needed. Offer individual pressure results at attended clinic visits, explain clinical concerns and refer to ordinary care. An aggregate plain-language summary is available on request after analysis. No research genetic result is promised.",
+      "sponsor_receives_identifiable_information": "False",
+      "payments": "Each site keeps contact details and its identity-to-code key separately on an encrypted access-controlled drive; consent and signed cash receipts are in locked research cabinets. Research assessments carry the study ID. The sponsor and statistician receive coded study data only, without names, contact details, identity keys, consent signatures or payment receipts. Cash is paid locally; the sponsor receives aggregate payment totals, not participant identities.",
+      "data_handling": null
+    },
+    "risks_benefits": {
+      "risks": "Risks include brief discomfort, tearing, irritation or blurred vision during tonometry; rare corneal abrasion or reaction to routine assessment drops; frustration with questions; travel/time burden; and loss of confidentiality. Participants may pause or stop testing. The clinic uses its usual infection control and assessment safety procedures. Persistent symptoms or clinical concerns go to the study doctor and ordinary care. No direct benefit is promised.",
+      "benefits": "No direct benefit is promised. The findings may inform future studies of glaucoma care and daily function. Compensation is not a clinical benefit.",
+      "alternatives": "The alternative is ordinary care without joining. Existing treatment remains under the treating clinician regardless of participation or withdrawal.",
+      "compensation_or_reimbursement": "Compensation: $30 after completion of Day 0, $10 after the Day 30 telephone contact and $30 after the Day 60 visit, maximum $70. Each completed contact is paid separately in cash by the enrolling clinic before departure or, for the phone contact, at the next clinic visit or by arranged pickup within 14 days. If a participant withdraws after the phone contact, offer pickup within 14 days; no further research visit is required to collect payment already earned. There is no completion bonus and no requirement to complete all contacts to retain earned compensation. A started but unfinished contact earns half that contact's amount. No parking, transit, mileage or other expense reimbursement is provided. Compensation is not a clinical benefit.",
+      "costs": "The sponsor pays for research assessments and study administration. Research charges are not billed to participants or insurers. Ordinary care remains paid under the participant's usual arrangements.",
+      "research_injury": "For possible research injury contact the enrolling site's coordinator to reach its study doctor; the clinic arranges evaluation. Use emergency services for emergencies. There is no sponsor fund for free injury care or additional injury compensation. Ordinary treatment may be billed to the participant or insurer. Do not promise free treatment or waive legal rights.",
+      "privacy": "PRIVACY AND AUTHORIZATION Collect name, contact information, signed consent, age, sex, relevant glaucoma records, prescriptions, study-eye selection, pressure values, function ratings, reported care updates and compensation receipts. No date of birth, Social Security number, genetic information or specimens are collected. Each site keeps contact details and its identity-to-code key separately on an encrypted access-controlled drive; consent and signed cash receipts are in locked research cabinets. Research assessments carry the study ID. The sponsor and statistician receive coded study data only, without names, contact details, identity keys, consent signatures or payment receipts. Cash is paid locally; the sponsor receives aggregate payment totals, not participant identities. Authorized site investigators/coordinators may access identifiable records for study duties. Authorized monitors, the reviewing IRB and legally authorized oversight bodies may inspect relevant original records for oversight. Sponsor analysts do not receive identifiers through those review arrangements. Authorization permits the specified historical abstraction and new study data collection and expires on 31 August 2027, or earlier written revocation. Expiry does not extend the participant's planned 60-day research follow-up. Revoke authorization by writing to the coordinator at the enrolling site's mailing address below. Stop new abstraction and collection after revocation; already collected information may remain in analyses and required oversight records. Ordinary care continues. Withdrawal does not erase earned compensation. Retain study records, keys and receipts securely for ten years after the 31 December 2027 administrative closeout, then destroy them unless a binding requirement requires longer retention. Retention does not permit new collection. No public individual-data sharing, data sale, unrelated future research, commercial specimen use, specimen banking or optional genetic participation is planned. No genetic-discrimination or future-specimen consent choice is needed.",
+      "optional_research_participation_choices": "None; no LAR/proxy/witness signatures, genetic-discrimination or future-specimen choices required.",
+      "risk_mitigation": null,
+      "injury_handling": null
+    },
+    "regulatory": {
+      "prs": {
+        "provider_study_id": "GLIDE-27-06",
+        "study_type": "Observational",
+        "time_perspective": "Other",
+        "overall_status": "Not yet recruiting",
+        "enrollment": "120",
+        "enrollment_type": "Anticipated",
+        "verification_date": "2026-10",
+        "start_date": "2027-02-01",
+        "start_date_type": "Anticipated",
+        "primary_completion_date": "2027-08-15",
+        "primary_completion_date_type": "Anticipated",
+        "participant_registry_disclosure": false,
+        "observational_study_design": "Cohort",
+        "study_completion_date": "2027-08-15",
+        "study_completion_date_type": "Anticipated",
+        "fda_regulated_drug": "False",
+        "fda_regulated_device": "False",
+        "patient_registry": null,
+        "target_duration_quantity": null,
+        "target_duration_units": null
+      },
+      "registry_facts": "REGISTRY AND CONDITIONAL FACTS Overall status: Not yet recruiting. Enrollment: 120, anticipated. Verification month: October 2026. No NCT identifier has been assigned. Registry start: 2027-02-01, anticipated. Primary completion: 2027-08-15, anticipated. Study completion: 2027-08-15, anticipated. IRB status: Not yet submitted. No approval, approval number or date obtained. FDA-regulated drug: No. FDA-regulated device: No. The existing medications are observed ordinary care; no IND, IDE or investigational product is involved. Participant ClinicalTrials.gov consent disclosure: No, it is not requested for this study's consent. Producing the XML does not itself authorize adding it. Sponsor public-registration-before-enrollment requirement: None in this plan. Sponsor receives identifiable participant information: No; coded analysis and aggregate payment totals only, as described above. Genetic information: No. Specimens: No. Future specimen use: No. Optional research participation choices: None. LAR/witness signatures: No.",
+      "sponsor_public_registration_before_enrollment_requirement": "None in this plan.",
+      "genetic_information": "False",
+      "specimens": "False",
+      "future_specimen_use": "False",
+      "optional_research_choices": "None",
+      "lar_witness_signatures": "False"
+    }
+  },
+  "section_contracts": [
+    {
+      "section_id": "study-design.bias",
+      "number": "8.2.",
+      "title": "Methods Used to Minimize Bias",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft",
+        "fixed_boilerplate"
+      ],
+      "minimum_evidence": [
+        "design.study_design"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [
+        {
+          "boilerplate_id": "bias",
+          "text": "Potential sources of selection, measurement, and analysis bias will be addressed through consistent eligibility criteria, predefined assessments, and the approved analysis plan.",
+          "sha256": "52a1c44db10ce81e78401f0d22f6fa95bdf25be4e7d8b40d379523925978ed70"
+        }
+      ],
+      "content_expectations": [
+        "State the source-supported bias controls directly, including supplied common testing conditions, predefined outcomes and analysis methods, and limits on interpreting nonrandomized cohort differences. If none are supplied, use the listed concise boilerplate. Do not repeat the design, setting, arms, or masking account already given in Study Design.",
+        "Do not replace supplied detail with generic clinical prose."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_evidence",
+      "evidence_scopes": [],
+      "approved_source_word_count": 306,
+      "reference_detail_target_words": 0,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [],
+        "brief_reference_only": [],
+        "do_not_restate": []
+      }
+    },
+    {
+      "section_id": "study-procedure.visits",
+      "number": "9.2.",
+      "title": "Visits and Examinations",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft"
+      ],
+      "minimum_evidence": [
+        "procedures.assessments",
+        "procedures.visit_schedule",
+        "procedures.visit_schedule_table",
+        "procedures.assessment_details",
+        "procedures.intervention_management",
+        "procedures.retention"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [],
+      "content_expectations": [
+        "Account for every approved visit, time point, and visit-specific procedure.",
+        "Do not replace supplied detail with generic clinical prose."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_items",
+      "evidence_scopes": [],
+      "approved_source_word_count": 863,
+      "reference_detail_target_words": 560,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [
+          "complete-visit-schedule"
+        ],
+        "brief_reference_only": [],
+        "do_not_restate": []
+      }
+    },
+    {
+      "section_id": "study-procedure.measurements",
+      "number": "9.3.",
+      "title": "Study Methods and Measurements",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft"
+      ],
+      "minimum_evidence": [
+        "procedures.methods",
+        "procedures.assessment_details",
+        "procedures.specimens",
+        "procedures.return_of_results",
+        "endpoints.primary",
+        "endpoints.secondary",
+        "endpoints.other"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [],
+      "content_expectations": [
+        "Explain the approved measurement activities in operational language. Connect each measure to the source-supplied assessment activities and relevant time point, such as chart abstraction, score review, device download, or questionnaire when those activities are approved. When the source gives no instrument, scoring rule, denominator, or detailed method, state only the observable activity; an endpoint restatement such as 'the endpoint will be evaluated' is not a measurement method. Group related measures without repeating the complete visit schedule or inventing details.",
+        "Do not replace supplied detail with generic clinical prose.",
+        "This section owns supplied specimen handling and results-return policies. Preserve collection/coding, transfer recipients and access limits, testing purpose, specimen destruction timing and any absolute deadline, future-use/sharing/sale/commercial restrictions, and the distinction between specimen retention and derived-data retention. Distinguish individual clinical results, research/genetic results, incidental findings and aggregate summaries, including any limits, preferences, recipients and timing. Keep routine-care referral arrangements when supplied. Preserve uncertainty; absent optional policies remain absent. For records-only research, describe only the approved existing records/specimens and results policies without adding collection or participant contact."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_evidence",
+      "evidence_scopes": [],
+      "approved_source_word_count": 927,
+      "reference_detail_target_words": 556,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [
+          "endpoint-measurement-methods",
+          "specimen-handling",
+          "return-of-results"
+        ],
+        "brief_reference_only": [
+          "complete-visit-schedule",
+          "endpoint-inventory"
+        ],
+        "do_not_restate": [
+          "complete-visit-schedule",
+          "endpoint-inventory"
+        ]
+      }
+    }
+  ],
+  "constraints": [
+    "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+    "Use only supplied approved evidence and applicable template/Fixed Clinical Boilerplate. Align shared population, groups, quantities, timing, procedures and outcomes across the Protocol, selected ICF and PRS narratives; preserve relationships and qualifications rather than copying wording.",
+    "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+    "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
+    "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
+    "Preserve supplied numbered citations next to the Protocol claims they support and their bibliography linkage. Do not invent citations; ICF explanations use plain language.",
+    "Return exactly one result for every requested section ID.",
+    "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
+    "Return structured section content, not a whole document or document markup.",
+    "Write to each section's purpose and ownership. Explain each operational rule fully in its owning section; elsewhere give only the fact needed for that section and a brief reference to the owning heading. Preserve necessary identifiers, endpoint definitions, quantities, timing anchors/windows, conditions, exceptions, safety information and client consent language. Compress repeated explanations, not clinical meaning.",
+    "Use participant-facing language for ICF sections.",
+    "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",
+    "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+    "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+    "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
+    "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+    "Protocol General Information is a compact synopsis; Objectives states the study purpose and objectives; Study Design owns the design, comparisons and grouped endpoint inventory. Study Methods and Measurements owns detailed measurement, exposure-counting, study-eye and historical-record selection rules; Visits and Examinations owns contact mode, timing and scheduled activities. Bias describes the purpose of controls with brief references to their methods, rather than repeating those instructions. Analysis Data Sets owns which observations enter analyses; Statistical Methodology owns calculations, models and interpretation. Retain complete methods once, using the actual owning headings for references.",
+    "Satisfy every section's content_expectations and cover every material value named by minimum_evidence, except that Section 15's source-derived table and notes carry its detailed inventory. Its adjacent prose should briefly introduce the table without restating its rows or notes.",
+    "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
+    "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+    "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+    "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+    "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+    "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays."
+  ],
+  "generation_only_prompts": {
+    "profile": "n8n-with-brad-corrections/v1",
+    "source": {
+      "filename": "Form Fill Fillout -_ Generate Protocol + Send Gmail.json",
+      "sha256": "15b20d12597b6f0fc8829650771302fb9161d8718a96c1c631b93d0154b55b1a"
+    },
+    "prompts": [
+      {
+        "node": "Study Design & Methods1",
+        "targets": [
+          {
+            "section_id": "study-design.bias",
+            "legacy_fields": "methods"
+          }
+        ],
+        "original_messages": [
+          {
+            "content": "You are a medical writer generating the Study Design and Methods sections of clinical study protocols.",
+            "role": "system"
+          },
+          {
+            "content": "=### Context:\nWe are writing an ambispective clinical study protocol document.\nYour task is to generate the **Study Design and Methods** sections.\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n\n### What you need to do:\n- Generate **studyDesignLong**: an expanded paragraph that integrates studyDesign, numberOfSites, endpoints, and assessmentsSchedule. Mention timepoints only if they are explicitly present in the inputs.\n- Generate **methods**: describe bias minimization procedures consistent with the design. \nFor retrospective/ambispective components, include standardized data abstraction, predefined endpoints/timepoints, consistent measurement definitions, and handling of missing data, but do not add procedures not described in the inputs.\n- Generate **masked**: extract masking or blinding details.\n- Generate **variables**: present the endpoints grouped as Primary, Secondary, and Exploratory exactly as provided in the Endpoints input.\n- Generate **duration**: a very short description of the follow-up duration or observation window based only on explicit timepoints in Assessments Schedule and/or Timeline. If not specified, return \"Not specified\".\n- Determine **studyArm**: Return \"double arm\" if the Endpoints or Study Design describe a comparator/group comparison (e.g., \"between groups\", contralateral, treated vs control). Otherwise return \"single arm\".\n\n### Important notes:\n- Do not invent outcomes, procedures, masking, timepoints, or measurements beyond what is provided.\n- Keep the tone professional, neutral, and consistent with clinical protocol style.\n- Use language consistent with an ambispective design. If retrospective components are present, describe them as review/extraction of existing records.\n- Do not imply randomization, masking, or prospective visits unless explicitly stated in the Study Design or Assessments Schedule.\n- If the study includes only a single follow-up visit/timepoint, do not describe additional visits beyond what is provided.\n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"studyDesignLong\": \"expanded description paragraph\",\n  \"methods\": \"bias minimization methods\",\n  \"masked\": \"masking/blinding details\",\n  \"variables\": \"endpoints in structured text\",\n  \"duration\": \"duration in a very short text\",\n  \"studyArm\": \"single arm or double arm\"\n}\n"
+          },
+          {
+            "content": "=### Study Title:\nAmbispective Analysis of Patient Reported Outcomes and Visual Acuity in Patients with Bilateral Implantation of Odyssey Intraocular Lenses\n\n### Study Design:\nSingle-center, ambispective observational study. Eligible subjects who previously underwent bilateral uncomplicated cataract surgery with implantation of the TECNIS Odyssey intraocular lens will be identified retrospectively. Each subject will participate in a single prospective postoperative study visit conducted at least three months after surgery. Cataract surgery itself is not part of the study.\n\n### Endpoints:\nPrimary Endpoint:\n- Photopic and mesopic visual acuity at distance (6 m), intermediate (66 cm), and near (40 cm and 33 cm) assessed at the postoperative study visit.\n\nSecondary Endpoint:\n- Patient-reported outcomes assessed using the Assessment of Intraocular Lens Implant Symptoms (AIOLIS) questionnaire.\n\nExploratory Endpoints:\n- Correlation of postoperative quality-of-vision concerns with corneal performance index.\n- Correlation of pupil size with patient satisfaction.\n\n### Assessments Schedule:\n- Retrospective Component:\n  Identification of eligible subjects through medical record review confirming prior bilateral cataract surgery with Odyssey IOL implantation.\n\n- Prospective Study Visit (≥ 3 months postoperatively):\n  - Informed consent\n  - Medical history\n  - Manifest refraction\n  - Photopic and mesopic visual acuity testing at distance, intermediate, and near\n  - Assessment of Intraocular Lens Implant Symptoms (AIOLIS)\n  - Ocular Surface Disease Index (OSDI)\n  - iTrace assessment\n  - Pupil size measurement\n  - Adverse event assessment\n\nAll study procedures are non-interventional and consistent with standard ophthalmic evaluations.\n\n### Timeline:\nStudy Start Date: March 1, 2025  \nFirst Patient Enrolled: March 15, 2025  \nLast Patient Completed: December 15, 2025  \nData Analysis: January 2026  \nFinal Report Submission: February 28, 2026\n\n### Number of Sites:\nOne\n\n### Background:\nMultifocal and extended range of vision intraocular lenses have improved spectacle independence following cataract surgery; however, earlier designs have been associated with visual disturbances such as halos, glare, and reduced contrast sensitivity. The TECNIS Odyssey intraocular lens was developed to provide a broader range of vision while maintaining visual quality. Although the Odyssey IOL is FDA approved and used in routine clinical practice, limited data are available regarding postoperative visual acuity and patient-reported outcomes following bilateral implantation. This study aims to evaluate visual performance and patient satisfaction at least three months after surgery.\n\n### Primary Objective:\nTo evaluate postoperative visual acuity outcomes following bilateral implantation of the TECNIS Odyssey intraocular lens.\n\n### Hypothesis:\nBilateral implantation of the TECNIS Odyssey intraocular lens provides good visual acuity at distance, intermediate, and near, with acceptable patient-reported visual quality and satisfaction.\n"
+          },
+          {
+            "content": "={\n  \"studyDesignLong\": \"This study is a single site, single-masked, randomized, prospective, contralateral eye study of the efficiency of the Active Sentry handpiece at low IOP compared with the Ozil at high IOP. Subjects will be assessed pre-operatively, operatively, and at 1 day and 1 week post-operatively. Clinical evaluations will include measurement of visual acuity and central corneal thickness (CCT).\\n\\nThe primary outcome measure will be the total aspiration time between groups on the day of surgery.\\n\\nSecondary outcome measures are as follows:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory outcome measures are as follows:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"methods\": \"As a randomized study there is no expected bias. Patient selection will be based on the patient’s interest and the surgeon’s opinion as to whether they are a suitable candidate for sequential bilateral cataract surgery. The data analyzer will be masked.\\n\\nThe measurement of visual acuity will be conducted in a systematic fashion to minimize bias. Individuals conducting visual acuity measures will be instructed to perform the same testing in the same fashion for all subjects, with the same level of encouragement to subjects.\\n\\nAll data collection will be completed through provided Case Report Forms (CRFs) or computer files generated by automated test equipment. All site personnel involved in the study will be trained in regard to conducting study-specific procedures.\",\n  \"masked\": \"The data analyzer will be masked.\",\n  \"variables\": \"Primary: The total aspiration time between groups on the day of surgery.\\n\\nSecondary:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"duration\": \"Preoperative (≤90 days) to 1 week postoperative\",\n  \"studyArm\": \"double arm\"\n}",
+            "role": "assistant"
+          },
+          {
+            "content": "=### Study Title: \n{{ $('Set Questions').first().json.whatIsTheFullTitleOfTheStudy }}\n\n\n### Study Design: \n{{ $('Set Questions').first().json.describeTheStudyDesign }}\n\n\n### Endpoints:\n{{ $('Set Questions').first().json.listThePrimaryAndSecondaryEndpoints }}\n\n\n### Assessments Schedule:\n{{ $('Set Questions').first().json.listAllPlannedAssessmentsAndTheirSchedule }}\n\n\n### Timeline\n{{ $('Set Questions').first().json.provideTheStudyTimeline }}\n\n\n### Number of Sites:\n{{ $('Set Questions').first().json.howManyInvestigationalSitesWillParticipateInTheStudy }}\n\n\n### Background:\n{{ $('Set Questions').first().json.provideTheBackgroundAndSignificanceOfTheStudy }}\n\n\n### Primary Objective:\n{{ $('Set Questions').first().json.whatAreThePrimaryObjectivesOfTheStudy }}\n\n\n### Hypothesis:\n{{ $('Set Questions').first().json.stateTheStudyHypothesis }}"
+          }
+        ],
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a medical writer generating the Study Design and Methods sections of clinical study protocols."
+          },
+          {
+            "role": "user",
+            "content": "### Context:\nWe are writing an ambispective clinical study protocol document.\nYour task is to generate the **Study Design and Methods** sections.\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n\n### What you need to do:\n- Generate **studyDesignLong**: an expanded paragraph that integrates studyDesign, numberOfSites, endpoints, and assessmentsSchedule. Mention timepoints only if they are explicitly present in the inputs.\n- Generate **methods**: describe bias minimization procedures consistent with the design. \nFor retrospective/ambispective components, include standardized data abstraction, predefined endpoints/timepoints, consistent measurement definitions, and handling of missing data, but do not add procedures not described in the inputs.\n- Generate **masked**: extract masking or blinding details.\n- Generate **variables**: present the endpoints grouped as Primary, Secondary, and Exploratory exactly as provided in the Endpoints input.\n- Generate **duration**: a very short description of the follow-up duration or observation window based only on explicit timepoints in Assessments Schedule and/or Timeline. If not specified, return \"Not specified\".\n- Determine **studyArm**: Return \"double arm\" if the Endpoints or Study Design describe a comparator/group comparison (e.g., \"between groups\", contralateral, treated vs control). Otherwise return \"single arm\".\n\n### Important notes:\n- Do not invent outcomes, procedures, masking, timepoints, or measurements beyond what is provided.\n- Keep the tone professional, neutral, and consistent with clinical protocol style.\n- Use language consistent with an ambispective design. If retrospective components are present, describe them as review/extraction of existing records.\n- Do not imply randomization, masking, or prospective visits unless explicitly stated in the Study Design or Assessments Schedule.\n- If the study includes only a single follow-up visit/timepoint, do not describe additional visits beyond what is provided.\n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"studyDesignLong\": \"expanded description paragraph\",\n  \"methods\": \"bias minimization methods\",\n  \"masked\": \"masking/blinding details\",\n  \"variables\": \"endpoints in structured text\",\n  \"duration\": \"duration in a very short text\",\n  \"studyArm\": \"single arm or double arm\"\n}\n"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title:\nAmbispective Analysis of Patient Reported Outcomes and Visual Acuity in Patients with Bilateral Implantation of Odyssey Intraocular Lenses\n\n### Study Design:\nSingle-center, ambispective observational study. Eligible subjects who previously underwent bilateral uncomplicated cataract surgery with implantation of the TECNIS Odyssey intraocular lens will be identified retrospectively. Each subject will participate in a single prospective postoperative study visit conducted at least three months after surgery. Cataract surgery itself is not part of the study.\n\n### Endpoints:\nPrimary Endpoint:\n- Photopic and mesopic visual acuity at distance (6 m), intermediate (66 cm), and near (40 cm and 33 cm) assessed at the postoperative study visit.\n\nSecondary Endpoint:\n- Patient-reported outcomes assessed using the Assessment of Intraocular Lens Implant Symptoms (AIOLIS) questionnaire.\n\nExploratory Endpoints:\n- Correlation of postoperative quality-of-vision concerns with corneal performance index.\n- Correlation of pupil size with patient satisfaction.\n\n### Assessments Schedule:\n- Retrospective Component:\n  Identification of eligible subjects through medical record review confirming prior bilateral cataract surgery with Odyssey IOL implantation.\n\n- Prospective Study Visit (≥ 3 months postoperatively):\n  - Informed consent\n  - Medical history\n  - Manifest refraction\n  - Photopic and mesopic visual acuity testing at distance, intermediate, and near\n  - Assessment of Intraocular Lens Implant Symptoms (AIOLIS)\n  - Ocular Surface Disease Index (OSDI)\n  - iTrace assessment\n  - Pupil size measurement\n  - Adverse event assessment\n\nAll study procedures are non-interventional and consistent with standard ophthalmic evaluations.\n\n### Timeline:\nStudy Start Date: March 1, 2025  \nFirst Patient Enrolled: March 15, 2025  \nLast Patient Completed: December 15, 2025  \nData Analysis: January 2026  \nFinal Report Submission: February 28, 2026\n\n### Number of Sites:\nOne\n\n### Background:\nMultifocal and extended range of vision intraocular lenses have improved spectacle independence following cataract surgery; however, earlier designs have been associated with visual disturbances such as halos, glare, and reduced contrast sensitivity. The TECNIS Odyssey intraocular lens was developed to provide a broader range of vision while maintaining visual quality. Although the Odyssey IOL is FDA approved and used in routine clinical practice, limited data are available regarding postoperative visual acuity and patient-reported outcomes following bilateral implantation. This study aims to evaluate visual performance and patient satisfaction at least three months after surgery.\n\n### Primary Objective:\nTo evaluate postoperative visual acuity outcomes following bilateral implantation of the TECNIS Odyssey intraocular lens.\n\n### Hypothesis:\nBilateral implantation of the TECNIS Odyssey intraocular lens provides good visual acuity at distance, intermediate, and near, with acceptable patient-reported visual quality and satisfaction.\n"
+          },
+          {
+            "role": "assistant",
+            "content": "{\n  \"studyDesignLong\": \"This study is a single site, single-masked, randomized, prospective, contralateral eye study of the efficiency of the Active Sentry handpiece at low IOP compared with the Ozil at high IOP. Subjects will be assessed pre-operatively, operatively, and at 1 day and 1 week post-operatively. Clinical evaluations will include measurement of visual acuity and central corneal thickness (CCT).\\n\\nThe primary outcome measure will be the total aspiration time between groups on the day of surgery.\\n\\nSecondary outcome measures are as follows:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory outcome measures are as follows:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"methods\": \"As a randomized study there is no expected bias. Patient selection will be based on the patient’s interest and the surgeon’s opinion as to whether they are a suitable candidate for sequential bilateral cataract surgery. The data analyzer will be masked.\\n\\nThe measurement of visual acuity will be conducted in a systematic fashion to minimize bias. Individuals conducting visual acuity measures will be instructed to perform the same testing in the same fashion for all subjects, with the same level of encouragement to subjects.\\n\\nAll data collection will be completed through provided Case Report Forms (CRFs) or computer files generated by automated test equipment. All site personnel involved in the study will be trained in regard to conducting study-specific procedures.\",\n  \"masked\": \"The data analyzer will be masked.\",\n  \"variables\": \"Primary: The total aspiration time between groups on the day of surgery.\\n\\nSecondary:\\n• Total fluid volume between groups on the day of surgery.\\n• Total phaco time between groups on the day of surgery.\\n• Total case time between groups on the day of surgery.\\n• Aspiration time during phaco between groups on the day of surgery.\\n• Central corneal thickness (CCT) between groups at postoperative day 1 and week 1.\\n\\nExploratory:\\n• Cumulative dissipated energy between groups on the day of surgery.\",\n  \"duration\": \"Preoperative (≤90 days) to 1 week postoperative\",\n  \"studyArm\": \"double arm\"\n}"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title: \nHistorical Glaucoma Drop Burden and Prospective Daily Visual Function.\n\n\n### Study Design: \nProtocol study type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other, combining retrospective record abstraction and prospective research follow-up in the same consenting participants. Condition: Primary open-angle glaucoma treated with topical pressure-lowering medication. Healthy volunteers: No. All sexes eligible. Number of sites: 2, both in the United States. Enrollment target: 120 unique adults, aiming for 60 per site. These are people, not eyes, visits, prescriptions or historical records. No treatment, drug, device, surgery or drop schedule is assigned by research. There is no randomization, masking, placebo or investigational product. The exposure is the number of active topical glaucoma drug ingredients already prescribed in ordinary care at enrollment. Category: Drug, observed only. Research staff do not start, stop, switch, withhold or supply glaucoma drops. EXPOSURE GROUPS AND STUDY EYE All 120 people form one observational study population with two exposure groups: 1. One active topical glaucoma drug ingredient prescribed at Day 0. 2. Two or more active topical glaucoma drug ingredients prescribed at Day 0. A fixed-combination bottle counts as its number of active ingredients, not one ingredient merely because it is one bottle. Count each distinct ingredient once across both eyes; do not double-count the same ingredient used in both eyes. Classify from the clinician's current prescription list before any Day 0 change. No group size or balance is guaranteed. Recruitment is consecutive, not allocation to a medication regimen. Record later ordinary-care changes without changing the baseline exposure group or automatically removing the participant. One eye contributes pressure outcomes. At Day 0 select the eligible glaucoma eye with higher measured pressure; if tied, select the right eye. If only one eye is eligible, select that eye. Keep this eye for all pressure outcomes and historical eye-specific abstraction. A missing later measurement does not justify switching eyes. Participant function ratings remain one response per person.\n\n\n### Endpoints:\n{\"primary\": [{\"analysis_method\": \"Day 60 minus Day 0, 0-to-100 scale; adjusted linear model by baseline exposure group.\", \"description\": \"Primary outcome: Change in daily visual-function rating from Day 0 to Day 60 +/- 7 days after enrollment. Calculate Day 60 minus Day 0 on the 0-to-100 scale. Positive change means improvement; negative change means worsening.\", \"measure\": \"Change in daily visual-function rating\", \"time_frame\": \"Day 0 to Day 60 +/- 7 days after enrollment\"}], \"secondary\": [{\"analysis_method\": \"\", \"description\": \"Secondary outcome 1: Selected study-eye pressure at Day 60 +/- 7 days, in mmHg. Lower pressure is a lower measured value; no target-pressure threshold or definition of clinical success is supplied. This endpoint is a level, not change.\", \"measure\": \"Selected study-eye pressure\", \"time_frame\": \"Day 60 +/- 7 days after enrollment\"}, {\"analysis_method\": \"\", \"description\": \"Secondary outcome 2: Number of documented glaucoma encounters per participant during 1 January through 31 December 2026, using the deduplication rule above. Count documented glaucoma encounters per person within the fixed period; deduplicate entries with the same person, date and encounter identifier. Report record completeness. No documented surgery is reported as 'not documented' unless the record explicitly establishes absence; missing records do not establish none.\", \"measure\": \"Number of documented glaucoma encounters per participant\", \"time_frame\": \"1 January through 31 December 2026 inclusive\"}, {\"analysis_method\": \"\", \"description\": \"Secondary outcome 3: Number of ordinary-care topical glaucoma regimen changes per participant from enrollment through Day 60 +/- 7 days. A change is a clinician-directed start, stop or dose-frequency change; a refill alone is not a change. Count a same-day coordinated regimen adjustment as one event, even if more than one ingredient changes. Use accessible records and scheduled-contact updates, reconcile duplicates and retain unknown status when information is absent.\", \"measure\": \"Number of ordinary-care topical glaucoma regimen changes per participant\", \"time_frame\": \"Enrollment through Day 60 +/- 7 days\"}]}\n\n\n### Assessments Schedule:\n{\"assessments\": [\"Visit 1: Day 0 is in person, no window, about 50 minutes total. Historical abstraction is later staff work, not another participant visit or extra time added to the 50-minute visit total.\", \"Visit 2: Day 30 +/- 5 days after enrollment is by telephone, about 10 minutes. No eye-pressure test, new drug instruction, specimen collection or device assessment occurs by telephone.\", \"Visit 3: Day 60 +/- 7 days after enrollment is in person, about 25 minutes. There is no extra exit form or closeout contact.\", \"There are no home diaries, adherence targets, app logs, home devices, daily symptom scores, visual acuity tests, imaging, dilation, blood draws, saliva, genetic tests, specimen storage or future specimen use.\"], \"visit_schedule\": [{\"duration\": \"About 50 minutes total\", \"mode\": \"In person\", \"participant_visit\": \"True\", \"procedures\": \"Written consent and authorization before research; Confirm eligibility; Record age; Record sex; Record glaucoma history; Record current prescription list before any Day 0 change; Classify baseline ingredient-burden group; Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.; Goldmann applanation pressure in both eligible glaucoma eyes, mmHg: two readings per eye and arithmetic mean. select higher-pressure eligible eye, right eye if tied, or only eligible eye.; Record study-eye selection; Ask about assessment-related symptoms; Explain telephone follow-up\", \"timing\": \"Day 0 enrollment; no window\", \"visit\": \"Visit 1: Day 0\"}, {\"duration\": \"About 10 minutes\", \"mode\": \"Telephone\", \"participant_visit\": \"True\", \"procedures\": \"Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.; Ask about ordinary-care medication changes; Ask about ordinary-care glaucoma encounters; Ask about assessment-related symptoms\", \"timing\": \"Day 30 +/- 5 days after enrollment\", \"visit\": \"Visit 2: Day 30\"}, {\"duration\": \"About 25 minutes\", \"mode\": \"In person\", \"participant_visit\": \"True\", \"procedures\": \"Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.; Goldmann applanation pressure in the same fixed selected study eye, mmHg: two readings and arithmetic mean. no switching for missing measurement.; Update prescriptions; Ask about ordinary-care medication changes; Ask about ordinary-care glaucoma encounters; Ask about assessment-related symptoms; Confirm completion\", \"timing\": \"Day 60 +/- 7 days after enrollment\", \"visit\": \"Visit 3: Day 60\"}, {\"duration\": \"\", \"mode\": \"Staff review of accessible enrolling-site records\", \"participant_visit\": \"False\", \"procedures\": \"Abstract encounter dates; Abstract documented glaucoma diagnoses; Abstract prescribed topical drug ingredients; Abstract pressure measurements with eye, measurement date and recorded method. select latest historical study-eye value using supplied tie rules; Abstract documented glaucoma surgery. preserve not documented versus established absence; Count glaucoma encounters per person with person/date/encounter-identifier deduplication; Report historical record completeness\", \"timing\": \"After written consent and authorization; records dated 1 January through 31 December 2026 inclusive only\", \"visit\": \"Historical record abstraction (staff task; not a participant visit)\"}], \"visit_schedule_table\": null}\n\n\n### Timeline\nRecruitment and enrollment: 1 February through 31 May 2027. Final participant assessments, primary completion and study completion: anticipated by 15 August 2027, allowing the final Day 60 window. Historical abstraction period: 1 January through 31 December 2026 inclusive. Administrative closeout: 31 December 2027.\n\n\n### Number of Sites:\n2\n\n\n### Background:\nThe study links existing glaucoma care records to newly collected daily-function ratings and eye-pressure measurements. People using different numbers of drug ingredients may differ in disease severity and other characteristics; the study does not establish whether drops cause a change in daily function. No prior effect estimate, bibliography or validated questionnaire reference is supplied.\n\n\n### Primary Objective:\nEstimate the difference between baseline medication-burden groups in change in daily visual-function rating from Day 0 to Day 60.\n\n\n### Hypothesis:\nHypothesis: The group prescribed two or more active ingredients at enrollment will have a smaller improvement in daily function than the one-ingredient group. This is an exploratory association hypothesis, not an established effect or a claim of comparative treatment efficacy."
+          }
+        ]
+      },
+      {
+        "node": "Procedures & Assessments1",
+        "targets": [
+          {
+            "section_id": "study-procedure.visits",
+            "legacy_fields": "visitSchedule + visitScheduleDetails"
+          },
+          {
+            "section_id": "study-procedure.measurements",
+            "legacy_fields": "measurements"
+          }
+        ],
+        "original_messages": [
+          {
+            "content": "You are a medical writer generating the Procedures and Assessments sections of clinical study protocols.",
+            "role": "system"
+          },
+          {
+            "content": "=### Context:\nWe are writing an ambispective clinical study protocol document. \nYour task is to generate the **Procedures and Assessments** sections.  \n\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Timeline: Study dates\n\n\n### What you need to do:\nGenerate **visitSchedule**: a short narrative introduction summarizing the visit or data collection structure (e.g., retrospective data review, operative data, and/or follow-up assessments as applicable).\nGenerate **visitScheduleDetails**: numbered subsections starting at 9.2.1.\nInclude only as many subsections as are supported by the Assessments Schedule and Timeline.\n- Generate **visitScheduleTable**: an array of structured objects with the fields:\n  - visitNumber  \n  - visitName  \n  - visitWindow  \n  - CRFnumber  \n- Generate **measurements**: a short narrative summary of the planned assessments.  \n- Generate **measurementsDetails**: subsections labeled 9.3.1, 9.3.2, etc., with expanded descriptions of how each assessment is conducted (standardized procedures, methodology, equipment).  \n- Generate Study Start Date in format yyyy-mm-dd\n- Generate Study End Date in format yyyy-mm-dd\n\n\n### Important notes:\n- Do not invent assessments or visits beyond what is explicitly provided.\n- For ambispective studies, describe visits as data collection timepoints or record review when applicable.\n- Do not imply screening, baseline, follow-up, or exit visits unless they are explicitly described in the Assessments Schedule or Timeline.\n- If the study includes a single visit or retrospective data extraction, reflect this accurately.  \n- Visit details must use numbered subsections (9.2.1, 9.2.2, …).  \n- Measurement details must use numbered subsections (9.3.1, 9.3.2, …).  \n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"visitSchedule\": \"narrative summary\",\n  \"visitScheduleDetails\": \"9.2.1. Preoperative ...\\n\\n9.2.2. Operative (Surgery) ...\\n\\n9.2.3. Postoperative 1 Day ...\\n\\n9.2.4. Postoperative 1 Week ...\\n\\n9.2.5. Exit Procedures ...\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Preoperative\",\n      \"visitWindow\": \"-90 to 0 days from surgery\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Operative\",\n      \"visitWindow\": \"0 from surgery\",\n      \"CRFnumber\": \"2\"\n    }\n  ],\n  \"measurements\": \"- CBC at screening and week 12\\n- ECG at baseline and week 6\\n- Quality of life survey at baseline and week 12\",\n  \"measurementsDetails\": \"9.3.1. Laboratory Testing ...\\n\\n9.3.2. ECG ...\\n\\n9.3.3. Quality of Life Survey ...\"\n  \"startDate\": \"2025-01-15\",\n  \"endDate\": \"2025-04-30\"\n}\n"
+          },
+          {
+            "content": "=### Study Title:\nAmbispective Analysis of Patient Reported Outcomes and Visual Acuity in Patients with Bilateral Implantation of Odyssey Intraocular Lenses\n\n### Study Design:\nSingle-center, ambispective observational study. Subjects who previously underwent bilateral uncomplicated cataract surgery with implantation of the TECNIS Odyssey intraocular lens will be identified retrospectively through medical record review. Each eligible subject will participate in a single prospective postoperative study visit conducted at least three months after surgery. Cataract surgery itself is not part of the study.\n\n### Background:\nMultifocal and extended range of vision intraocular lenses have improved spectacle independence following cataract surgery; however, earlier designs have been associated with visual disturbances such as halos, glare, and reduced contrast sensitivity. The TECNIS Odyssey intraocular lens was developed to provide a broader range of vision while maintaining visual quality. Although the Odyssey IOL is FDA approved and used in routine clinical practice, limited data are available regarding postoperative visual acuity and patient-reported outcomes following bilateral implantation. This study aims to further characterize visual performance and patient satisfaction at least three months after surgery.\n\n### Primary Objective:\nTo evaluate postoperative visual acuity outcomes following bilateral implantation of the TECNIS Odyssey intraocular lens.\n\n### Hypothesis:\nBilateral implantation of the TECNIS Odyssey intraocular lens provides good visual acuity at distance, intermediate, and near, with acceptable patient-reported visual quality and satisfaction.\n\n### Endpoints:\nPrimary Endpoint:\n- Photopic and mesopic visual acuity at distance (6 m), intermediate (66 cm), and near (40 cm and 33 cm) assessed at the postoperative study visit.\n\nSecondary Endpoint:\n- Patient-reported outcomes assessed using the Assessment of Intraocular Lens Implant Symptoms (AIOLIS) questionnaire.\n\nExploratory Endpoints:\n- Correlation of postoperative quality-of-vision concerns with corneal performance index.\n- Correlation of pupil size with patient satisfaction.\n\n### Assessments Schedule:\n- Retrospective Component:\n  Identification of eligible subjects via medical record review confirming prior bilateral cataract surgery with Odyssey IOL implantation.\n\n- Prospective Study Visit (≥ 3 months postoperatively):\n  - Informed consent\n  - Medical history\n  - Manifest refraction\n  - Photopic and mesopic visual acuity testing at distance, intermediate, and near\n  - Assessment of Intraocular Lens Implant Symptoms (AIOLIS)\n  - Ocular Surface Disease Index (OSDI)\n  - iTrace assessment\n  - Pupil size measurement\n  - Adverse event assessment\n\nAll study procedures are non-interventional and consistent with standard ophthalmic evaluations.\n\n### Timeline:\nStudy Start Date: June 1, 2025  \nFirst Patient Enrolled: July 15, 2025  \nLast Patient Completed: December 20, 2026  \nData Analysis: January–February 2027  \nFinal Report Submission: March 31, 2027\n\n### Number of Sites:\nOne\n"
+          },
+          {
+            "content": "={\n  \"visitSchedule\": \"Subjects will participate in five scheduled study visits over a 12-week period. These will include a screening/baseline visit, two interim follow-up visits at Week 4 and Week 8, a final evaluation at Week 12, and an exit visit if subjects discontinue prematurely. The visit schedule, complete with visit windows and associated CRF forms, is summarized in the table below. Details of each visit, including the specific testing to be conducted, are provided in subsections 9.2.1 through 9.2.5.\",\n  \"visitScheduleDetails\": \"9.2.1. Screening/Baseline\\nAt the baseline visit, subjects will undergo informed consent, eligibility confirmation, assignment of study ID, and collection of demographic and medical history. Baseline assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire.\\n\\n9.2.2. Week 4 Follow-up\\nSubjects will return for interim evaluation at Week 4 (±7 days). Assessments will include vital signs (blood pressure, heart rate) and monitoring for treatment-emergent adverse events. Compliance with study medication will also be reviewed.\\n\\n9.2.3. Week 8 Follow-up\\nAt Week 8 (±7 days), subjects will undergo vital signs measurement and review of adverse events. Ongoing medication compliance and safety will be evaluated.\\n\\n9.2.4. Week 12 Final Visit\\nAt Week 12 (±7 days), subjects will undergo final efficacy and safety evaluations. Assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire. Adverse events and medication compliance will also be recorded.\\n\\n9.2.5. Exit Procedures\\nSubjects who discontinue early will complete an exit visit as soon as possible. The exit visit will include safety evaluations, vital signs, review of adverse events, and return of study medication where applicable.\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Screening/Baseline\",\n      \"visitWindow\": \"Day 0\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Week 4 Follow-up\",\n      \"visitWindow\": \"Week 4 (±7 days)\",\n      \"CRFnumber\": \"2\"\n    },\n    {\n      \"visitNumber\": \"3\",\n      \"visitName\": \"Week 8 Follow-up\",\n      \"visitWindow\": \"Week 8 (±7 days)\",\n      \"CRFnumber\": \"3\"\n    },\n    {\n      \"visitNumber\": \"4\",\n      \"visitName\": \"Week 12 Final Visit\",\n      \"visitWindow\": \"Week 12 (±7 days)\",\n      \"CRFnumber\": \"4\"\n    },\n    {\n      \"visitNumber\": \"5\",\n      \"visitName\": \"Exit Visit\",\n      \"visitWindow\": \"At time of early discontinuation\",\n      \"CRFnumber\": \"5\"\n    }\n  ],\n  \"measurements\": \"All routine testing and planned study assessments will be conducted at each scheduled visit. Any abnormalities identified should be documented in the CRF 'Comment' section. Specific study examination procedures are outlined below.\",\n  \"measurementsDetails\": \"9.3.1. Vital Signs\\nBlood pressure and heart rate will be measured at each scheduled visit (baseline, week 4, week 8, week 12) using a calibrated sphygmomanometer. Measurements will be taken in a seated position after a minimum of 5 minutes rest.\\n\\n9.3.2. Laboratory Testing\\nComplete blood count, serum electrolytes, and liver function tests will be performed at baseline and week 12. Samples will be collected via venipuncture and analyzed at a certified central laboratory.\\n\\n9.3.3. ECG\\nA standard 12-lead electrocardiogram will be conducted at baseline and week 12. ECGs will be evaluated for any clinically significant abnormalities by a blinded cardiologist.\\n\\n9.3.4. Quality of Life Questionnaire\\nA validated hypertension-specific quality of life instrument will be administered at baseline and week 12. Questionnaires will be completed by subjects under the supervision of site personnel to ensure completeness and accuracy.\",\n  \"startDate\": \"2025-06-01\",\n  \"endDate\": \"2027-03-31\"\n}\n",
+            "role": "assistant"
+          },
+          {
+            "content": "=### Study Title: \n{{ $('Set Questions').first().json.whatIsTheFullTitleOfTheStudy }}\n\n\n### Study Design:\n{{ $('Set Questions').first().json.describeTheStudyDesign }}\n\n\n### Background:\n{{ $('Set Questions').first().json.provideTheBackgroundAndSignificanceOfTheStudy }}\n\n\n### Primary Objective:\n{{ $('Set Questions').first().json.whatAreThePrimaryObjectivesOfTheStudy }}\n\n\n### Hypothesis:\n{{ $('Set Questions').first().json.stateTheStudyHypothesis }}\n\n\n### Endpoints:\n{{ $('Set Questions').first().json.listThePrimaryAndSecondaryEndpoints }}\n\n\n### Assessments Schedule:\n{{ $('Set Questions').first().json.listAllPlannedAssessmentsAndTheirSchedule }}\n\n\n### Timeline\n{{ $('Set Questions').first().json.provideTheStudyTimeline }}\n\n\n### Number of Sites:\n{{ $('Set Questions').first().json.howManyInvestigationalSitesWillParticipateInTheStudy }}"
+          }
+        ],
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a medical writer generating the Procedures and Assessments sections of clinical study protocols."
+          },
+          {
+            "role": "user",
+            "content": "### Context:\nWe are writing an ambispective clinical study protocol document. \nYour task is to generate the **Procedures and Assessments** sections.  \n\n\n### Inputs we will provide (with descriptions):\n- Study Title: The full official title of the study.\n- Study Design: Free text describing the study design as provided in the form.\n- Background: Background and significance text.\n- Primary Objective: The main objective text.\n- Hypothesis: The hypothesis text.\n- Endpoints: The list of primary and secondary endpoints.\n- Assessments Schedule: The planned assessments and their schedule.\n- Number of Sites: The total number of investigational sites.\n- Timeline: Study dates\n\n\n### What you need to do:\nGenerate **visitSchedule**: a short narrative introduction summarizing the visit or data collection structure (e.g., retrospective data review, operative data, and/or follow-up assessments as applicable).\nGenerate **visitScheduleDetails**: numbered subsections starting at 9.2.1.\nInclude only as many subsections as are supported by the Assessments Schedule and Timeline.\n- Generate **visitScheduleTable**: an array of structured objects with the fields:\n  - visitNumber  \n  - visitName  \n  - visitWindow  \n  - CRFnumber  \n- Generate **measurements**: a short narrative summary of the planned assessments.  \n- Generate **measurementsDetails**: subsections labeled 9.3.1, 9.3.2, etc., with expanded descriptions of how each assessment is conducted (standardized procedures, methodology, equipment).  \n- Generate Study Start Date in format yyyy-mm-dd\n- Generate Study End Date in format yyyy-mm-dd\n\n\n### Important notes:\n- Do not invent assessments or visits beyond what is explicitly provided.\n- For ambispective studies, describe visits as data collection timepoints or record review when applicable.\n- Do not imply screening, baseline, follow-up, or exit visits unless they are explicitly described in the Assessments Schedule or Timeline.\n- If the study includes a single visit or retrospective data extraction, reflect this accurately.  \n- Visit details must use numbered subsections (9.2.1, 9.2.2, …).  \n- Measurement details must use numbered subsections (9.3.1, 9.3.2, …).  \n\n\n### Output format:\nReturn only valid JSON in the following structure:\n{\n  \"visitSchedule\": \"narrative summary\",\n  \"visitScheduleDetails\": \"9.2.1. Preoperative ...\\n\\n9.2.2. Operative (Surgery) ...\\n\\n9.2.3. Postoperative 1 Day ...\\n\\n9.2.4. Postoperative 1 Week ...\\n\\n9.2.5. Exit Procedures ...\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Preoperative\",\n      \"visitWindow\": \"-90 to 0 days from surgery\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Operative\",\n      \"visitWindow\": \"0 from surgery\",\n      \"CRFnumber\": \"2\"\n    }\n  ],\n  \"measurements\": \"- CBC at screening and week 12\\n- ECG at baseline and week 6\\n- Quality of life survey at baseline and week 12\",\n  \"measurementsDetails\": \"9.3.1. Laboratory Testing ...\\n\\n9.3.2. ECG ...\\n\\n9.3.3. Quality of Life Survey ...\"\n  \"startDate\": \"2025-01-15\",\n  \"endDate\": \"2025-04-30\"\n}\n"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title:\nAmbispective Analysis of Patient Reported Outcomes and Visual Acuity in Patients with Bilateral Implantation of Odyssey Intraocular Lenses\n\n### Study Design:\nSingle-center, ambispective observational study. Subjects who previously underwent bilateral uncomplicated cataract surgery with implantation of the TECNIS Odyssey intraocular lens will be identified retrospectively through medical record review. Each eligible subject will participate in a single prospective postoperative study visit conducted at least three months after surgery. Cataract surgery itself is not part of the study.\n\n### Background:\nMultifocal and extended range of vision intraocular lenses have improved spectacle independence following cataract surgery; however, earlier designs have been associated with visual disturbances such as halos, glare, and reduced contrast sensitivity. The TECNIS Odyssey intraocular lens was developed to provide a broader range of vision while maintaining visual quality. Although the Odyssey IOL is FDA approved and used in routine clinical practice, limited data are available regarding postoperative visual acuity and patient-reported outcomes following bilateral implantation. This study aims to further characterize visual performance and patient satisfaction at least three months after surgery.\n\n### Primary Objective:\nTo evaluate postoperative visual acuity outcomes following bilateral implantation of the TECNIS Odyssey intraocular lens.\n\n### Hypothesis:\nBilateral implantation of the TECNIS Odyssey intraocular lens provides good visual acuity at distance, intermediate, and near, with acceptable patient-reported visual quality and satisfaction.\n\n### Endpoints:\nPrimary Endpoint:\n- Photopic and mesopic visual acuity at distance (6 m), intermediate (66 cm), and near (40 cm and 33 cm) assessed at the postoperative study visit.\n\nSecondary Endpoint:\n- Patient-reported outcomes assessed using the Assessment of Intraocular Lens Implant Symptoms (AIOLIS) questionnaire.\n\nExploratory Endpoints:\n- Correlation of postoperative quality-of-vision concerns with corneal performance index.\n- Correlation of pupil size with patient satisfaction.\n\n### Assessments Schedule:\n- Retrospective Component:\n  Identification of eligible subjects via medical record review confirming prior bilateral cataract surgery with Odyssey IOL implantation.\n\n- Prospective Study Visit (≥ 3 months postoperatively):\n  - Informed consent\n  - Medical history\n  - Manifest refraction\n  - Photopic and mesopic visual acuity testing at distance, intermediate, and near\n  - Assessment of Intraocular Lens Implant Symptoms (AIOLIS)\n  - Ocular Surface Disease Index (OSDI)\n  - iTrace assessment\n  - Pupil size measurement\n  - Adverse event assessment\n\nAll study procedures are non-interventional and consistent with standard ophthalmic evaluations.\n\n### Timeline:\nStudy Start Date: June 1, 2025  \nFirst Patient Enrolled: July 15, 2025  \nLast Patient Completed: December 20, 2026  \nData Analysis: January–February 2027  \nFinal Report Submission: March 31, 2027\n\n### Number of Sites:\nOne\n"
+          },
+          {
+            "role": "assistant",
+            "content": "{\n  \"visitSchedule\": \"Subjects will participate in five scheduled study visits over a 12-week period. These will include a screening/baseline visit, two interim follow-up visits at Week 4 and Week 8, a final evaluation at Week 12, and an exit visit if subjects discontinue prematurely. The visit schedule, complete with visit windows and associated CRF forms, is summarized in the table below. Details of each visit, including the specific testing to be conducted, are provided in subsections 9.2.1 through 9.2.5.\",\n  \"visitScheduleDetails\": \"9.2.1. Screening/Baseline\\nAt the baseline visit, subjects will undergo informed consent, eligibility confirmation, assignment of study ID, and collection of demographic and medical history. Baseline assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire.\\n\\n9.2.2. Week 4 Follow-up\\nSubjects will return for interim evaluation at Week 4 (±7 days). Assessments will include vital signs (blood pressure, heart rate) and monitoring for treatment-emergent adverse events. Compliance with study medication will also be reviewed.\\n\\n9.2.3. Week 8 Follow-up\\nAt Week 8 (±7 days), subjects will undergo vital signs measurement and review of adverse events. Ongoing medication compliance and safety will be evaluated.\\n\\n9.2.4. Week 12 Final Visit\\nAt Week 12 (±7 days), subjects will undergo final efficacy and safety evaluations. Assessments will include vital signs (blood pressure, heart rate), complete blood count, serum electrolytes, liver function tests, ECG, and quality of life questionnaire. Adverse events and medication compliance will also be recorded.\\n\\n9.2.5. Exit Procedures\\nSubjects who discontinue early will complete an exit visit as soon as possible. The exit visit will include safety evaluations, vital signs, review of adverse events, and return of study medication where applicable.\",\n  \"visitScheduleTable\": [\n    {\n      \"visitNumber\": \"1\",\n      \"visitName\": \"Screening/Baseline\",\n      \"visitWindow\": \"Day 0\",\n      \"CRFnumber\": \"1\"\n    },\n    {\n      \"visitNumber\": \"2\",\n      \"visitName\": \"Week 4 Follow-up\",\n      \"visitWindow\": \"Week 4 (±7 days)\",\n      \"CRFnumber\": \"2\"\n    },\n    {\n      \"visitNumber\": \"3\",\n      \"visitName\": \"Week 8 Follow-up\",\n      \"visitWindow\": \"Week 8 (±7 days)\",\n      \"CRFnumber\": \"3\"\n    },\n    {\n      \"visitNumber\": \"4\",\n      \"visitName\": \"Week 12 Final Visit\",\n      \"visitWindow\": \"Week 12 (±7 days)\",\n      \"CRFnumber\": \"4\"\n    },\n    {\n      \"visitNumber\": \"5\",\n      \"visitName\": \"Exit Visit\",\n      \"visitWindow\": \"At time of early discontinuation\",\n      \"CRFnumber\": \"5\"\n    }\n  ],\n  \"measurements\": \"All routine testing and planned study assessments will be conducted at each scheduled visit. Any abnormalities identified should be documented in the CRF 'Comment' section. Specific study examination procedures are outlined below.\",\n  \"measurementsDetails\": \"9.3.1. Vital Signs\\nBlood pressure and heart rate will be measured at each scheduled visit (baseline, week 4, week 8, week 12) using a calibrated sphygmomanometer. Measurements will be taken in a seated position after a minimum of 5 minutes rest.\\n\\n9.3.2. Laboratory Testing\\nComplete blood count, serum electrolytes, and liver function tests will be performed at baseline and week 12. Samples will be collected via venipuncture and analyzed at a certified central laboratory.\\n\\n9.3.3. ECG\\nA standard 12-lead electrocardiogram will be conducted at baseline and week 12. ECGs will be evaluated for any clinically significant abnormalities by a blinded cardiologist.\\n\\n9.3.4. Quality of Life Questionnaire\\nA validated hypertension-specific quality of life instrument will be administered at baseline and week 12. Questionnaires will be completed by subjects under the supervision of site personnel to ensure completeness and accuracy.\",\n  \"startDate\": \"2025-06-01\",\n  \"endDate\": \"2027-03-31\"\n}\n"
+          },
+          {
+            "role": "user",
+            "content": "### Study Title: \nHistorical Glaucoma Drop Burden and Prospective Daily Visual Function.\n\n\n### Study Design:\nProtocol study type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other, combining retrospective record abstraction and prospective research follow-up in the same consenting participants. Condition: Primary open-angle glaucoma treated with topical pressure-lowering medication. Healthy volunteers: No. All sexes eligible. Number of sites: 2, both in the United States. Enrollment target: 120 unique adults, aiming for 60 per site. These are people, not eyes, visits, prescriptions or historical records. No treatment, drug, device, surgery or drop schedule is assigned by research. There is no randomization, masking, placebo or investigational product. The exposure is the number of active topical glaucoma drug ingredients already prescribed in ordinary care at enrollment. Category: Drug, observed only. Research staff do not start, stop, switch, withhold or supply glaucoma drops. EXPOSURE GROUPS AND STUDY EYE All 120 people form one observational study population with two exposure groups: 1. One active topical glaucoma drug ingredient prescribed at Day 0. 2. Two or more active topical glaucoma drug ingredients prescribed at Day 0. A fixed-combination bottle counts as its number of active ingredients, not one ingredient merely because it is one bottle. Count each distinct ingredient once across both eyes; do not double-count the same ingredient used in both eyes. Classify from the clinician's current prescription list before any Day 0 change. No group size or balance is guaranteed. Recruitment is consecutive, not allocation to a medication regimen. Record later ordinary-care changes without changing the baseline exposure group or automatically removing the participant. One eye contributes pressure outcomes. At Day 0 select the eligible glaucoma eye with higher measured pressure; if tied, select the right eye. If only one eye is eligible, select that eye. Keep this eye for all pressure outcomes and historical eye-specific abstraction. A missing later measurement does not justify switching eyes. Participant function ratings remain one response per person.\n\n\n### Background:\nThe study links existing glaucoma care records to newly collected daily-function ratings and eye-pressure measurements. People using different numbers of drug ingredients may differ in disease severity and other characteristics; the study does not establish whether drops cause a change in daily function. No prior effect estimate, bibliography or validated questionnaire reference is supplied.\n\n\n### Primary Objective:\nEstimate the difference between baseline medication-burden groups in change in daily visual-function rating from Day 0 to Day 60.\n\n\n### Hypothesis:\nHypothesis: The group prescribed two or more active ingredients at enrollment will have a smaller improvement in daily function than the one-ingredient group. This is an exploratory association hypothesis, not an established effect or a claim of comparative treatment efficacy.\n\n\n### Endpoints:\n{\"primary\": [{\"analysis_method\": \"Day 60 minus Day 0, 0-to-100 scale; adjusted linear model by baseline exposure group.\", \"description\": \"Primary outcome: Change in daily visual-function rating from Day 0 to Day 60 +/- 7 days after enrollment. Calculate Day 60 minus Day 0 on the 0-to-100 scale. Positive change means improvement; negative change means worsening.\", \"measure\": \"Change in daily visual-function rating\", \"time_frame\": \"Day 0 to Day 60 +/- 7 days after enrollment\"}], \"secondary\": [{\"analysis_method\": \"\", \"description\": \"Secondary outcome 1: Selected study-eye pressure at Day 60 +/- 7 days, in mmHg. Lower pressure is a lower measured value; no target-pressure threshold or definition of clinical success is supplied. This endpoint is a level, not change.\", \"measure\": \"Selected study-eye pressure\", \"time_frame\": \"Day 60 +/- 7 days after enrollment\"}, {\"analysis_method\": \"\", \"description\": \"Secondary outcome 2: Number of documented glaucoma encounters per participant during 1 January through 31 December 2026, using the deduplication rule above. Count documented glaucoma encounters per person within the fixed period; deduplicate entries with the same person, date and encounter identifier. Report record completeness. No documented surgery is reported as 'not documented' unless the record explicitly establishes absence; missing records do not establish none.\", \"measure\": \"Number of documented glaucoma encounters per participant\", \"time_frame\": \"1 January through 31 December 2026 inclusive\"}, {\"analysis_method\": \"\", \"description\": \"Secondary outcome 3: Number of ordinary-care topical glaucoma regimen changes per participant from enrollment through Day 60 +/- 7 days. A change is a clinician-directed start, stop or dose-frequency change; a refill alone is not a change. Count a same-day coordinated regimen adjustment as one event, even if more than one ingredient changes. Use accessible records and scheduled-contact updates, reconcile duplicates and retain unknown status when information is absent.\", \"measure\": \"Number of ordinary-care topical glaucoma regimen changes per participant\", \"time_frame\": \"Enrollment through Day 60 +/- 7 days\"}]}\n\n\n### Assessments Schedule:\n{\"assessments\": [\"Visit 1: Day 0 is in person, no window, about 50 minutes total. Historical abstraction is later staff work, not another participant visit or extra time added to the 50-minute visit total.\", \"Visit 2: Day 30 +/- 5 days after enrollment is by telephone, about 10 minutes. No eye-pressure test, new drug instruction, specimen collection or device assessment occurs by telephone.\", \"Visit 3: Day 60 +/- 7 days after enrollment is in person, about 25 minutes. There is no extra exit form or closeout contact.\", \"There are no home diaries, adherence targets, app logs, home devices, daily symptom scores, visual acuity tests, imaging, dilation, blood draws, saliva, genetic tests, specimen storage or future specimen use.\"], \"visit_schedule\": [{\"duration\": \"About 50 minutes total\", \"mode\": \"In person\", \"participant_visit\": \"True\", \"procedures\": \"Written consent and authorization before research; Confirm eligibility; Record age; Record sex; Record glaucoma history; Record current prescription list before any Day 0 change; Classify baseline ingredient-burden group; Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.; Goldmann applanation pressure in both eligible glaucoma eyes, mmHg: two readings per eye and arithmetic mean. select higher-pressure eligible eye, right eye if tied, or only eligible eye.; Record study-eye selection; Ask about assessment-related symptoms; Explain telephone follow-up\", \"timing\": \"Day 0 enrollment; no window\", \"visit\": \"Visit 1: Day 0\"}, {\"duration\": \"About 10 minutes\", \"mode\": \"Telephone\", \"participant_visit\": \"True\", \"procedures\": \"Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.; Ask about ordinary-care medication changes; Ask about ordinary-care glaucoma encounters; Ask about assessment-related symptoms\", \"timing\": \"Day 30 +/- 5 days after enrollment\", \"visit\": \"Visit 2: Day 30\"}, {\"duration\": \"About 25 minutes\", \"mode\": \"In person\", \"participant_visit\": \"True\", \"procedures\": \"Daily visual-function rating: 'Over the past seven days, how well could you perform your usual daily visual tasks?' One study-specific response per person, 0 (unable to perform usual tasks) to 100 (able to perform all usual tasks without difficulty). higher is better. no validation claim.; Goldmann applanation pressure in the same fixed selected study eye, mmHg: two readings and arithmetic mean. no switching for missing measurement.; Update prescriptions; Ask about ordinary-care medication changes; Ask about ordinary-care glaucoma encounters; Ask about assessment-related symptoms; Confirm completion\", \"timing\": \"Day 60 +/- 7 days after enrollment\", \"visit\": \"Visit 3: Day 60\"}, {\"duration\": \"\", \"mode\": \"Staff review of accessible enrolling-site records\", \"participant_visit\": \"False\", \"procedures\": \"Abstract encounter dates; Abstract documented glaucoma diagnoses; Abstract prescribed topical drug ingredients; Abstract pressure measurements with eye, measurement date and recorded method. select latest historical study-eye value using supplied tie rules; Abstract documented glaucoma surgery. preserve not documented versus established absence; Count glaucoma encounters per person with person/date/encounter-identifier deduplication; Report historical record completeness\", \"timing\": \"After written consent and authorization; records dated 1 January through 31 December 2026 inclusive only\", \"visit\": \"Historical record abstraction (staff task; not a participant visit)\"}], \"visit_schedule_table\": null}\n\n\n### Timeline\nRecruitment and enrollment: 1 February through 31 May 2027. Final participant assessments, primary completion and study completion: anticipated by 15 August 2027, allowing the final Day 60 window. Historical abstraction period: 1 January through 31 December 2026 inclusive. Administrative closeout: 31 December 2027.\n\n\n### Number of Sites:\n2"
+          }
+        ]
+      }
+    ],
+    "current_instruction_targets": [],
+    "editorial_corrections": {
+      "study-procedure.visits": [
+        "Include a supplied missed-contact or rescheduling policy once alongside the relevant visit details, preserving its attempt limit and existing window. The drafted prose owns that rule; no second formal source sentence is needed."
+      ]
+    },
+    "consent_template_comments": [],
+    "adapter_instructions": [
+      "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
+      "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
+      "A list group may contain a nonempty label alongside items. That label renders as an unbulleted paragraph immediately before the group's items; use it to separate endpoint categories without turning introductions into bullets.",
+      "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
+      "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
+      "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
+      "Use the current section ownership instructions to tighten the retained prompts: keep Protocol synopses brief, explain each operational rule fully in its owning section and use brief heading references elsewhere. Endpoint definitions and analysis calculations remain complete where needed; ICF explanations remain self-contained for participants. Preserve every material quantity, window, exception and safety qualification.",
+      "Write final study prose, not commentary about drafting. Translate source directions into the applicable study fact: for example, 'Day 30 ratings are descriptive only' rather than an explanation about inventing registry outcomes. Omit empty category labels when no endpoint belongs to that category.",
+      "For evaluation-procedures, inspect the supplied assessment_presentation notes against the approved table. When an edit is needed, return the existing source_text/display_text/rationale shape to retain unique information without repeating the matrix. This is part of drafting, not a separate review task.",
+      "For ICF requests also follow consent_template_comments. Assess applicability from the approved source and selected family, preserving supplied conditions and existing family-owned sections. Template comments do not establish new study facts or authorization.",
+      "Use only the approved comparator, endpoints, visits, risks, benefits, statistical methods and regulatory facts. Omit legacy defaults that invent placebo, standard-of-care comparators, extra outcomes, inferred side-effect lists, dates or significance levels.",
+      "For current_instruction_targets, draft study-specific content from the approved source and current section instructions, retaining applicable fixed client language.",
+      "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses."
+    ]
+  }
+}

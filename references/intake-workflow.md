@@ -70,6 +70,14 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   Put explicit activity/visit relationships in the structured schedule. Keep
   one row per actual assessment or action. Keep questionnaire response choices
   and score ranges in that questionnaire's description, not as extra activities.
+  Use short activity names in schedule rows, such as "Study-eye pressure".
+  Keep the complete instrument, units, reading count, selection rules, score
+  anchors and exceptions in `procedures.assessment_details` or `procedures.methods`;
+  the narrative explains these methods while the matrix shows when each activity
+  occurs. Preserve distinctions needed to identify different activities in their
+  row labels, such as both-eye selection versus fixed-eye follow-up. Show both
+  the concise row and its full method for Source-of-Truth approval. Existing
+  approved rows remain unchanged during generation.
   Put statements such as "no separate exit form" in supplemental notes rather
   than making them checked procedures. In ambispective studies, distinguish
   staff abstraction of historical records from future participant contacts;

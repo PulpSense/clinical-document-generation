@@ -6,13 +6,14 @@ Current candidate: registry disclosure mapping fix (contract v2.50, prompt v30),
 built on retrospective coverage commit `8d48c22`.
 Record the installed commit from the next Hermes run receipt.
 
-**Current step: Run 6 disclosure fix implemented and locally replayed; Hermes rerun pending.**
+**Current step: Run 7 XML fixes pass local replay; concise drafting trials reviewed; Hermes confirmation pending.**
 CHART, current-version NEAR/Advarra, COMFORT/Sterling, NEAR/Sterling and
-COMFORT/Advarra pass Codex review. Both template-switch tests pass review.
+COMFORT/Advarra and BREAK/Sterling pass Codex review. Both template-switch tests pass review.
 The owner now operates Hermes and uploads complete run archives for review;
 computer operation is no longer delegated. Fresh approved Source of Truth records
 are present for Runs 2–3. Preserve those clinical facts during template switches.
-Next: rerun BREAK with the disclosure fix before Run 7.
+Next: run one GLIDE confirmation with the updated exporter and drafting adapter,
+then proceed to fresh retrospective Run 8 after review.
 
 ## Sequence
 
@@ -27,8 +28,8 @@ new input and a new template do not change at the same time.
 | 3 | Ambispective | COMFORT input with fresh Source of Truth | Sterling | Current-version run passes Codex review; owner acceptance pending |
 | 4 | Prospective | Same NEAR clinical facts as Run 2 | Sterling | Passes Codex review; owner acceptance pending |
 | 5 | Ambispective | Same COMFORT clinical facts as Run 3 | Advarra | Passes Codex review; owner acceptance pending |
-| 6 | Prospective | BREAK-27-05, approved revision r-3a7da16f6dea | Sterling | Local disclosure fix passes; Hermes rerun pending |
-| 7 | Ambispective | New clinical input, to be prepared | Advarra | Pending |
+| 6 | Prospective | BREAK-27-05, approved revision r-3a7da16f6dea | Sterling | Rerun passes Codex review; owner acceptance pending |
+| 7 | Ambispective | GLIDE-27-06, fresh input | Advarra | DOCX review passes; XML local fix verified; confirmation pending |
 | 8 | Retrospective | New clinical input, to be prepared | Not applicable | Pending |
 
 Runs 2–3 repeat the existing studies after the retrospective branch is settled.
@@ -36,7 +37,7 @@ Runs 4–5 change only the selected consent family, preserving the studies'
 clinical facts. Record and approve that template-selection change through the
 usual Source of Truth process. Runs 6–8 test fresh clinical inputs after the
 template-switch results are accepted. Prepare and approve those inputs before
-starting their runs. Run 6 input is retained below; Runs 7–8 inputs remain pending.
+starting their runs. Run 6 and Run 7 inputs are retained below; Run 8 input remains pending.
 
 The current retrospective workflow produces **only protocol.docx**, with no ICF
 or XML. Prospective and ambispective produce protocol.docx, icf.docx and study.xml.
@@ -551,3 +552,185 @@ field formatting, and approved-source immutability.
 This local replay does not accept a new Hermes run. Rerun BREAK using the same
 approved Source of Truth, retain the entire run ZIP and review it before moving
 to Runs 7–8.
+
+
+### Run 6 BREAK rerun review — 16 October 2026
+
+Archive: `/Users/juanpabloleoni/Downloads/BREAK-27-05-cf810a8-entire-run.zip`.
+Archive SHA-256: `c79be775ce8c57cedce6d9a665100bfcb1a8565865e74abad0d7a0281a79da79`.
+The input bytes match the retained Run 6 input. Hermes records a clean checkout
+of `cf810a8db32d13050dae3531b71114ac93d691b0`, fresh intake and fresh approval;
+this is not a replay of the deleted run. Revision: `r-34948dcf0dfe`.
+Approved Source-of-Truth Markdown SHA-256:
+`0297e7b2edf766b8ebeec6ad7bca270f7bdff6b5d78da39614680dde616ec14f`.
+All five drafting requests agree with that source hash and the installed six
+runtime script hashes. All three delivered output hashes match the receipt.
+Generation time: 3 minutes 57.22 seconds. The single protocol field refresh
+passed, with 17 pages; no automated content/visual review or repair loop ran.
+
+The fresh approved source explicitly records
+`regulatory.prs.participant_registry_disclosure: true`. The final Sterling ICF
+includes exactly one copy of the reviewed ClinicalTrials.gov statement on page
+6, before Questions, with no stray chapter-sequence number. Body contacts retain
+both sites and the actual reviewing Meridian IRB. Sterling opening merge fields
+and blank approval identifiers remain as requested by the supplied input.
+
+Reviewed all 17 protocol pages and 7 ICF pages using local renders, with enlarged
+inspection of the disclosure/contact page, protocol contact table and assessment
+matrix. No material content or layout defect was found. The contact table stays
+on one page. Assessment rows remain intact with repeated headers across the
+two-page matrix. All 43 TOC page references match the rendered protocol.
+
+Cross-document comparison preserves 72 people, two sites and groups,
+randomized behavioral assignment, assessor-only masking, three clinic visits
+and one telephone contact with the supplied windows and durations, separate
+Days 1–56 diaries without invented symptom ratings, negative symptom change as
+improvement, intervention-only adherence with correct denominator/missingness,
+reimbursement-only payments, sponsor access to limited identifying reimbursement
+data versus coded analysis data, finite collection authorization, retention,
+withdrawal and calendar distinctions. Thin background and unspecified operational
+reporting timelines do not justify further prompt changes.
+
+XML is well formed in the retained Brad-derived structure, with Interventional
+classification, randomized parallel design, single outcomes-assessor masking,
+72 anticipated participants, two arms and sites, one primary and three secondary
+outcomes, no invented exploratory outcome, NCT identifier or IRB approval number.
+This review did not test a live registry import.
+
+Result: Run 6 passes Codex review at `cf810a8`; owner acceptance remains separate.
+No production code, prompts, approved source or supplied outputs were changed.
+Proceed to fresh-input ambispective/Advarra Run 7, then fresh retrospective Run 8.
+
+
+### Run 7 GLIDE input prepared — 16 October 2026
+
+Input: `inputs/GLIDE-27-06-study-input.txt`.
+Owner-transfer copy: `/Users/juanpabloleoni/Downloads/GLIDE-27-06-study-input.txt`.
+Expected Hermes location after owner transfer:
+`/opt/data/GLIDE-27-06-study-input.txt`; transfer has not been verified here.
+Use tested runtime `cf810a8` on `codex/generation-only-experiment`; prepare and
+approve a fresh Source of Truth, then retain the entire run ZIP for review.
+
+The new study observes existing glaucoma medication burden at two sites and
+combines fixed-period historical records with Day 0/30/60 research contacts.
+Review especially:
+
+- Ambispective observational classification, exposure groups without assigned
+  drug treatment, and baseline group membership despite ordinary-care changes.
+- Distinct people, historical encounters and study-eye pressure measurements;
+  count combination-drug ingredients without double-counting across eyes.
+- Fixed study-eye selection, irregular historical records, explicit selection
+  rules and missingness without invented historical tests or function scores.
+- Two clinic visits and one telephone contact, no home diary, and no pressure
+  test by phone; staff abstraction and closeout are not participant visits.
+- Positive function change means improvement, contrasting with BREAK's symptom
+  direction; primary change and secondary pressure level remain distinct.
+- Observational adjusted association, no causal claim, available-case denominators
+  and unknown regimen-change information kept distinct from zero events.
+- Contact-specific compensation with partial-contact and withdrawal rules, no
+  expense reimbursement, local cash payments and coded-only sponsor analysis.
+- Specified authorization expiry versus individual collection end and ten-year
+  retention; none of those extends research follow-up.
+- Populated Advarra opening fields, actual Harborview IRB contacts, no invented
+  IRB approval, no genetics/specimen/LAR choices and no consent registry clause.
+- XML reflects two observed groups, appropriate dates, one primary and three
+  secondary outcomes, without invented randomized arms or extra outcomes.
+
+No generation or Source-of-Truth approval has occurred for Run 7 yet.
+
+
+### Run 7 GLIDE review — 17 October 2026
+
+Archive: `/Users/juanpabloleoni/Downloads/Historical-Glaucoma-Drop-Burden-and-Prospective-Daily-Visual-Function__Ambispective__2026-10-17.zip`.
+Archive SHA-256: `65eb8e5788fbe5b2000709a27e122175c9c0550898801e3297c7838ac69a777b`.
+Installation evidence records activation of `cf810a8db32d13050dae3531b71114ac93d691b0`
+at `/opt/data/skills/clinical-document-generation`. All five drafting requests
+match the six local production script hashes and contract v2.50. Input bytes
+match the retained GLIDE input. Output receipt hashes verify for all three files.
+Revision: `r-d49898c78a1a`. Approved Source-of-Truth Markdown SHA-256:
+`6ca75890eb2c588c034885f5f20b045a5fa7fc88e1d51708fd743b768e013b46`;
+all five requests agree. Generation time: 5 minutes 3.68 seconds.
+The single protocol field refresh passed; no automated content/visual assessment
+or repair loop ran.
+
+Reviewed 21 protocol pages and six Advarra ICF pages, plus structured source and
+XML. All 43 TOC page numbers match. Opening Advarra study fields are populated,
+actual Harborview IRB and both site contacts are retained, the protocol contact
+table stays on one page, and matrix headers repeat with intact rows over pages
+16–18. The matrix explicitly labels historical abstraction as staff work, not
+a fourth participant visit. Verbose matrix labels and minor prose repetition
+are not acceptance blockers under the owner's stated scope.
+
+Clinical content preserves observational ambispective classification, 120 people,
+baseline ingredient counting including combination bottles and bilateral use,
+unchanged group membership, fixed-eye selection and averaging, no pressure test by
+telephone, irregular historical records with selection/deduplication/missingness
+rules, positive function change as improvement, secondary pressure as a level,
+association rather than causal inference, local contact-specific/partial-contact
+compensation, no expense reimbursement, coded sponsor analysis, authorization
+expiry versus retention, no specimens/genetics or unwanted consent choices, and
+no participant registry disclosure. No material clinical drafting defect found.
+
+Two XML format findings prevent accepting the complete run:
+
+1. `oversight_info/fda_regulated_drug`, `oversight_info/fda_regulated_device`
+   and `eligibility/healthy_volunteers` contain `False`, while Brad's manual
+   authority uses Yes/No. Intake represented the negative facts as the text
+   `False` and XML scalar filling copies it verbatim. Preserve the negative
+   meaning while emitting the established Yes/No field vocabulary. This is a
+   deterministic value-formatting concern, not missing clinical input.
+2. Both observational `arm_group/arm_type` elements contain `Observational
+   exposure group`. Intake used that descriptive label in `design.arms[].type`,
+   and `_fill_repeated` copies it into `arm_type`. Brad's manual observational
+   record leaves that element empty. Preserve the two group labels/descriptions
+   and observational classification, with no invented interventional arm types.
+
+XML is well formed and retains two sites/groups, one primary and three secondary
+outcomes, correct supplied dates and no invented registry or approval identifier.
+Empty optional sampling/IPD fields are not a new clinical-content blocker; no
+live registry import or XSD-validity claim was made in this review.
+
+Result: DOCX content/layout passes review; complete Run 7 acceptance remains
+pending the XML formatting correction and verification. No production code,
+prompts, approved source or delivered files were changed. Run 8 remains pending.
+
+
+### Run 7 fixes and section-only trials — 17 October 2026
+
+Issue #116. Candidate contract `clinical-documents-v2.51-prs-transport` and
+prompt `section-drafting-v31-concise-protocol` replace `cf810a8` for the next run.
+The PRS exporter formats explicit boolean/Yes/No values in the three affected
+fields as Yes/No, retaining optional blanks and unrecognized values without
+inventing decisions. Observational arm_type elements stay blank while their
+group names/descriptions remain; interventional arm types remain source supplied.
+Approved source is not mutated and no new generation-stage checks were added.
+
+GLIDE's XML-only replay used the saved approved reference and unchanged XML
+narratives. Exactly five leaf values changed, matching the reported findings;
+all other values and element order are identical. This required no model call,
+DOCX construction or visual render. Tests also cover positive, negative, missing,
+unknown and interventional cases through public XML generation.
+
+The drafting adapter now emphasizes full operational rules in their owning
+section, brief references in Bias/Visits, and final study prose rather than
+comments about generation. New intake guidance uses concise schedule activity
+labels with full measurement instructions retained for source approval. Existing
+approved schedule rows are not shortened during generation. All 22 original
+n8n nodes and document formatting/assembly remain unchanged.
+
+Three sections each from GLIDE, BREAK and COMFORT were drafted and manually
+reviewed by the same Codex agent from saved current prompts, without assembling
+DOCX. Requests, actual drafts, provenance and review notes are retained in
+`concise-protocol-trials/`. These are controlled local writing trials, not an
+independent model benchmark or Hermes result. No material loss was found in the
+trial sections; clinical definitions, exceptions and timing remain complete in
+Methods while repeated explanations in Bias/Visits are condensed.
+
+33 focused current-workflow tests pass; Python compilation and diff whitespace
+checks pass. Two older XML files have 35 failures reproduced at baseline
+`cf810a8`, with no new failing test IDs; their other 44 tests pass. Four existing
+lowercase transport expectations were updated to the approved Yes/No vocabulary.
+The full suite was not run under the owner's focused-only constraint.
+
+One complete GLIDE Hermes confirmation remains pending, followed by retrospective
+Run 8. The local replay does not mark the original complete Run 7 accepted.

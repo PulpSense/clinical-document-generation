@@ -1,0 +1,66 @@
+{
+  "case": "glide",
+  "producer": "Codex in this conversation; manually generated section-only writing trial from saved current request. No separate model API, Hermes run or independent quality validation.",
+  "section_results": [
+    {
+      "section_id": "study-design.bias",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Consecutive recruitment, predefined exposure classification and a fixed study eye reduce discretionary selection and inconsistent measurement. Apply the ingredient-counting, eye-selection and historical-record rules in Study Methods and Measurements. Later care changes leave the baseline exposure group unchanged. Historical methods and missingness remain as recorded rather than being treated as standardized research measurements."
+        },
+        {
+          "text": "The primary analysis adjusts function change for baseline exposure group, Day 0 function, age and site, as specified in Statistical Methodology. Use observed data and report missingness by site and group. These measures do not eliminate confounding by indication; group differences are exploratory associations."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.visits",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Three research contacts occur within 60 days of enrollment. Historical abstraction is separate staff work after consent, not another participant contact."
+        },
+        {
+          "text": "Day 0 is an in-person enrollment visit without a window, about 50 minutes total. Obtain written consent and authorization before research, confirm eligibility, and record age, sex, glaucoma history and prescriptions before any Day 0 change. Classify baseline ingredient burden, obtain the function rating, measure pressure in both eligible glaucoma eyes and record the selected study eye. Ask about assessment-related symptoms and explain telephone follow-up. Measurement and classification rules are in Study Methods and Measurements."
+        },
+        {
+          "text": "Day 30 +/- 5 days is a telephone contact lasting about 10 minutes. Obtain the function rating and ask about ordinary-care medication changes, glaucoma encounters and assessment-related symptoms. No pressure test, new drug instruction, specimen collection or device assessment occurs by telephone."
+        },
+        {
+          "text": "Day 60 +/- 7 days is an in-person final visit lasting about 25 minutes. Obtain the function rating, measure pressure in the fixed study eye, update prescriptions and care events, ask about assessment-related symptoms and confirm completion. No extra exit form or closeout contact is required."
+        },
+        {
+          "text": "Staff may make up to two scheduling attempts within a missed contact's existing window. Clinic pressure testing is not replaced by telephone or home testing. Unscheduled clinical visits remain ordinary care; reported events are recorded at scheduled contacts. Historical abstraction adds no participant visit or time to the Day 0 total."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.measurements",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Classify baseline medication burden from the clinician's prescription list before any Day 0 change: one versus two or more distinct active topical glaucoma ingredients. Count each ingredient in a combination bottle separately and the same ingredient used in both eyes once. Retain this classification after later care changes. Research does not assign, supply, start, stop, switch or withhold glaucoma treatment."
+        },
+        {
+          "text": "At Day 0, use clinic Goldmann applanation tonometry in both eligible glaucoma eyes, taking two readings per eye and their arithmetic mean in mmHg. Select the higher-pressure eligible eye, the right eye if tied, or the only eligible eye. At Day 60 +/- 7 days, take and average two readings only in that fixed eye; missing data do not permit switching. Routine anesthetic and fluorescein are assessment components under usual clinic safety procedures. The pressure endpoint is the Day 60 level, not change or a defined target-pressure success."
+        },
+        {
+          "text": "At Day 0, Day 30 +/- 5 days and Day 60 +/- 7 days, ask: 'Over the past seven days, how well could you perform your usual daily visual tasks?' Record one study-specific rating per person from 0, unable to perform usual tasks, to 100, able to perform all usual tasks without difficulty. Higher is better; no validation claim is made. Primary change is Day 60 minus Day 0: positive is improvement and negative is worsening. Day 30 function provides descriptive context."
+        },
+        {
+          "text": "After written consent and authorization, abstract accessible enrolling-site records dated 1 January through 31 December 2026 only: encounter dates, glaucoma diagnoses, prescribed ingredients, eye-specific pressure with date and recorded method, and documented glaucoma surgery. Historical care was irregular. Preserve its methods and missingness without constructing historical research visits or function scores, obtaining outside records or extending the period. Missing historical pressure does not exclude participation."
+        },
+        {
+          "text": "For descriptive historical pressure, use the fixed eye's latest documented value within that period. On the latest date use the last time-stamped value; if times are absent, use the first value in the clinical entry and document the selection. Deduplicate encounter counts by person, date and encounter identifier and report completeness. Record surgery as 'not documented' unless absence is explicitly established."
+        },
+        {
+          "text": "From enrollment through Day 60 +/- 7 days, count clinician-directed starts, stops or dose-frequency changes, excluding refills alone. Count a coordinated same-day adjustment as one event even if several ingredients change. Reconcile records and scheduled-contact updates, remove duplicate reports and keep unknown change status distinct from zero. There is no home diary or additional monitoring. Individual pressure results are offered at attended clinic visits, with clinical concerns referred to ordinary care; an aggregate plain-language summary is available on request after analysis."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

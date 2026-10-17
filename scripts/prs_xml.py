@@ -585,6 +585,9 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "primaryCompletionDateType": {"actual": "Actual", "anticipated": "Anticipated"},
         "lastFollowUpDateType": {"actual": "Actual", "anticipated": "Anticipated"},
     }
+    yes_no = {"true": "Yes", "false": "No", "yes": "Yes", "no": "No"}
+    for token in ("fdaRegulatedDrug", "fdaRegulatedDevice", "healthyVolunteers"):
+        transports[token] = yes_no
     for token, mapping in transports.items():
         values[token] = mapping.get(" ".join(values[token].split()).casefold(), values[token])
     return values
@@ -683,8 +686,12 @@ def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
                 child = copy.deepcopy(prototype); child.text = label
                 node.insert(position + offset, child)
     arms = _observational_cohorts(reference)
+    observational = _text(get_path(reference, "regulatory.prs.study_type")).casefold() == "observational"
     for node, item in zip(_resize(study, "arm_group", len(arms)), arms):
-        _set(node, "arm_group_label", item.get("arm_group_label") or item.get("label") or item.get("name")); _set(node, "arm_type", item.get("arm_type") or item.get("type")); _set(node, "arm_group_description/textblock", item.get("description"))
+        _set(node, "arm_group_label", item.get("arm_group_label") or item.get("label") or item.get("name"))
+        # Brad's observational structure retains an empty arm_type element.
+        _set(node, "arm_type", "" if observational else item.get("arm_type") or item.get("type"))
+        _set(node, "arm_group_description/textblock", item.get("description"))
     for tag, path in (("primary_outcome", "endpoints.primary"), ("secondary_outcome", "endpoints.secondary"), ("other_outcome", "endpoints.other")):
         items = _items(reference, path)
         shared_uid = _stable_study_uid(reference)
@@ -790,6 +797,11 @@ def _expected_transport_value(target: str, source: Any) -> str:
     normalized = " ".join(value.split()).casefold()
     if target == "eligibility/gender" and normalized in {"all sexes", "both"}:
         return "All"
+    if target == "eligibility/healthy_volunteers":
+        if normalized in {"true", "yes"}:
+            return "Yes"
+        if normalized in {"false", "no"}:
+            return "No"
     vocabulary = {
         "eligibility/gender": ("All", "Female", "Male"),
         "eligibility/sampling_method": ("Probability Sample", "Non-Probability Sample"),

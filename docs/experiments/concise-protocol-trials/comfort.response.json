@@ -1,0 +1,57 @@
+{
+  "case": "comfort",
+  "producer": "Codex in this conversation; manually generated section-only writing trial from saved current request. No separate model API, Hermes run or independent quality validation.",
+  "section_results": [
+    {
+      "section_id": "study-design.bias",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Recruit consecutive eligible consenting clinic patients using common eligibility criteria. The study observes prior routine bilateral cataract surgery and ocular-care history; it assigns no treatment and uses no randomization or masking. Apply the same prospective measurements across sites and retain historical methods and missingness as documented, as described in Study Methods and Measurements."
+        },
+        {
+          "text": "Report missingness separately for historical and prospective data without imputing unrecorded care or questionnaire responses. Historical-treatment proportions use people with relevant records as their denominator. Regression of Day 90 comfort adjusts for Day 0 comfort, age and site; any pooled-eye exploratory model accounts for paired eyes with a participant random intercept. These measures support exploratory associations, not causal, confirmatory or clinically actionable genetic conclusions."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.visits",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The same consenting participants have three prospective contacts over 90 days. Historical abstraction after consent is staff work, not an additional visit."
+        },
+        {
+          "text": "Day 0 is an in-person enrollment visit of about 70 minutes. Obtain written consent before research, confirm eligibility and authorize access to historical records. Record demographics and current ocular care, assess distance acuity in each eye and ocular comfort, collect one approximately 2 mL saliva sample by passive drool, and ask about assessment-related symptoms. Measurement and specimen procedures are described in Study Methods and Measurements."
+        },
+        {
+          "text": "Day 30 +/- 5 days is a telephone contact of about 15 minutes for the comfort rating, interval ocular-care update, unscheduled ocular visits since enrollment and assessment-related symptoms. There is no telephone acuity test or saliva collection. For a missed telephone contact, staff may make up to two further scheduling attempts within its existing window; home vision tests are not substituted."
+        },
+        {
+          "text": "Day 90 +/- 10 days is an in-person final visit of about 40 minutes. Repeat per-eye acuity and comfort assessments, update ocular care and unscheduled visits, ask about assessment-related symptoms and confirm completion. No fourth visit, extra exit form or second saliva sample is required."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.measurements",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "After consent and authorization, abstract existing enrolling-clinic records from 1 January 2025 through 30 September 2026 inclusive: surgery dates, implanted lens categories, documented ocular diagnoses, clinician-recorded ocular surface treatments, recorded best-corrected distance acuity and documented unscheduled ocular visits. Preserve recorded care and missing values. There was no historical research questionnaire, saliva collection or standardized research assessment; source records remain at the clinic."
+        },
+        {
+          "text": "At Day 0, Day 30 +/- 5 days and Day 90 +/- 10 days, use the same study-specific comfort question covering the preceding seven days, scored 0, extremely uncomfortable, to 10, fully comfortable. Higher is better; the instrument is not presented as validated. Primary change is Day 90 minus Day 0, with positive values indicating improved comfort. At Day 0 and Day 90, measure best-corrected distance acuity separately in each eye at 4 meters using a logMAR chart and current correction; lower logMAR is better. A participant-reported unscheduled visit reported at both follow-ups is counted once."
+        },
+        {
+          "text": "Collect one approximately 2 mL saliva sample by passive drool at Day 0 only. It is required for eligibility, not an optional substudy. Tubes carry only study ID and are shipped to the contracted research laboratory for targeted genotyping; the laboratory receives no names, contacts or identity key and returns coded data to the statistician. Variant selection is specified in the laboratory plan before release of the coded outcome dataset. Specimens and extracted DNA are destroyed within 90 days after testing and no later than 30 June 2027; they are not banked, sold or used for unrelated research. Coded genetic data remain in the retained dataset."
+        },
+        {
+          "text": "Genotyping is research-only and not validated for individual clinical decisions. No clinical report, individual genetic result or incidental genetic finding is returned, and clinically actionable incidental findings are not sought. Individual visual-acuity results are offered at clinic visits, clinical concerns are referred to ordinary care, and an aggregate plain-language summary is available on request after analysis. There is no treatment assignment to unmask."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

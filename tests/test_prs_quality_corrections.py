@@ -163,7 +163,7 @@ def test_known_optional_transport_tokens_pass_without_defaults(tmp_path, raw, sa
     })
     output, report, study = render(tmp_path, reference)
     assert report["status"] == "passed"
-    assert study.findtext("eligibility/healthy_volunteers") == raw
+    assert study.findtext("eligibility/healthy_volunteers") == {"yes": "Yes", "no": "No"}[raw.casefold()]
     assert study.findtext("eligibility/sampling_method") == sampling
     assert not study.findtext("primary_compl_date")
     assert not study.findtext("last_follow_up_date")
