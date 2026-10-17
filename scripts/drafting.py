@@ -61,7 +61,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v32-active-section-ownership"
+PROMPT_VERSION = "section-drafting-v33-citations-and-form-actions"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "rendering.py", "workflow.py", "output_recovery.py")
 
@@ -132,7 +132,7 @@ def _request_constraints() -> list[str]:
         "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
         "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
         "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
-        "Preserve supplied numbered citations next to the Protocol claims they support and their bibliography linkage. Do not invent citations; ICF explanations use plain language.",
+        "The assembler owns the single final Protocol REFERENCES section and populates it from the approved bibliography. Draft Protocol sections as clinical prose with supplied citation numbers beside the claims they support, linked to those same bibliography entries; omit reference headings and full bibliographic entries from section responses. Do not invent citations; ICF explanations use plain language.",
         "Return exactly one result for every requested section ID.",
         "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
         "Return structured section content, not a whole document or document markup.",
@@ -146,6 +146,7 @@ def _request_constraints() -> list[str]:
         "Use protocol_writing_plan for the active Protocol headings and method/completion owners. General Information is a compact synopsis; Objectives states purpose; Study Design owns comparisons and endpoints; Bias explains why controls matter. Place full operational rules in the named active methods_owner and completion rules in completion_owner, even when their heading differs by branch. Statistical Methodology owns calculations/models. Cross-reference only a heading listed in the plan. When assessment_table_owner is null, describe the historical windows and activities in prose or lists rather than claiming a matrix or columns are rendered.",
         "Satisfy every section's content_expectations and cover every material value named by minimum_evidence. If the writing plan names an assessment_table_owner, its source-derived table and notes carry that inventory and adjacent prose only introduces it. Otherwise the active methods_owner carries the full historical assessment details in prose or lists.",
         "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
+        "Express source form instructions as natural actions, distinguishing the action verb from the form name: an instruction 'Complete Exit Form' becomes 'complete the Exit Form'. Retain 'Complete' within a title only when the source explicitly identifies it as part of the official form name; then write 'fill out the form titled Complete Exit Form'. Preserve supplied form identifiers and numbers, including an ambiguous trailing numeral unless the source establishes that it is a footnote marker. A list or schedule label alone does not establish an official title. Apply this distinction consistently to Protocol, ICF and PRS narratives without renaming source-owned table labels.",
         "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
         "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",

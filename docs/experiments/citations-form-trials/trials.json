@@ -1,0 +1,619 @@
+{
+  "provenance": "Fresh Codex-authored local section-writing trials in this conversation using current public drafting requests. No separate model API, Hermes inference or document generation. Form-action variants are scoped development cases, not changes to an approved source.",
+  "prompt_version": "section-drafting-v33-citations-and-form-actions",
+  "constraints": [
+    "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+    "Use only supplied approved evidence and applicable template/Fixed Clinical Boilerplate. Align shared population, groups, quantities, timing, procedures and outcomes across the Protocol, selected ICF and PRS narratives; preserve relationships and qualifications rather than copying wording.",
+    "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+    "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
+    "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
+    "The assembler owns the single final Protocol REFERENCES section and populates it from the approved bibliography. Draft Protocol sections as clinical prose with supplied citation numbers beside the claims they support, linked to those same bibliography entries; omit reference headings and full bibliographic entries from section responses. Do not invent citations; ICF explanations use plain language.",
+    "Return exactly one result for every requested section ID.",
+    "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
+    "Return structured section content, not a whole document or document markup.",
+    "Write to each section's purpose and ownership. Explain each operational rule fully in its owning section; elsewhere give only the fact needed for that section and a brief reference to the owning heading. Preserve necessary identifiers, endpoint definitions, quantities, timing anchors/windows, conditions, exceptions, safety information and client consent language. Compress repeated explanations, not clinical meaning.",
+    "Use participant-facing language for ICF sections.",
+    "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",
+    "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+    "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+    "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
+    "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+    "Use protocol_writing_plan for the active Protocol headings and method/completion owners. General Information is a compact synopsis; Objectives states purpose; Study Design owns comparisons and endpoints; Bias explains why controls matter. Place full operational rules in the named active methods_owner and completion rules in completion_owner, even when their heading differs by branch. Statistical Methodology owns calculations/models. Cross-reference only a heading listed in the plan. When assessment_table_owner is null, describe the historical windows and activities in prose or lists rather than claiming a matrix or columns are rendered.",
+    "Satisfy every section's content_expectations and cover every material value named by minimum_evidence. If the writing plan names an assessment_table_owner, its source-derived table and notes carry that inventory and adjacent prose only introduces it. Otherwise the active methods_owner carries the full historical assessment details in prose or lists.",
+    "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
+    "Express source form instructions as natural actions, distinguishing the action verb from the form name: an instruction 'Complete Exit Form' becomes 'complete the Exit Form'. Retain 'Complete' within a title only when the source explicitly identifies it as part of the official form name; then write 'fill out the form titled Complete Exit Form'. Preserve supplied form identifiers and numbers, including an ambiguous trailing numeral unless the source establishes that it is a footnote marker. A list or schedule label alone does not establish an official title. Apply this distinction consistently to Protocol, ICF and PRS narratives without renaming source-owned table labels.",
+    "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+    "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+    "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+    "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+    "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays."
+  ],
+  "trials": [
+    {
+      "case": "puresee",
+      "study_type": "Prospective",
+      "family": "Advarra",
+      "source_sha256": "1c7410ea9c16b59c6032182561f413cee782f6cbdeed279576129a4289b64379",
+      "request_sha256": "9a1514b583ab0f6762cefcf9450e07010d2c4a68bf1cac6a61f68e8c8bc51525",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "introduction"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-puresee.draft.protocol-foundations.generation-only.a1.d9187fbd",
+        "request_sha256": "9a1514b583ab0f6762cefcf9450e07010d2c4a68bf1cac6a61f68e8c8bc51525",
+        "revision_id": "prompt-trial-puresee",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "introduction",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "Reports on the TECNIS Odyssey full-range-of-vision intraocular lens describe visual acuity and spectacle independence at distance, intermediate and near.[1,2] TECNIS PureSee is a non-diffractive extended depth of focus lens. Its design may reduce dysphotopsias and improve contrast sensitivity compared with diffractive lenses. A randomized trial reported better intermediate and near vision than a monofocal control, with similar contrast sensitivity, distance vision and dysphotopsia profiles.[3]",
+                "evidence_refs": [
+                  "study.background",
+                  "study.references"
+                ],
+                "boilerplate_refs": []
+              },
+              {
+                "text": "Combining PureSee in the dominant eye with Odyssey in the non-dominant eye has been proposed to broaden the range of vision and reduce visual disturbances. Data on visual outcomes, satisfaction and reported dysphotopsias with this combination remain limited. Findings for the individual lenses do not establish the outcomes of their combined use.",
+                "evidence_refs": [
+                  "study.background",
+                  "study.references"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "puresee",
+      "study_type": "Prospective",
+      "family": "Advarra",
+      "source_sha256": "20aa8d6a4c5a9b86fe054a1be88579c7a110ae49fe09a02f3cd37a82e438aade",
+      "request_sha256": "41cee06683b7004e70f87feac93201063311bbcc8d1bab0aa54b8af5de0744c4",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "study-procedure.visits"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-puresee.draft.protocol-operations.generation-only.a1.57ffba02",
+        "request_sha256": "41cee06683b7004e70f87feac93201063311bbcc8d1bab0aa54b8af5de0744c4",
+        "revision_id": "prompt-trial-puresee",
+        "task": "section_drafting",
+        "batch_id": "protocol-operations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "study-procedure.visits",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "Preoperative screening includes informed consent, demographics and medical history. The operative phase comprises one visit per eye for routine cataract surgery and implantation of PureSee in the dominant eye and Odyssey in the non-dominant eye; the study observes this care without research assignment.",
+                "evidence_refs": [
+                  "procedures.visit_schedule",
+                  "procedures.methods"
+                ],
+                "boilerplate_refs": []
+              },
+              {
+                "text": "At 3 months postoperative, assess binocular photopic visual acuity without correction and with distance correction at distance, 66 cm intermediate and 40 cm near. Obtain the binocular distance-corrected defocus curve from +1.0 D through -2.50 D and administer AIOLIS. Monitor adverse events and device deficiencies, and complete the Exit Form1.",
+                "evidence_refs": [
+                  "procedures.visit_schedule",
+                  "procedures.methods"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "puresee",
+      "study_type": "Prospective",
+      "family": "Advarra",
+      "source_sha256": "9ba2f73e5cd07bbd076e9ec55703efac9964b6204e4e3db5437289770f24f7cc",
+      "request_sha256": "c136b74236b37983fd8a385d83439d7c29ca7370454d331f980b45bbd0a26560",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "icf.procedures"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-puresee.draft.icf-narrative.generation-only.a1.e703ee4e",
+        "request_sha256": "c136b74236b37983fd8a385d83439d7c29ca7370454d331f980b45bbd0a26560",
+        "revision_id": "prompt-trial-puresee",
+        "task": "section_drafting",
+        "batch_id": "icf-narrative",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "icf.procedures",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "Before surgery, we will review this consent form with you, obtain your consent, and collect demographic information and your medical history. Your routine cataract surgery involves one visit for each eye, with PureSee in your dominant eye and Odyssey in your non-dominant eye. The study observes your care without randomly assigning lenses or directing their selection.",
+                "evidence_refs": [
+                  "procedures.visit_schedule",
+                  "procedures.methods"
+                ],
+                "boilerplate_refs": []
+              },
+              {
+                "text": "At 3 months after surgery, we will test vision with both eyes together in bright lighting, without vision correction and with correction for distance vision. Testing covers distance vision, intermediate vision at 66 centimeters and near vision at 40 centimeters. A distance-corrected defocus test uses lens powers from +1.0 D through -2.50 D to measure your range of clear vision. You will answer the AIOLIS questionnaire about your experience with the lenses. The study team will check for medical problems and lens problems and complete the Exit Form1.",
+                "evidence_refs": [
+                  "procedures.visit_schedule",
+                  "procedures.methods"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "puresee",
+      "study_type": "Prospective",
+      "family": "Advarra",
+      "source_sha256": "fad6da7db84cbecd7c7e199e6881df05d1aa4c17066214cdc52807ffc9b13454",
+      "request_sha256": "d2a80839927a6b71e05d32decc0ac91fe48e0042012af0f9826a1372c1b203f7",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "prs.brief-summary",
+        "prs.detailed-description"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-puresee.draft.prs-narrative.generation-only.a1.9b5c9afe",
+        "request_sha256": "d2a80839927a6b71e05d32decc0ac91fe48e0042012af0f9826a1372c1b203f7",
+        "revision_id": "prompt-trial-puresee",
+        "task": "prs_narrative_drafting",
+        "batch_id": "prs-narrative",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "narrative": {
+          "brief_summary": {
+            "text": "This prospective observational study describes visual and patient-reported outcomes after routine cataract surgery with PureSee in the dominant eye and Odyssey in the non-dominant eye. Forty adults will be followed through 3 months postoperative. The primary outcome is binocular distance-corrected intermediate visual acuity at 66 cm. There is one cohort, no control group and no randomized lens assignment.",
+            "evidence_refs": [
+              "design.study_design",
+              "population.sample_size",
+              "endpoints.primary"
+            ]
+          },
+          "detailed_description": {
+            "text": "Preoperative screening includes consent, demographics and medical history. The operative phase includes one routine surgery visit per eye. At 3 months postoperative, binocular photopic uncorrected and distance-corrected visual acuities are assessed at distance, 66 cm intermediate and 40 cm near. The distance-corrected intermediate measurement at 66 cm is primary. Secondary outcomes comprise mean binocular CDVA, UIVA at 66 cm, UDVA, DCNVA at 40 cm and UNVA at 40 cm; the binocular distance-corrected defocus curve from +1.0 D through -2.50 D; and percentages of responses for each AIOLIS question. Adverse events and device deficiencies are monitored, and staff complete the Exit Form1. Outcomes are summarized descriptively using available observations, without imputation or inferential hypothesis testing. The enrollment target allows for dropout from an estimated 35 participants needed to characterize performance; this uncontrolled study cannot establish comparative superiority.",
+            "evidence_refs": [
+              "procedures.visit_schedule",
+              "procedures.methods",
+              "endpoints.secondary",
+              "statistics.analysis_plan"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "case": "near",
+      "study_type": "Prospective",
+      "family": "Advarra",
+      "source_sha256": "3630a81af3d8093b555e71d3b7b094aba5f29684a7d7cd1f85fbc6eb66032a68",
+      "request_sha256": "d6989168fb3d2558ba4d4e613793c7824e3d0d0d293fb774bbb2b835d5dd7912",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "introduction"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-near.draft.protocol-foundations.generation-only.a1.9aef54fb",
+        "request_sha256": "d6989168fb3d2558ba4d4e613793c7824e3d0d0d293fb774bbb2b835d5dd7912",
+        "revision_id": "prompt-trial-near",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "introduction",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "People receiving two routinely selected lens types may differ in near vision and use of reading glasses. Collecting the same assessments at consistent follow-up points in both cohorts can describe those differences.",
+                "evidence_refs": [
+                  "study.background"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "comfort",
+      "study_type": "Ambispective",
+      "family": "Sterling",
+      "source_sha256": "87706fbd56d006143f476f6356d3a954099756c9cc9ae968c1b82d4a74c2f5d2",
+      "request_sha256": "a680161bbf7e34d903cbbf128ec3250a4fd1739100699cec3434b43e397ce15f",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "introduction"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-comfort.draft.protocol-foundations.generation-only.a1.c3ee4e67",
+        "request_sha256": "a680161bbf7e34d903cbbf128ec3250a4fd1739100699cec3434b43e397ce15f",
+        "revision_id": "prompt-trial-comfort",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "introduction",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "Comfort after cataract surgery may vary with documented ocular-care history. Linking historical clinic records with newly collected symptoms and vision assessments can describe these relationships. Research genotyping provides an exploratory opportunity to examine associations with symptom variation.",
+                "evidence_refs": [
+                  "study.background"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "break",
+      "study_type": "Prospective",
+      "family": "Sterling",
+      "source_sha256": "2ea98617b9709453bc31c4fc3e9e7ec4cd3b1142aacaa50dae8e513232a2fe32",
+      "request_sha256": "68d5d36ea1d3ef31aaf8923629a89249b6391981db25c6224ab8f08762d96abf",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "introduction"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-break.draft.protocol-foundations.generation-only.a1.9e69f8ec",
+        "request_sha256": "68d5d36ea1d3ef31aaf8923629a89249b6391981db25c6224ab8f08762d96abf",
+        "revision_id": "prompt-trial-break",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "introduction",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "A scheduled break routine may affect eye discomfort during frequent screen use, but its benefit is uncertain. Comparing the routine with usual break habits addresses this clinical question.",
+                "evidence_refs": [
+                  "study.background"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "glide",
+      "study_type": "Ambispective",
+      "family": "Advarra",
+      "source_sha256": "ac627b0c92dfe91d0872bced4318b85426340da250bd42052f2109feb4f61cd3",
+      "request_sha256": "45ff41acbd3ab6b2a9d6c2e13a0459965e1ebe502d20d1300ef3b3bbf3ea6151",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "introduction"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-glide.draft.protocol-foundations.generation-only.a1.9230ab37",
+        "request_sha256": "45ff41acbd3ab6b2a9d6c2e13a0459965e1ebe502d20d1300ef3b3bbf3ea6151",
+        "revision_id": "prompt-trial-glide",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "introduction",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "Historical glaucoma care records and newly collected daily-function ratings and eye-pressure measurements can describe relationships between care history and current function. People using different numbers of drug ingredients may also differ in disease severity and other characteristics, limiting causal interpretation of any association.",
+                "evidence_refs": [
+                  "study.background"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "record",
+      "study_type": "Retrospective",
+      "family": null,
+      "source_sha256": "1494c9c9585aaa08dfbf26100da407f97793962bd911d6b7b23f826bd22dfe09",
+      "request_sha256": "822008289aa22567a9cdba5f24e1aa6414f704e0babe02cacff3a463a5f14108",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "introduction"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-record.draft.protocol-foundations.generation-only.a1.daead8be",
+        "request_sha256": "822008289aa22567a9cdba5f24e1aa6414f704e0babe02cacff3a463a5f14108",
+        "revision_id": "prompt-trial-record",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "introduction",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "Routine records may describe symptom changes and subsequent care, but attendance, questionnaire completeness and prescribing documentation vary. A combined account is needed that distinguishes recorded symptom change from missing follow-up and undocumented care changes.",
+                "evidence_refs": [
+                  "study.background"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "caps",
+      "study_type": "Retrospective",
+      "family": null,
+      "source_sha256": "b93d9f92caac3e9d40ef1c13fb74ae1e7e027da7238845f4d5126cf2867335a3",
+      "request_sha256": "0f9c85f7224b38fe8c4d9e991f4a6a2970b9bd81742e8a43764917d8a71c2b10",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "introduction"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-caps.draft.protocol-foundations.generation-only.a1.1b2a84a3",
+        "request_sha256": "0f9c85f7224b38fe8c4d9e991f4a6a2970b9bd81742e8a43764917d8a71c2b10",
+        "revision_id": "prompt-trial-caps",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "introduction",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "Routine records may describe vision after laser capsulotomy, but measurement availability and methods vary. The clinic lacks a summary that preserves missingness and distinguishes people from treated eyes.",
+                "evidence_refs": [
+                  "study.background"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "instruction",
+      "study_type": "Prospective",
+      "family": "Advarra",
+      "source_sha256": "cab55913beaba4e7dd6c86414fb6386f553cbeedf5e6c5b5e51b5226b8cf3671",
+      "request_sha256": "a535c5206cdbd6c7908919e1912e471eaf9e9a933aff63b223d31471ea737e24",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "study-procedure.measurements"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-instruction.draft.protocol-operations.generation-only.a1.3d5dcd9d",
+        "request_sha256": "a535c5206cdbd6c7908919e1912e471eaf9e9a933aff63b223d31471ea737e24",
+        "revision_id": "prompt-trial-instruction",
+        "task": "section_drafting",
+        "batch_id": "protocol-operations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "study-procedure.measurements",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "Complete the Exit Form at the final visit.",
+                "evidence_refs": [
+                  "procedures.methods"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "official-title",
+      "study_type": "Prospective",
+      "family": "Advarra",
+      "source_sha256": "728c270e0abf8868f84c5b99b826f744034bb535827e3ddeea1efb685c0bbb17",
+      "request_sha256": "940d8d6e13d31d92c7b9bf23c3a18a3200b4d02842409fbc35b986f6e0b72d1d",
+      "prompt_version": "section-drafting-v33-citations-and-form-actions",
+      "targets": [
+        "study-procedure.measurements"
+      ],
+      "response": {
+        "schema_version": "hermes-response/v2",
+        "request_id": "prompt-trial-official-title.draft.protocol-operations.generation-only.a1.11159114",
+        "request_sha256": "940d8d6e13d31d92c7b9bf23c3a18a3200b4d02842409fbc35b986f6e0b72d1d",
+        "revision_id": "prompt-trial-official-title",
+        "task": "section_drafting",
+        "batch_id": "protocol-operations",
+        "producer": {
+          "model_id": "Codex-current-conversation-local-prompt-trial"
+        },
+        "section_results": [
+          {
+            "section_id": "study-procedure.measurements",
+            "outcome": "drafted",
+            "paragraphs": [
+              {
+                "text": "At the final visit, fill out the form titled Complete Exit Form (EF-12).",
+                "evidence_refs": [
+                  "procedures.methods"
+                ],
+                "boilerplate_refs": []
+              }
+            ],
+            "lists": []
+          }
+        ]
+      }
+    }
+  ],
+  "receipts": [
+    {
+      "case": "puresee",
+      "targets": [
+        "introduction"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "puresee",
+      "targets": [
+        "study-procedure.visits"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "puresee",
+      "targets": [
+        "icf.procedures"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "puresee",
+      "targets": [
+        "prs.brief-summary",
+        "prs.detailed-description"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "near",
+      "targets": [
+        "introduction"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "comfort",
+      "targets": [
+        "introduction"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "break",
+      "targets": [
+        "introduction"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "glide",
+      "targets": [
+        "introduction"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "record",
+      "targets": [
+        "introduction"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "caps",
+      "targets": [
+        "introduction"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "instruction",
+      "targets": [
+        "study-procedure.measurements"
+      ],
+      "transport_passed": true,
+      "findings": []
+    },
+    {
+      "case": "official-title",
+      "targets": [
+        "study-procedure.measurements"
+      ],
+      "transport_passed": true,
+      "findings": []
+    }
+  ]
+}
