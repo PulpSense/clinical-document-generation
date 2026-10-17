@@ -61,7 +61,7 @@ def request_payload(repo: Path, reference: Mapping[str, Any], bundle: Mapping[st
                              or artifact == "icf" and _icf_heading_key(paragraph.text) in (_STERLING_ICF_HEADING_KEYS | _ADVARRA_ICF_HEADING_KEYS)
                              or "{visitsTable}" in paragraph.text]
         names = {token.strip("{}") for paragraph in _all_paragraphs(document) for token in TOKEN.findall(paragraph.text)}
-        names.update(("date", "version", "investigatorName", "investigatorTitle", "facilityName", "facilityCity", "studySiteAddress") if artifact == "protocol" else ("studyCordinatorPhone", "studySiteAddress"))
+        names.update(("date", "version", "amendmentNumber", "investigatorName", "investigatorTitle", "facilityName", "facilityCity", "studySiteAddress") if artifact == "protocol" else ("studyCordinatorPhone", "studySiteAddress"))
         tokens[artifact] = sorted(names)
     xml_schema = None
     if bundle.get("prs_authority"):

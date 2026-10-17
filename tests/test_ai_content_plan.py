@@ -242,3 +242,17 @@ def test_planned_evidence_and_site_tables_keep_every_value_and_note(tmp_path, br
     visible = '\n'.join(p.text for p in rendering._all_paragraphs(document))
     for text in ('AI-selected evidence', '0.42', 'AI-selected evidence qualification.', 'Explicit planned site', 'Explicit planned investigator', 'Explicit planned contact', 'Explicit planned site qualification.'):
         assert text in visible
+
+
+def test_title_page_keeps_ai_planned_amendment_and_version_distinct(tmp_path):
+    source = json.loads((ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    bundle = contracts.contracted_template_bundle(ROOT, source)
+    request = content_plan.request_payload(ROOT, source, bundle, {})
+    plan = plan_response(request)['plan']
+    plan['docx_fields']['protocol'].update(amendmentNumber='Amendment 3', version='Version 4.2')
+    report = rendering.render_documents(ROOT, tmp_path, content_plan.with_plan(source, plan), {'protocol': [], 'icf': {}, 'prs': {}}, artifact_names={'protocol'}, audit_output=False)
+    assert report['status'] == 'passed'
+    document = Document(tmp_path / 'candidate/protocol.docx')
+    rows = {row.cells[0].text: row.cells[1].text for table in document.tables for row in table.rows if len(row.cells)>1}
+    assert rows['Amendment Number'] == 'Amendment 3'
+    assert rows['Protocol Version'] == 'Version 4.2'

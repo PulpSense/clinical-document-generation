@@ -799,7 +799,8 @@ def _normalize_protocol_title_controls(document: Document, reference: Mapping[st
         row for row in table.rows
         if row.cells[0].text.strip().casefold() == "amendment number"
     ), table.rows[1] if len(table.rows) > 1 else table.rows[0])
-    _set_paragraph_text(amendment.cells[1].paragraphs[0], "")
+    _set_paragraph_text(amendment.cells[1].paragraphs[0],
+                        planned_fields["amendmentNumber"] if planned_fields is not None else "")
 
     def set_control(label: str, value: str, anchor) -> Any:
         existing = next((

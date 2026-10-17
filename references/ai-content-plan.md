@@ -21,6 +21,8 @@ The plan contains exactly these keys:
   institutions, test/control articles and signature identities where their tokens
   occur. Keep Sterling's reserved merge fields exactly as its comments require
   within ICF fields. Protocol fields retain actual study identities.
+  Keep protocol version, protocol date and amendmentNumber separate. Populate an
+  amendment number only from supplied facts; use an explicit empty string otherwise.
   `studySiteAddress` includes the complete site directory when multiple sites
   participate. Choose a short descriptive title and an accurately anchored
   participant duration. Distinguish staff tasks from participant contacts.
