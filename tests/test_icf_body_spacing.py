@@ -79,3 +79,16 @@ def test_signature_compaction_retains_lines_labels_and_preference_wording():
     final = next(p for p in document.paragraphs if p.text.strip().casefold() ==
                  "you will be given a signed and dated copy of this informed consent document to keep.")
     assert final.paragraph_format.keep_with_next
+
+
+@pytest.mark.parametrize("family", ["Advarra", "Sterling"])
+def test_native_icf_does_not_end_with_an_unused_body_spacer(family, tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text())
+    reference["meta"]["icf_template"] = family
+    rendering.render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}},
+                               artifact_names={"icf"}, audit_output=False)
+    document = Document(tmp_path / "candidate/icf.docx")
+    assert document.paragraphs[-1].text.strip(), "A terminal template spacer can create a header-only page."
+    assert any("Signature of Participant" in paragraph.text for paragraph in document.paragraphs)
+    if family == "Advarra":
+        assert document.paragraphs[-1].text == "☐ No, do not inform my primary care physician at this time."

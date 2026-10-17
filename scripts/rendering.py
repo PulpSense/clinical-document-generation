@@ -2787,6 +2787,25 @@ def _normalize_icf_body_spacing(document: Document, *, sterling: bool) -> None:
                 paragraph.paragraph_format.space_before = Pt(10)
                 paragraph.paragraph_format.space_after = Pt(4)
 
+    # A final cosmetic template paragraph can overflow onto a header-only page.
+    # Signing room inside the body and paragraphs carrying native objects stay.
+    tail = document.element.body.sectPr.getprevious()
+    while tail is not None and tail.tag == qn("w:p"):
+        paragraph = Paragraph(tail, document)
+        if not _plain_blank(paragraph) or tail.xpath(
+            './/w:fldChar | .//w:fldSimple | .//w:instrText | .//w:drawing'
+            ' | .//w:pict | .//w:object | .//w:bookmarkStart | .//w:bookmarkEnd'
+            ' | .//w:commentRangeStart | .//w:commentRangeEnd | .//w:commentReference'
+            ' | .//w:u | .//w:pageBreakBefore | .//w:sdt | .//w:sym'
+            ' | .//w:footnoteReference | .//w:endnoteReference'
+        ):
+            break
+        previous = tail.getprevious()
+        if previous is None or previous.tag == qn("w:tbl"):
+            break
+        tail.getparent().remove(tail)
+        tail = previous
+
 
 def _compact_icf_signature_end(document: Document) -> None:
     """Avoid a client-template spacer forcing the final copy statement onto an otherwise blank page."""
