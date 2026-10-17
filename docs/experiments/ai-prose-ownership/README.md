@@ -88,3 +88,23 @@ approval or new external model benchmark is claimed.
 CHART passes current request transport and native preservation of its eight
 operations paragraphs using the retained scoped source. Its complete earlier
 approved source is unavailable, so this remains section-only coverage.
+
+## Final review
+
+Independent Standards and Spec reviews of implementation commit `a1477bf`
+reported zero material/actionable findings. The Standards reviewer identified a
+nonblocking duplicate `icf.duration` dictionary key that overrode the more
+specific enrollment instruction. A public request assertion reproduced the
+override; the duplicate was removed and the surviving instruction corrected.
+All 24 focused follow-up tests passed in 10.52 seconds, including public handoff,
+ownership, citation/form and historical transport coverage.
+
+Six representative documents were rendered locally (46 pages); 25 pages were
+visually inspected: all PureSee Advarra ICF pages (1–5), all NEAR Sterling ICF
+pages (1–7), all COMFORT Advarra ICF pages (1–6), PureSee Protocol pages 5, 10
+and 11, RECORD Protocol pages 8–9, and CAPS Protocol pages 6–7. This is visual
+sampling, not an all-document visual certification. The inspected pages retain
+the family layouts, source contacts and signatures, complete withdrawal text,
+and the restored 14.1 heading with its matching TOC entry. RECORD retains a
+sparse continuation page; no pagination optimization was attempted. Rendering
+remains a local development check, not a new production workflow stage.

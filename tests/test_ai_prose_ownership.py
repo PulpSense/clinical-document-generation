@@ -134,6 +134,8 @@ def test_drafting_handoff_requests_complete_sections_and_authorized_fixed_text(t
     assert 'Draft the complete withdrawal section' in ' '.join(corrections['icf.withdrawal'])
     assert 'expected enrollment once' in ' '.join(corrections['icf.duration'])
     withdrawal = next(c for c in request['section_contracts'] if c['section_id'] == 'icf.withdrawal')
+    duration = next(c for c in request['section_contracts'] if c['section_id'] == 'icf.duration')
+    assert 'expected enrollment once' in ' '.join(duration['content_expectations'])
     assert withdrawal['fixed_boilerplate']
     assert approved == before
 
