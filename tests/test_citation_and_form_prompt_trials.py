@@ -35,7 +35,8 @@ def test_editorial_ownership_reaches_each_active_drafting_batch(branch, family, 
             wave='generation-only')
         request = json.loads(path.read_text())
         constraints = '\n'.join(request['constraints'])
-        assert 'assembler owns the single final Protocol REFERENCES section' in constraints
+        assert 'AI content plan owns the final Protocol REFERENCES content' in constraints
+        assert 'assembly places that planned bibliography once' in constraints
         assert 'citation numbers beside the claims they support' in constraints
         assert 'official form name' in constraints
         assert 'ambiguous trailing numeral' in constraints

@@ -1,0 +1,422 @@
+[
+  {
+    "case": "break-sterling",
+    "source_sha256": "54edcc4e0e82f6414b034752178f099d2726fdc23ab6e993560476a0b4c9413e",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may stop at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. A final discussion of symptoms and ordinary care is optional; no final research test, diary submission or additional data collection is mandatory after withdrawal. The investigator may discontinue participation at the participant’s request, if assessments cannot be completed, or if the study closes. Record the reason when available. Eligible expenses already incurred remain reimbursable; do not require diary completion or study completion as a condition of reimbursement."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Handling of information already collected follows the consent and Confidentiality provisions."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may stop at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. A final discussion of symptoms and ordinary care is optional; no final research test, diary submission or additional data collection is mandatory after withdrawal. The investigator may discontinue participation at the participant’s request, if assessments cannot be completed, or if the study closes. Record the reason when available. Eligible expenses already incurred remain reimbursable; do not require diary completion or study completion as a condition of reimbursement."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": false,
+      "blocks": []
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  },
+  {
+    "case": "comfort-advarra",
+    "source_sha256": "2208a3ccbe1511028bdd1c1d8b984e5cd08eb52d3026a460739bd2b2e9bb7b90",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may leave at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. The investigator may discontinue participation for participant request, inability to complete assessments, additional ocular surgery or study closure. Document the reason when available. Leaving research does not stop routine care.",
+          "Offer a final discussion of symptoms and ordinary-care needs, but make clear that it is optional. Withdrawal requires no final research visit, saliva collection or examination."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Follow the Confidentiality provisions for previously collected information, authorization withdrawal and any unanalyzed specimen, and the financial section for earned payments."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may leave at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. The investigator may discontinue participation at the participant’s request, for inability to complete assessments, following additional ocular surgery or if the study closes. Record the reason when available. Leaving research does not stop routine care.",
+          "Offer a final discussion of symptoms and ordinary-care needs, but keep it optional. Withdrawal requires no final research visit, examination or saliva collection."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": false,
+      "blocks": []
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  },
+  {
+    "case": "comfort-sterling",
+    "source_sha256": "d5954ad0fb9da3d9dc94ef43d0e63a11bac2520db6966b43b246960d272b340a",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in analysis as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may leave at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. The investigator may discontinue participation at the participant’s request, because assessments cannot be completed, following additional ocular surgery, or because of study closure. Record the reason when available.",
+          "Offer an optional final discussion of symptoms and ordinary-care needs. No final research visit, saliva collection or examination is required after withdrawal. Leaving the study does not stop routine care."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Follow the Confidentiality provisions for previously collected information, authorization withdrawal and any unanalyzed specimen, and the financial section for earned payments."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may leave at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. The investigator may discontinue participation at the participant’s request, for inability to complete assessments, following additional ocular surgery or if the study closes. Record the reason when available. Leaving research does not stop routine care.",
+          "Offer a final discussion of symptoms and ordinary-care needs, but keep it optional. Withdrawal requires no final research visit, examination or saliva collection."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": false,
+      "blocks": []
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  },
+  {
+    "case": "glide-advarra",
+    "source_sha256": "78cfda6e84908a0d463647c6d606295b9aaa1127bdd4c2a0309dff1a6c326137",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Participants may decline or stop without penalty or loss of ordinary benefits by telling or writing to their site coordinator. The investigator may discontinue participation at the participant's request, if assessments cannot be completed, or if the study closes. Record reasons when available; later medication changes alone are not discontinuation criteria. A final clinical discussion is optional, and no final research measurement or extra contact is mandatory."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one, and information collected before withdrawal may continue to be used as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Handling of information already collected follows the consent and Confidentiality provisions."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may decline or stop without penalty or loss of ordinary benefits by telling or writing to their site coordinator. The investigator may discontinue participation at the participant's request, if assessments cannot be completed, or if the study closes. Record reasons when available; later medication changes alone are not discontinuation criteria. A final clinical discussion is optional, and no final research measurement or extra contact is mandatory."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": false,
+      "blocks": []
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  },
+  {
+    "case": "near-advarra",
+    "source_sha256": "767eabd7ac9f46fd03244a429a26edba0a80a659caed57479c5a961aff884751",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Participants who stop taking part may have information collected before withdrawal retained in study records and included in analyses, as permitted by their consent and applicable requirements."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may discontinue at any time, without penalty or loss of their usual benefits, by telling or writing to the coordinator. Staff offer an optional discussion of symptoms and ordinary-care needs; withdrawal does not require a final research examination, extra tests or further data collection.",
+          "The investigator may end participation at the participant's request, if the participant cannot complete assessments, if additional ocular surgery occurs, or if the study stops. The reason is recorded when available. Payments already earned and reimbursement for eligible travel expenses already incurred remain due."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Handling of information already collected follows the consent and Confidentiality provisions."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may discontinue at any time, without penalty or loss of their usual benefits, by telling or writing to the coordinator. Staff offer an optional discussion of symptoms and ordinary-care needs; withdrawal does not require a final research examination, extra tests or further data collection.",
+          "The investigator may end participation at the participant's request, if the participant cannot complete assessments, if additional ocular surgery occurs, or if the study stops. The reason is recorded when available. Payments already earned and reimbursement for eligible travel expenses already incurred remain due."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": false,
+      "blocks": []
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  },
+  {
+    "case": "near-sterling",
+    "source_sha256": "eba7ab02b37a1369c6cc3d2ae228b32383d64fb71f81f81cbe2faea7d2c370c3",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may stop at any time without penalty or loss of usual benefits by telling or writing to the coordinator. The investigator may discontinue participation at the participant’s request, if the participant cannot complete the assessments, following additional ocular surgery, or if the study is stopped. The reason is recorded when available.",
+          "Staff offer an optional discussion of symptoms and ordinary-care needs. Withdrawal does not require a final research examination, extra testing or further data collection. Earned payments and eligible travel expenses already incurred remain due."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Handling of information already collected follows the consent and Confidentiality provisions."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may stop at any time without penalty or loss of usual benefits by telling or writing to the coordinator. The investigator may discontinue participation at the participant’s request, if the participant cannot complete the assessments, following additional ocular surgery, or if the study is stopped. The reason is recorded when available.",
+          "Staff offer an optional discussion of symptoms and ordinary-care needs. Withdrawal does not require a final research examination, extra testing or further data collection. Earned payments and eligible travel expenses already incurred remain due."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": false,
+      "blocks": []
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  },
+  {
+    "case": "puresee",
+    "source_sha256": "f234d82c3e9a6256c67533c518e54ad7ce99e93b1b8afa1416479e060b205056",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one, and information collected before withdrawal may continue to be used as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Handling of information already collected follows the consent and Confidentiality provisions."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": false,
+      "blocks": []
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  },
+  {
+    "case": "comfort-final",
+    "source_sha256": "774a5ce8f09a21c67fb39eae6bcb817d0afa8f90acfed4ea1196103b1554459f",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "A participant may leave research at any time, without penalty or loss of usual benefits, by telling or writing to the site coordinator. The investigator may discontinue participation at the participant’s request, for inability to complete assessments, for additional ocular surgery or for study closure. Record the reason when it is available; routine care continues despite leaving research.",
+          "Offer a final discussion about symptoms and ordinary-care needs, but participation in that discussion is optional. Withdrawal does not require a final research visit, examination or saliva collection.",
+          "Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one, and information collected before withdrawal may continue to be used as permitted by the consent and applicable requirements.",
+          "Participants may notify the site coordinator orally or in writing. The investigator may discontinue participation for participant request, inability to complete assessments, additional ocular surgery or study closure; record the reason when available. Offer an optional final discussion of symptoms and ordinary-care needs, without requiring any final research visit, examination or saliva collection. Discontinuation does not interrupt routine care."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Follow the Confidentiality provisions for previously collected information, authorization withdrawal and any unanalyzed specimen, and the financial section for earned payments."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may leave at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. The investigator may discontinue participation at the participant’s request, for inability to complete assessments, following additional ocular surgery or if the study closes. Record the reason when available. Leaving research does not stop routine care.",
+          "Offer a final discussion of symptoms and ordinary-care needs, but keep it optional. Withdrawal requires no final research visit, examination or saliva collection."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": false,
+      "blocks": []
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  },
+  {
+    "case": "puresee-final",
+    "source_sha256": "069b64f859608cdfe57e1690e253de2c5e31b60585b805092b1995b695addc7c",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one, and information collected before withdrawal may continue to be used as permitted by the consent and applicable requirements."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Handling of information already collected follows the consent and Confidentiality provisions."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": false,
+      "blocks": []
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  },
+  {
+    "case": "comfort-hermes03",
+    "source_sha256": "473107dcb321ede2504e7da21639822c0a14cd255389c65925563f54541d2110",
+    "original": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "For a participant who withdraws or is discontinued, staff record the reason when available and offer an optional final discussion of symptoms and ordinary-care needs. No final research visit, examination or saliva collection is required after withdrawal. Routine care continues independently of research participation. Possible research injury or persistent discomfort is directed through the enrolling coordinator to the study doctor for clinic-arranged evaluation; ordinary emergency services are used for emergencies.",
+          "Previously collected information may remain in the study records and be used as permitted by the consent and applicable requirements. Withdrawal of authorization stops new research collection; the enrolling coordinator receives written authorization withdrawal, and the site requests destruction of any specimen not yet analyzed. Data already generated or incorporated into analyses may continue to be used for study integrity and required oversight. Earned payments remain payable after withdrawal."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may leave at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. The investigator may discontinue participation for participant request, inability to complete assessments, additional ocular surgery or study closure. The reason is recorded when available; a participant is not required to provide a reason. Leaving research does not stop routine care.",
+          "A final discussion about symptoms and ordinary-care needs is offered but remains optional. Withdrawal does not require a final research visit, examination or saliva collection. Operational handling of previously collected information, specimens and earned payments is described under Discontinued Subjects and Confidentiality."
+        ],
+        "lists": []
+      }
+    },
+    "authored": {
+      "study-procedure.discontinued": {
+        "paragraphs": [
+          "Discontinuation grounds and participant rights are described under Patient Discontinuation. Follow the Confidentiality provisions for previously collected information, authorization withdrawal and any unanalyzed specimen, and the financial section for earned payments."
+        ],
+        "lists": []
+      },
+      "endpoint-criteria.discontinuation": {
+        "paragraphs": [
+          "Participants may leave at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. The investigator may discontinue participation at the participant’s request, for inability to complete assessments, following additional ocular surgery or if the study closes. Record the reason when available. Leaving research does not stop routine care.",
+          "Offer a final discussion of symptoms and ordinary-care needs, but keep it optional. Withdrawal requires no final research visit, examination or saliva collection."
+        ],
+        "lists": []
+      }
+    },
+    "termination_before": {
+      "include": true,
+      "blocks": [
+        {
+          "text": "The investigator may discontinue participation for participant request, inability to complete assessments, additional ocular surgery or study closure. The reason is recorded when available. Discontinuation is distinct from completion, and leaving research does not stop routine care. A final discussion of symptoms and ordinary-care needs is offered but optional; no mandatory final research visit, saliva collection or examination is required after withdrawal.",
+          "bullet": false
+        }
+      ]
+    },
+    "termination_after": {
+      "include": false,
+      "blocks": []
+    }
+  }
+]

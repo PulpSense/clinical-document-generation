@@ -4282,6 +4282,9 @@ def refresh_protocol_fields(docx_path: Path, *, timeout_seconds: float = 120) ->
         result = {"status": "passed", "renderer": str(Path(command).resolve()),
                   "page_count": page_count, "source_sha256": original_hash,
                   "pagination_pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+                  "heading_pages": {paragraph.text.rsplit("\t", 1)[0]: int(paragraph.text.rsplit("\t", 1)[1])
+                                    for paragraph in Document(working).paragraphs
+                                    if paragraph.style.name.casefold() in {"toc 1", "toc 2"}},
                   "output_sha256": hashlib.sha256(working.read_bytes()).hexdigest()}
         os.replace(working, docx_path)
     return result

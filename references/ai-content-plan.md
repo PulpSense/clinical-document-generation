@@ -8,6 +8,36 @@ short titles, duration, tables and registry values. Code renders explicit values
 it supplies no clinical defaults and performs no semantic review or repair.
 Preserve every material qualification. Missing optional facts stay absent.
 
+Before filling the plan, choose one owning section per operational concept
+across the complete Protocol, including source_sections, shell text, table notes
+and later section drafts. Record the owners and any permitted brief summaries in
+`decisions` so every drafting batch follows the same allocation. Full procedures
+belong in the active methods section, discontinuation grounds and participant
+rights in Patient Discontinuation, data/specimen handling in Confidentiality,
+payments in the financial section, and study closeout in Study Completion.
+Use the active catalog headings for other branches. Other Protocol sections
+supply only their distinct purpose and a brief reference to the owning heading.
+A synopsis still states the essential design, population, endpoints and timing.
+
+Include an optional section only when it adds a distinct source-grounded policy
+or operational distinction. Compare meaning across the planned sections, rather
+than treating two headings or differently named source fields as two policies.
+When Patient Termination merely restates Patient Discontinuation, keep the full
+policy under Patient Discontinuation and set the optional termination section's
+include to false with empty blocks. Retain genuinely different investigator-led
+termination rules, consent rights, safety actions and exceptions under their
+appropriate owners; explain their distinction in decisions. Apply the same
+reasoning to other optional sections and repeated planned blocks.
+
+Self-contained consent is a separate document: preserve its required key summary,
+applicable template safeguards and complete participant disclosures. Within that
+ICF, place each detailed explanation under its appropriate heading and use a
+short reference elsewhere when that remains understandable to a participant.
+Planned contact cells contain names, roles and contact details; put shared hours,
+non-emergency limitations and emergency-care directions in one adjacent prose
+block, preserving any site-specific exceptions. XML outcome descriptions each
+state their measurement definition once while retaining necessary time frames.
+
 Return JSON with schema_version `clinical-content-plan/v1`, the exact request_id
 and request_sha256, producer.model_id identifying the actual model, and `plan`.
 The plan contains exactly these keys:

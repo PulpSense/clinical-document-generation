@@ -108,3 +108,60 @@ def test_missing_heading_outline_keeps_original_bytes(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="did not identify one page"):
         rendering.refresh_protocol_fields(path)
     assert path.read_bytes() == original
+
+
+def test_pagination_receipt_records_actual_heading_pages(tmp_path, monkeypatch):
+    path = tmp_path / 'protocol.docx'
+    protocol(path)
+    monkeypatch.setattr(rendering.shutil, 'which', lambda _: '/controlled/soffice')
+    class Office:
+        returncode = 0
+        def __init__(self, args, **kwargs):
+            writer = PdfWriter()
+            for _ in range(5):
+                writer.add_blank_page(width=612, height=792)
+            for title, page in [('1. TITLE PAGE', 0), ('4. TABLE OF CONTENTS', 1), ('5. INTRODUCTION', 4)]:
+                writer.add_outline_item(title, page)
+            writer.write(Path(args[args.index('--outdir') + 1]) / 'protocol.pdf')
+        def communicate(self, timeout=None):
+            return 'converted', ''
+    monkeypatch.setattr(rendering.subprocess, 'Popen', Office)
+    receipt = rendering.refresh_protocol_fields(path)
+    assert receipt['heading_pages'] == {
+        '1. TITLE PAGE': 1, '4. TABLE OF CONTENTS': 2, '5. INTRODUCTION': 5}
+
+
+@pytest.mark.parametrize('branch', ['prospective', 'ambispective', 'retrospective'])
+def test_real_office_final_render_matches_cached_toc(tmp_path, branch):
+    """Compare the final cached DOCX with its own render on the same office host."""
+    import json
+    import os
+    from pypdf import PdfReader
+    office = os.environ.get('CLINICAL_SOFFICE')
+    if not office:
+        pytest.skip('Set CLINICAL_SOFFICE to run the real-office regression.')
+    root = Path(__file__).resolve().parents[1]
+    source = json.loads((root / f'tests/fixtures/{branch}-acceptance-source.json').read_text())
+    rendering.render_documents(root, tmp_path, source, {'protocol': [], 'icf': {}, 'prs': {}},
+                               artifact_names={'protocol'}, audit_output=False)
+    path = tmp_path / 'candidate/protocol.docx'
+    receipt = rendering.refresh_protocol_fields(path)
+    out = tmp_path / 'final-render'
+    out.mkdir()
+    subprocess.run([office, f'-env:UserInstallation={(tmp_path / "office-profile").as_uri()}',
+                    '--headless', '--convert-to', 'pdf:writer_pdf_Export', '--outdir', str(out), str(path)],
+                   capture_output=True, text=True, check=True, timeout=120)
+    reader = PdfReader(out / 'protocol.pdf')
+    pages = {}
+    def collect(items):
+        for item in items:
+            if isinstance(item, list):
+                collect(item)
+            else:
+                pages[item.title] = reader.get_destination_page_number(item) + 1
+    collect(reader.outline)
+    cached = {p.text.rsplit('\t', 1)[0]: int(p.text.rsplit('\t', 1)[1])
+              for p in Document(path).paragraphs if p.style.name.casefold() in {'toc 1', 'toc 2'}}
+    assert cached == receipt['heading_pages']
+    assert cached == {heading: pages[heading] for heading in cached}
+    assert receipt['page_count'] == len(reader.pages)

@@ -1,0 +1,134 @@
+[
+  {
+    "case": "break-sterling",
+    "study_type": "Prospective",
+    "family": "Sterling",
+    "status": "passed",
+    "heading_count": 44,
+    "final_pages": 17,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "caps-retrospective",
+    "study_type": "Retrospective",
+    "family": null,
+    "status": "passed",
+    "heading_count": 21,
+    "final_pages": 7,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "comfort-advarra",
+    "study_type": "Ambispective",
+    "family": "Advarra",
+    "status": "passed",
+    "heading_count": 44,
+    "final_pages": 19,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "comfort-sterling",
+    "study_type": "Ambispective",
+    "family": "Sterling",
+    "status": "passed",
+    "heading_count": 44,
+    "final_pages": 19,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "glide-advarra",
+    "study_type": "Ambispective",
+    "family": "Advarra",
+    "status": "passed",
+    "heading_count": 44,
+    "final_pages": 21,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "near-advarra",
+    "study_type": "Prospective",
+    "family": "Advarra",
+    "status": "passed",
+    "heading_count": 44,
+    "final_pages": 15,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "near-sterling",
+    "study_type": "Prospective",
+    "family": "Sterling",
+    "status": "passed",
+    "heading_count": 44,
+    "final_pages": 15,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "puresee",
+    "study_type": "Prospective",
+    "family": "Advarra",
+    "status": "passed",
+    "heading_count": 45,
+    "final_pages": 12,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "record-retrospective",
+    "study_type": "Retrospective",
+    "family": null,
+    "status": "passed",
+    "heading_count": 21,
+    "final_pages": 9,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "comfort-final",
+    "study_type": "Ambispective",
+    "family": "Sterling",
+    "status": "passed",
+    "heading_count": 44,
+    "final_pages": 20,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "puresee-final",
+    "study_type": "Prospective",
+    "family": "Advarra",
+    "status": "passed",
+    "heading_count": 45,
+    "final_pages": 12,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  },
+  {
+    "case": "comfort-hermes03",
+    "study_type": "Ambispective",
+    "family": "Sterling",
+    "status": "passed",
+    "heading_count": 44,
+    "final_pages": 20,
+    "final_toc_matches": true,
+    "approved_source_unchanged": true,
+    "generation": "public workflow with archived content and focused locally authored AI edits; no external model call"
+  }
+]
