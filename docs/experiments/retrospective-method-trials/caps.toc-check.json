@@ -1,0 +1,170 @@
+[
+  {
+    "title": "1. TITLE PAGE",
+    "expected": 1,
+    "actual": [
+      1
+    ],
+    "matches": true
+  },
+  {
+    "title": "2. INVESTIGATOR AGREEMENT",
+    "expected": 2,
+    "actual": [
+      2
+    ],
+    "matches": true
+  },
+  {
+    "title": "3. TABLE OF CONTENTS",
+    "expected": 3,
+    "actual": [
+      3
+    ],
+    "matches": true
+  },
+  {
+    "title": "4. INTRODUCTION",
+    "expected": 4,
+    "actual": [
+      4
+    ],
+    "matches": true
+  },
+  {
+    "title": "5. OBJECTIVE(S)",
+    "expected": 4,
+    "actual": [
+      4
+    ],
+    "matches": true
+  },
+  {
+    "title": "6. SUBJECTS",
+    "expected": 4,
+    "actual": [
+      4
+    ],
+    "matches": true
+  },
+  {
+    "title": "6.1. Subject Population",
+    "expected": 4,
+    "actual": [
+      4
+    ],
+    "matches": true
+  },
+  {
+    "title": "6.2. Inclusion/Exclusion Criteria",
+    "expected": 4,
+    "actual": [
+      4
+    ],
+    "matches": true
+  },
+  {
+    "title": "7. STUDY DESIGN",
+    "expected": 4,
+    "actual": [
+      4
+    ],
+    "matches": true
+  },
+  {
+    "title": "7.1. Study Design",
+    "expected": 4,
+    "actual": [
+      4
+    ],
+    "matches": true
+  },
+  {
+    "title": "7.2. Methods Used to Minimize Bias",
+    "expected": 5,
+    "actual": [
+      5
+    ],
+    "matches": true
+  },
+  {
+    "title": "8. STUDY PROCEDURE",
+    "expected": 5,
+    "actual": [
+      5
+    ],
+    "matches": true
+  },
+  {
+    "title": "8.1. Informed Consent / Subject Enrollment",
+    "expected": 5,
+    "actual": [
+      5
+    ],
+    "matches": true
+  },
+  {
+    "title": "9. ANALYSIS PLAN",
+    "expected": 6,
+    "actual": [
+      6
+    ],
+    "matches": true
+  },
+  {
+    "title": "9.1. Analysis Data Sets",
+    "expected": 6,
+    "actual": [
+      6
+    ],
+    "matches": true
+  },
+  {
+    "title": "9.2. Statistical Methodology",
+    "expected": 6,
+    "actual": [
+      6
+    ],
+    "matches": true
+  },
+  {
+    "title": "9.3. General Statistical Considerations",
+    "expected": 6,
+    "actual": [
+      6
+    ],
+    "matches": true
+  },
+  {
+    "title": "10. SAMPLE SIZE JUSTIFICATION",
+    "expected": 6,
+    "actual": [
+      6
+    ],
+    "matches": true
+  },
+  {
+    "title": "11. CONFIDENTIALITY/PUBLICATION OF THE STUDY",
+    "expected": 6,
+    "actual": [
+      6
+    ],
+    "matches": true
+  },
+  {
+    "title": "12. QUALITY COMPLAINTS AND ADVERSE EVENTS",
+    "expected": 7,
+    "actual": [
+      7
+    ],
+    "matches": true
+  },
+  {
+    "title": "13. GCP, ICH and ETHICAL CONSIDERATIONS",
+    "expected": 7,
+    "actual": [
+      7
+    ],
+    "matches": true
+  }
+]

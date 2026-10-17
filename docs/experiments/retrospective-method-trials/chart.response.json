@@ -1,0 +1,44 @@
+{
+  "schema_version": "hermes-response/v2",
+  "request_id": "local-chart.draft.protocol-operations.draft.a1.ad13890c",
+  "request_sha256": "fcc416e9df026c31707a6654eaf99512946167183495fa3e954fa556565444c8",
+  "revision_id": "local-chart",
+  "task": "section_drafting",
+  "batch_id": "protocol-operations",
+  "producer": {
+    "model_id": "Codex-current-conversation-controlled-writing-trial"
+  },
+  "section_results": [
+    {
+      "section_id": "study-procedure.enrollment",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "This retrospective review uses existing records without prospective recruitment, research visits or patient recontact. Consent and individual privacy-authorization waivers will be requested; neither is granted. Begin access and abstraction only after required ethics/privacy decisions and site permissions are documented. If the records-only approach is not permitted, obtain a revised approved plan rather than adding contact or an ICF automatically."
+        },
+        {
+          "text": "After permission, verify eligibility, reconcile duplicate records across sites through the restricted matching process, assign study IDs and abstract age, sex, eye laterality, surgery date and operating site, documented diabetes/glaucoma, baseline pressure-lowering medication use, recorded pressure values/dates/methods and new prescriptions within 45 postoperative days. Count each person once; eligible eyes remain separate analysis records. Assign the person's site to the first eligible operation and retain each eye's operating site. Excluding one eye does not remove an eligible fellow eye; exclude the person only if no eligible eye remains."
+        },
+        {
+          "text": "Eligible surgery dates are 1 January 2024 through 15 August 2026; accessible records are dated 3 October 2023 through 30 September 2026. Historical Day 0 is each eye's surgery date. Choose baseline as the latest pressure strictly before surgery within 90 calendar days, excluding surgery-day values. Choose Day 30 pressure closest to postoperative Day 30 within Days 21\u201345, using the earlier date for equal distance. On a selected baseline or outcome date, use the later recorded time; unresolved multiple values remain missing for that outcome. Retain recorded mmHg, measurement method and treatment context without conversion or assuming a common device."
+        },
+        {
+          "text": "For early elevation, use all pressures recorded on Days 1\u20137 and count an eye once if any value is at least 25 mmHg. The denominator is eligible eyes with a measurement in that window. During Days 0\u201345, a new pressure-lowering prescription means a drug not listed for that eye at baseline; a dose change alone does not count and a prescription does not prove adherence. Unresolved prescription laterality is missing for this outcome, not assigned to both eyes. Use eyes with sufficient medication documentation as the denominator. Missing pressures or medication entries do not establish no elevation or no prescription and do not exclude otherwise eligible eyes from the cohort."
+        },
+        {
+          "text": "Diabetes is documented present, explicitly documented absent or unknown. A single prescription does not establish diagnosis; unknown diabetes is not absence. Missing historical measurements are retained as missing rather than replaced with new visits or tests."
+        },
+        {
+          "text": "Staff eligibility/query review occurs in November 2026, abstraction through January 2027 and verification/query closure in February. Planned first access is 2 November 2026, subject to permission. Primary abstraction is expected complete by 29 January 2027; completion of all abstraction and source-query verification by 26 February defines research data-collection completion. Analysis and administrative closeout end by 31 March 2027 and include query resolution, duplicate reconciliation, disposition/count review, final coded-data lock, analysis and archival-access review. These are staff tasks, not participant visits or extension of clinical follow-up."
+        },
+        {
+          "text": "If access is restricted before abstraction, omit the record and document why. Follow any later authorization or ethics decision requiring removal of identifiable research data and document its analysis impact. There is no replacement recruitment, withdrawal appointment or promise that aggregated results can be withdrawn. No new examination, questionnaire, pressure/vision test, imaging re-reading, specimen/genetic activity or direct participant contact occurs."
+        },
+        {
+          "text": "No individual research result or clinical alert service is provided, and historical findings do not trigger new contact. Aggregate results may be available through clinic notices after analysis, without an additional assessment. Source clinical records remain at the clinics; retention of research linkage/data copies does not authorize destruction of originals."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

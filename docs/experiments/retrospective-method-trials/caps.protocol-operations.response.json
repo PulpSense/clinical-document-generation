@@ -1,0 +1,44 @@
+{
+  "schema_version": "hermes-response/v2",
+  "request_id": "r-c05398eebf1d.draft.protocol-operations.generation-only.a1.027e6534",
+  "request_sha256": "0992f7bf942f142c6f89f27bad2448afb6eb2195fd1bf274f9a71d5e03f7f265",
+  "revision_id": "r-c05398eebf1d",
+  "task": "section_drafting",
+  "batch_id": "protocol-operations",
+  "producer": {
+    "model_id": "Codex-current-conversation-controlled-writing-trial"
+  },
+  "section_results": [
+    {
+      "section_id": "study-procedure.enrollment",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "This review has no prospective enrollment, participant signature process or recontact. Consent and privacy-authorization waivers will be requested; neither waiver nor IRB approval is granted. Obtain required ethics/privacy decisions and written site permission before research access."
+        },
+        {
+          "text": "Verify eligibility, deduplicate patient records and select one study eye per person: the earliest eligible routine laser procedure, with the right eye selected if both eligible eyes were treated on the same date. If no eligible eye remains, exclude the person. Keep this eye for all endpoints; missing measurements do not permit switching. Index procedures occur from 1 January through 31 August 2025, and accessible historical records from 2 December 2024 through 31 December 2025. Historical Day 0 is the selected eye's laser date, not enrollment."
+        },
+        {
+          "text": "Abstract age at procedure, sex, treated eye, index date, recorded ocular diagnoses, acuity with correction status/date/method, and pressure with date/method. Use distance acuity explicitly recorded in logMAR with habitual distance correction. Do not convert Snellen values, infer correction status or substitute near, uncorrected or fellow-eye acuity."
+        },
+        {
+          "text": "Baseline is the latest eligible value in Days -30 through -1, excluding procedure-day measurements. If several values occur on the latest date, use the last time-stamped eligible value; unresolved selection is ambiguous and missing. Follow-up is closest to Day 42 within Days 28\u201370. Equal-distance dates use the earlier date; multiple values on that date use the last time-stamped eligible value. Unresolved multiplicity remains ambiguous and missing. Do not widen windows or choose a favorable result. Missing measurements affect the applicable analysis, not cohort eligibility."
+        },
+        {
+          "text": "For early pressure elevation, use all recorded fixed-eye values in Days 1\u20137 and classify a person once if any is at least 25 mmHg. A person with no pressure measurement in that eye/window has missing status, not no elevation. Retain recorded method and treatment context without representing untreated pressure trajectories. There is no pressure-change endpoint."
+        },
+        {
+          "text": "Staff obtain decisions and permission, verify eligibility, deduplicate and identify eyes in November 2026; abstract in December\u2013January; resolve permitted queries and lock coded data in February 2027; and analyze and report in March\u2013April. Administrative closeout and archiving end on 31 May 2027. A record is complete after extraction and permitted queries are resolved, including missing/ambiguous codes. Study completion requires dataset lock, planned analyses and the aggregate report; archiving follows. These tasks do not extend the fixed clinical-record period."
+        },
+        {
+          "text": "If permission is withdrawn, suspend research access immediately. Resume only after documented authorization is restored. Otherwise stop further abstraction, preserve required records and report available data and limitations. No patient contact, replacement eye or new test may fill gaps."
+        },
+        {
+          "text": "No new acuity/pressure test, questionnaire, telephone call, clinic visit, imaging review, specimen or genetic activity occurs. There is no specimen transfer, storage, banking or future use. Site privacy requests follow applicable permissions without a prospective withdrawal visit or a promise to reverse already deidentified aggregate findings. Original clinical records remain at the clinic under its separate retention policy."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

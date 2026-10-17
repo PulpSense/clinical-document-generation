@@ -1,0 +1,47 @@
+{
+  "schema_version": "hermes-response/v2",
+  "request_id": "local-record.draft.protocol-operations.draft.a1.cbb59a8d",
+  "request_sha256": "6c2523dad6537c45d2ac54cdec522fc85b9ecc89e13ad0c912c63930dc6c1534",
+  "revision_id": "local-record",
+  "task": "section_drafting",
+  "batch_id": "protocol-operations",
+  "producer": {
+    "model_id": "Codex-current-conversation-controlled-writing-trial"
+  },
+  "section_results": [
+    {
+      "section_id": "study-procedure.enrollment",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "This records-only review has no prospective enrollment, screening, participant contact or signature process. Consent and privacy-authorization waivers are requested, not granted. Obtain the required ethics/privacy decisions and site permission before access. If the records-only approach is not permitted, obtain an authorized revised plan before proceeding; patient contact is not an automatic substitute."
+        },
+        {
+          "text": "Verify eligibility, identify each person's first qualifying ordinary-care dry eye encounter from 1 January 2024 through 30 September 2025, deduplicate clinic patient identifiers and assign study IDs. Abstract age at index, sex, index date, documented contact-lens status, the ordinary-care plan, symptom ratings with dates and subsequent clinician-directed care changes. Original clinical records remain at the clinic. Use only accessible records dated 18 December 2023 through 31 December 2025. Historical Day 0 is the index care encounter, not enrollment."
+        },
+        {
+          "text": "Use only the clinic's recorded question, 'Over the past seven days, how severe were your dry eye symptoms overall?', scored from 0, no symptoms, to 100, worst imaginable symptoms. Higher is worse. The scale is not presented as validated. Do not convert other questionnaires, infer ratings from narrative notes or replace absent scores with zero."
+        },
+        {
+          "text": "Select baseline as the latest eligible score in Days -14 through 0. A Day 0 score is eligible only when explicitly recorded before the index care decision. If several scores occur on the selected date, use the latest time-stamped eligible score; unresolved ordering makes baseline ambiguous and missing. Select follow-up closest to Day 60 within Days 45 through 90. Ties between dates use the earlier date; multiple values on that date use the last time-stamped score. Unresolved multiple values are ambiguous and missing. Keep care context as documented; do not widen windows or obtain new measurements. Missing scores affect only the applicable analysis, not overall eligibility."
+        },
+        {
+          "text": "Classify contact-lens status as explicitly documented wearer, explicitly documented nonwearer or unknown/not documented. A prescription does not establish wear, and unknown is not nonwearer."
+        },
+        {
+          "text": "During Days 1 through 90, a care change is a clinician-directed medication start, stop or dose-frequency change, or start/stop of a non-drug dry eye measure. Refills alone, appointment booking and administrative notes are not changes. Count one coordinated same-day adjustment as one event even if several measures change. Deduplicate by person, date and clinical event; uncertain events remain uncertain. Zero changes requires explicit unchanged-care documentation covering the interval; an absent later record alone means unknown. These windows identify records, not visits or matrix columns."
+        },
+        {
+          "text": "Staff obtain permissions, verify eligibility and deduplicate in November 2026, abstract and verify from December 2026 through February 2027, resolve permitted queries and lock the data in March, and analyze/report in April\u2013May. Administrative closeout and archiving finish by 30 June 2027. A record is complete when extraction and permitted queries are resolved, including missing/ambiguous codes; study completion requires dataset lock and completion of planned analyses and reporting. These tasks do not extend the historical period or require participant contact."
+        },
+        {
+          "text": "Suspend access if a required permission is withdrawn or a privacy incident requires suspension under site policy. Preserve legally required records and resume only after required authorization. Report unavailable source data rather than contacting patients or arranging new tests. There is no new examination, pressure/vision test, questionnaire, telephone call, clinic visit, specimen collection, genetic test or imaging re-reading, and no specimen transfer, storage or future use."
+        },
+        {
+          "text": "There is no prospective withdrawal visit. Site privacy requests follow applicable permissions without promising reversal of already deidentified aggregate analyses."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

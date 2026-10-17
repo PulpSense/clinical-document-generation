@@ -1,0 +1,94 @@
+{
+  "schema_version": "hermes-response/v2",
+  "request_id": "r-c05398eebf1d.draft.protocol-foundations.generation-only.a1.c53ebc57",
+  "request_sha256": "8e57b89750a83e8355c55bfc2df135a6df9db8228bb042a7f70499ab0f0ec2b0",
+  "revision_id": "r-c05398eebf1d",
+  "task": "section_drafting",
+  "batch_id": "protocol-foundations",
+  "producer": {
+    "model_id": "Codex-current-conversation-controlled-writing-trial"
+  },
+  "section_results": [
+    {
+      "section_id": "introduction",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Routine records describe vision after laser capsulotomy, but the availability and methods of measurement vary. A summary of recorded change must preserve missingness and distinguish unique people from treated eyes; these observations cannot establish a laser treatment effect."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "objectives",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The primary objective is to describe fixed-study-eye distance visual-acuity change from the historical baseline to the Day 42 selection window. The secondary objective is to describe recorded early pressure elevation in that eye. This review is descriptive; no comparative treatment hypothesis or exploratory endpoint is proposed."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "subjects.population",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Include all eligible consecutive ordinary-care records at Elmstead Ophthalmology Clinic, anticipating 150 unique adults aged 50\u201390 at their first eligible procedure. All sexes are eligible; healthy volunteers are not included. One fixed eye contributes outcomes per person. Repeated records or procedures do not create additional people."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "subjects.eligibility",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Exclude the person only if no eligible eye remains. Select one study eye: earliest eligible laser, right eye if both on the same date. Deduplicate patients; never switch eyes for missing data. Missing measurements affect only the relevant analysis, not cohort eligibility. Other eye disease is recorded context, not an automatic exclusion. No screening washout or other-study restriction. Pregnancy status is not collected and creates no restriction; no children."
+        }
+      ],
+      "lists": [
+        {
+          "label": "Inclusion criteria",
+          "items": [
+            "Age 50 through 90 inclusive at the first eligible procedure.",
+            "Clinician-documented posterior capsule opacification.",
+            "Routine laser capsulotomy at Elmstead Ophthalmology Clinic from 1 January through 31 August 2025 inclusive.",
+            "Reliably identifiable person, procedure date and treated eye.",
+            "Records accessible under required ethics/privacy decisions and site permission."
+          ]
+        },
+        {
+          "label": "Exclusion criteria applied to eyes",
+          "items": [
+            "An eye whose laser was part of an interventional research protocol.",
+            "An eye whose identity or procedure date cannot be verified."
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "study-design.design",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "This single-site retrospective observational cohort reviews routine laser capsulotomy for clinician-documented posterior capsule opacification. Treatment and subsequent care were independent of research, with no assigned intervention, arms, randomization, masking, placebo or investigational product. Index dates are 1 January\u201331 August 2025; records are confined to 2 December 2024\u201331 December 2025."
+        },
+        {
+          "text": "The primary endpoint is follow-up-minus-baseline logMAR with habitual distance correction in the fixed study eye. Baseline uses Days -30 through -1 and follow-up Days 28\u201370, targeting Day 42; negative change is better and positive worse. The secondary endpoint is the proportion with at least one study-eye pressure of 25 mmHg or higher on Days 1\u20137, among people with an observed pressure in that eye/window. Each person counts once. Selection, tie and missingness rules are specified in Informed Consent / Subject Enrollment. These historical windows are not research appointments."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-design.bias",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Consecutive inclusion, deduplication, fixed-eye selection and predefined measurement/window rules limit discretionary choices; apply the detailed rules in Informed Consent / Subject Enrollment. Preserve recorded methods and treatment context, distinguish ambiguous/missing values from no elevation, and report endpoint-specific availability without imputation. Selection, measurement and attendance biases remain; change does not establish treatment efficacy."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

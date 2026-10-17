@@ -1,0 +1,2137 @@
+{
+  "schema_version": "hermes-request/v2",
+  "request_id": "local-caps.draft.protocol-operations.draft.a1.5dc29078",
+  "revision_id": "local-caps",
+  "task": "section_drafting",
+  "wave": "draft",
+  "batch_id": "protocol-operations",
+  "artifact": "protocol",
+  "branch": {
+    "study_type": "Retrospective",
+    "icf_template": null
+  },
+  "topology_version": "clinical-drafting-v1",
+  "prompt_version": "section-drafting-v32-active-section-ownership",
+  "governing_resources": {
+    "approved_source_sha256": null,
+    "source_evidence_coverage_map": {
+      "schema_version": "source-evidence-coverage-map/v1",
+      "study_type": "Retrospective",
+      "icf_template": null,
+      "entries": [
+        {
+          "source_path": "confidentiality.data_handling",
+          "approved_value_sha256": "dea669dfdecb318e452e552dfa2dcb2f12d72f72f653c858b6628327955dc93e",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.arms",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "design.masking",
+          "approved_value_sha256": "f2953d2931e36d0c55640f51865f8394ebe52194765d04e521017232558f871c",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.study_design",
+          "approved_value_sha256": "10af1ee969ec4678a736cf414b2838a815437f5b8a711924214f18eebad27945",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.bias",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.primary",
+          "approved_value_sha256": "f5c58df105936f75ab548d3820292e197fb9ae401519717051a4d0e6fbed35f7",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.secondary",
+          "approved_value_sha256": "4b6ae1497688fc368b1a16c9cf010d5cdd52ed003d0987afcff0433a595ba109",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "ethics",
+          "approved_value_sha256": "e9a00338d77f20e306d5a068151448ba0a20d4092c3cb270af94017f66463cdd",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.primary",
+          "approved_value_sha256": "f7834607b4eff07c523bd436b47ac3959585c46ee5c047e7e172e8390cb60fc1",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.secondary",
+          "approved_value_sha256": "86402e9c1fc41fc56e52247fe50a45214ac9b7118f0f3ca37a99b02a849f3531",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "parties.irb",
+          "approved_value_sha256": "3d1db137db64cd0aff478ed87cda8142da6ce3c088baac167d8b5047f7d08e85",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.eligibility_notes",
+          "approved_value_sha256": "15ebcf3520e648daef83ccb19cab448133c93ec6eef02ad082762de0c1bd3f2e",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.exclusion_criteria",
+          "approved_value_sha256": "9a746300b1995ea9cb74d8c239772ca32db6ee1fdf9a275818c9c32f2981a14a",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.inclusion_criteria",
+          "approved_value_sha256": "778ee63362816264933e722cc9c59ca57a2b23d340213cea6954e64356063a41",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.maximum_age",
+          "approved_value_sha256": "a052db291b4300fb560b998bdb044a2c0aee06a1618e7a77e8aea43fe774762a",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.minimum_age",
+          "approved_value_sha256": "a6b3b1872b8b41a2e390d8c0bc42d491a3beb1cd67d6ab95c14251e84b81add9",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_justification",
+          "approved_value_sha256": "81ce2002607f5a206e8b06e4d4c10ed7b86d8123f4d9a8b234c3c5d5d3c49764",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_size",
+          "approved_value_sha256": "9ae2bdd7beedc2e766c6b76585530e16925115707dc7a06ab5ee4aa2776b2c7b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.study_population",
+          "approved_value_sha256": "ebfe1a431e4b20771a13866c655bbedb1191ef89314f7dd26ee6dbc70230ff94",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessment_details",
+          "approved_value_sha256": "ad00ed84aeb39d60fb60ded727efb682c05d9ec49d0d4b8a5a6c39123bfb4d99",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessments",
+          "approved_value_sha256": "57742459036d7356b4efafcafd87af762925a5adf43ee662129f824bfa7ad85f",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.completion",
+          "approved_value_sha256": "3c33691470e9e33e492b29107ddd0e69dd759762d1be4f5a1299076370c76667",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.consent",
+          "approved_value_sha256": "3df4b60ae9c0a7db6507e398dfdc744d63bcdc240d8bb93f635c34f89f323ad6",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.discontinuation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.enrollment",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.methods",
+          "approved_value_sha256": "5fb20e36dce8ab498a0122a570c19714bc7d0f67faefc22a8236cf6af9d83b63",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.minimum_days_before_screening_without_participation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.replacement",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.retention",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.return_of_results",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.specimens",
+          "approved_value_sha256": "ea20c47c772a87012f8e762c2550343e51b7da051ec7e08e4bd8076547c0a726",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.staff_work_plan",
+          "approved_value_sha256": "fa4fd46cb6a98c8dffc24b7019c665761e0bea68ca8aac2aecb50d736d401de9",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.study_termination",
+          "approved_value_sha256": "2273e6c3a80b8a29a250abf0aa25dd9eb7a910829e7297f557034d022fa18cfc",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.termination",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule",
+          "approved_value_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule_table",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.benefits",
+          "approved_value_sha256": "f875ca411c0aa9e8e8bbcef6cd4760e3f2ac6ed1082b575a6c954640b686510a",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.compensation_or_reimbursement",
+          "approved_value_sha256": "43f752f7b00c89d2dd5740f90c00e469014018b63ead432da83558d5c8b0c86e",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.injury_handling",
+          "approved_value_sha256": "e68b47ec29fe28f82fd41ec65e2aa6d7e48d8460b3d1822f990d97fca5147980",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.privacy",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.risks",
+          "approved_value_sha256": "b53b0e4805c061f87d5422725413571724f83596b3ac4f4152d35c64cb9424c6",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "safety.roles",
+          "approved_value_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.analysis_plan",
+          "approved_value_sha256": "4ff56febe7026fccfd61c6bb541a1c1fcfcaec14eb20ee1574f63e28ce60ef8c",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.datasets",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.bias_minimization",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.bias",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.methodology",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.software",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.background",
+          "approved_value_sha256": "4f019799af7a6a5cd7c6fe1eba726714ec7f8a8efc36c979bc038e3e037556c5",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.completion",
+          "approved_value_sha256": "653018023531e5fc0047854d522c127fcc06b5c7b417f4a30d745afccbee0494",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.hypothesis",
+          "approved_value_sha256": "74ec4fc22cf31d9b28b6e1685f7c5871e83a79e16e8861905b75c3b8cda9b28a",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.references",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.timeline",
+          "approved_value_sha256": "fa4fd46cb6a98c8dffc24b7019c665761e0bea68ca8aac2aecb50d736d401de9",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.title",
+          "approved_value_sha256": "d8e9b0e0cab666ac98ee618add733b3d60c208020da289d878238594408e1862",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.unmet_need",
+          "approved_value_sha256": "5bbad6d4928eb4a483e79f05b96b3f86be8ef539008ce7d3878e94fa5b00763c",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            }
+          ]
+        }
+      ]
+    },
+    "contracted_template_bundle": {
+      "schema_version": "contracted-template-bundle/v2",
+      "selection": {
+        "study_type": "Retrospective",
+        "icf_family": null
+      },
+      "contracted_templates": {
+        "protocol": {
+          "path": "assets/client-templates/docx/retrospective-protocol.template.docx",
+          "sha256": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e"
+        }
+      },
+      "client_template_authorities": {
+        "protocol": {
+          "path": "assets/client-templates/reference/protocol-reference.docx",
+          "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+        }
+      },
+      "document_section_contract": {
+        "version": "clinical-documents-v2.52-retrospective-method-ownership",
+        "sha256": "68217443f38f50daa8f6c0c13b310dfdd7e70c90305a75db2a44d337ce9c9e06"
+      },
+      "fixed_clinical_boilerplate": {
+        "version": "clinical-boilerplate-v14",
+        "path": "references/fixed-clinical-boilerplate.json",
+        "sha256": "54c99f136eef6596fb697a5c84a01b639f00adba443144e9fda823221028c5b6"
+      },
+      "drafting_examples": {
+        "path": "references/drafting-examples.json",
+        "sha256": "04dceabdfaac70b0bd2f4da89c0e54132d3ede262fe7c25edeafed9c267d112b"
+      },
+      "sterling_clause_contract": null,
+      "approved_font_plan": {
+        "version": "approved-font-plan/v1",
+        "available_font_policy": "preserve",
+        "missing_font_policy": "approved_packaged_substitute",
+        "unknown_inventory_policy": "preserve_then_resolve_by_smoke_render",
+        "approved_fallbacks": {
+          "aptos": "Liberation Sans",
+          "arial": "Liberation Sans",
+          "arial unicode ms": "Liberation Sans",
+          "calibri": "Liberation Sans",
+          "courier new": "Liberation Mono",
+          "dejavu sans": "Liberation Sans",
+          "helvetica": "Liberation Sans",
+          "noto sans": "Liberation Sans",
+          "noto sans symbols": "Liberation Sans",
+          "segoe ui symbol": "Liberation Sans",
+          "symbol": "Liberation Sans",
+          "times new roman": "Liberation Serif",
+          "verdana": "Liberation Sans"
+        },
+        "packaged_families": {
+          "Liberation Mono": "LiberationMono-Regular.ttf",
+          "Liberation Sans": "LiberationSans-Regular.ttf",
+          "Liberation Serif": "LiberationSerif-Regular.ttf"
+        },
+        "packaged_font_assets": {
+          "assets/fallback-fonts/LiberationMono-Bold.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-Bold.ttf",
+            "sha256": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb"
+          },
+          "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-BoldItalic.ttf",
+            "sha256": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130"
+          },
+          "assets/fallback-fonts/LiberationMono-Italic.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-Italic.ttf",
+            "sha256": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1"
+          },
+          "assets/fallback-fonts/LiberationMono-Regular.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-Regular.ttf",
+            "sha256": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1"
+          },
+          "assets/fallback-fonts/LiberationSans-Bold.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-Bold.ttf",
+            "sha256": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173"
+          },
+          "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-BoldItalic.ttf",
+            "sha256": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee"
+          },
+          "assets/fallback-fonts/LiberationSans-Italic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-Italic.ttf",
+            "sha256": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0"
+          },
+          "assets/fallback-fonts/LiberationSans-Regular.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-Regular.ttf",
+            "sha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8"
+          },
+          "assets/fallback-fonts/LiberationSerif-Bold.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-Bold.ttf",
+            "sha256": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce"
+          },
+          "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf",
+            "sha256": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7"
+          },
+          "assets/fallback-fonts/LiberationSerif-Italic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-Italic.ttf",
+            "sha256": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e"
+          },
+          "assets/fallback-fonts/LiberationSerif-Regular.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-Regular.ttf",
+            "sha256": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74"
+          }
+        },
+        "sha256": "4a4fa12e026266c53b3e16a62033195b480b86395b158ae7f39a778e6c32f3d1"
+      },
+      "layout_preservation_baseline": {
+        "schema_version": "layout-preservation-baseline/v1",
+        "artifacts": {
+          "protocol": {
+            "contracted_template": {
+              "path": "assets/client-templates/docx/retrospective-protocol.template.docx",
+              "sha256": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e"
+            },
+            "client_template_authority": {
+              "path": "assets/client-templates/reference/protocol-reference.docx",
+              "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+            }
+          }
+        },
+        "sha256": "31e813f49d9f8fbc6c626497bc7f31d6d6e52024a85f3e96a958c7d6a448457e"
+      },
+      "prs_authority": null,
+      "resource_hashes": {
+        "assets/client-templates/docx/retrospective-protocol.template.docx": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e",
+        "assets/client-templates/reference/protocol-reference.docx": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b",
+        "assets/fallback-fonts/LiberationMono-Bold.ttf": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb",
+        "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130",
+        "assets/fallback-fonts/LiberationMono-Italic.ttf": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1",
+        "assets/fallback-fonts/LiberationMono-Regular.ttf": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1",
+        "assets/fallback-fonts/LiberationSans-Bold.ttf": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173",
+        "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee",
+        "assets/fallback-fonts/LiberationSans-Italic.ttf": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0",
+        "assets/fallback-fonts/LiberationSans-Regular.ttf": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8",
+        "assets/fallback-fonts/LiberationSerif-Bold.ttf": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce",
+        "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7",
+        "assets/fallback-fonts/LiberationSerif-Italic.ttf": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e",
+        "assets/fallback-fonts/LiberationSerif-Regular.ttf": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74",
+        "references/drafting-examples.json": "04dceabdfaac70b0bd2f4da89c0e54132d3ede262fe7c25edeafed9c267d112b",
+        "references/fixed-clinical-boilerplate.json": "54c99f136eef6596fb697a5c84a01b639f00adba443144e9fda823221028c5b6"
+      },
+      "identity_sha256": "581960305bc0a7567235554cffa8806bfb8bc42603dcde38fc8345150b4fe30a"
+    },
+    "implementation_sha256": {
+      "scripts/contracts.py": "4a201d151f770d2f8a7a803d3ad2b63ce163530e9a575adb53ac251836c93be7",
+      "scripts/drafting.py": "9c4e3477a7a73441f70a24dfc83de89454c92acb9159e611c4e3aed19b51cb5b",
+      "scripts/prs_xml.py": "1aad04586410b2f177bc616d7747431b5145795fb014a330827cb560c01adc03",
+      "scripts/rendering.py": "b436a871e87abefa0d5bfda0555996bf15e9fe02c8d6a57a28ec5c0fea7502b9",
+      "scripts/workflow.py": "eef4c882a96780e481fa7d90fc3b6e0fd51a2cf4da23c6152cf0d4184842e09c",
+      "scripts/output_recovery.py": "c7e46b9885bb3a8c117af4afda77e2e126f0b12a45c6e58ab4037a84173b0b41"
+    },
+    "topology_version": "clinical-drafting-v1",
+    "prompt_version": "section-drafting-v32-active-section-ownership",
+    "producer_policy": "nonempty-model-id",
+    "generation_only_prompts_sha256": "2114b96a474b288208b62e0031a8c2b665387969e6be89af0f8c355493419181"
+  },
+  "attempts": {
+    "study-procedure.enrollment": 1
+  },
+  "approved_input": [
+    {
+      "path": "design.study_design",
+      "value": "Single-site retrospective observational cohort of 150 anticipated unique adults; no assigned intervention, randomization, masking, placebo, prospective enrollment or participant contact. Index laser procedures 1 January through 31 August 2025; historical records 2 December 2024 through 31 December 2025. One study eye per person: earliest eligible laser, right eye if same-day tie. All clinical care predates research abstraction.",
+      "sha256": "10af1ee969ec4678a736cf414b2838a815437f5b8a711924214f18eebad27945"
+    },
+    {
+      "path": "design.number_of_sites",
+      "value": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "path": "design.intervention_name",
+      "value": "Routine laser capsulotomy (historical ordinary care only)",
+      "sha256": "aa7e2d4bb05fcbb1c5db57ed17fd3e73a08a67ebdb73d58e2e4ffa11ca695cde"
+    },
+    {
+      "path": "design.masking",
+      "value": "None",
+      "sha256": "f2953d2931e36d0c55640f51865f8394ebe52194765d04e521017232558f871c"
+    },
+    {
+      "path": "endpoints.primary",
+      "value": [
+        {
+          "measure": "Recorded distance visual-acuity change in the fixed study eye",
+          "time_frame": "Baseline Days -30 through -1 to follow-up Days 28 through 70 after index, targeting Day 42",
+          "description": "Follow-up minus baseline logMAR with habitual distance correction; negative is better and positive worse; available paired values only."
+        }
+      ],
+      "sha256": "731df71dd7f61fe57d8ec45db47229b354099773ddabf5eda493fc656be59da1"
+    },
+    {
+      "path": "endpoints.secondary",
+      "value": [
+        {
+          "measure": "Proportion with recorded study-eye pressure of at least 25 mmHg",
+          "time_frame": "Days 1 through 7 after index",
+          "description": "At least one qualifying value among all recorded values; denominator people with at least one pressure measurement in that eye/window. Each person counted once. Missing record is not no elevation."
+        }
+      ],
+      "sha256": "1c2670dc7fa4a8386926f46fe2bdf996a78d416c2a81d0d316c8ebf9b0474099"
+    },
+    {
+      "path": "population.sample_size",
+      "value": 150,
+      "sha256": "9ae2bdd7beedc2e766c6b76585530e16925115707dc7a06ab5ee4aa2776b2c7b"
+    },
+    {
+      "path": "population.sample_justification",
+      "value": "All eligible records; 150 people is a feasibility estimate, with no formal power calculation, assumed effect size or prospective attrition rate.",
+      "sha256": "81ce2002607f5a206e8b06e4d4c10ed7b86d8123f4d9a8b234c3c5d5d3c49764"
+    },
+    {
+      "path": "population.study_population",
+      "value": "Adults aged 50 through 90 at the first eligible procedure, with posterior capsule opacification and routine laser capsulotomy at the single site within the index period; one fixed study eye per unique person.",
+      "sha256": "ebfe1a431e4b20771a13866c655bbedb1191ef89314f7dd26ee6dbc70230ff94"
+    },
+    {
+      "path": "population.minimum_age",
+      "value": "50 Years",
+      "sha256": "a6b3b1872b8b41a2e390d8c0bc42d491a3beb1cd67d6ab95c14251e84b81add9"
+    },
+    {
+      "path": "population.maximum_age",
+      "value": "90 Years",
+      "sha256": "a052db291b4300fb560b998bdb044a2c0aee06a1618e7a77e8aea43fe774762a"
+    },
+    {
+      "path": "population.sex",
+      "value": "All",
+      "sha256": "663175a9c461a96d6f0252fc22dbb8ed4951e7a6fc0e31546823bcc69d6021d1"
+    },
+    {
+      "path": "population.healthy_volunteers",
+      "value": "No",
+      "sha256": "b2cbc4e2e5545a6c43f6f8cc8f0e4766773fa6c83d238076313b6fa1e349caf6"
+    },
+    {
+      "path": "population.inclusion_criteria",
+      "value": [
+        "Age 50 through 90 inclusive at the first eligible procedure.",
+        "Clinician-documented posterior capsule opacification.",
+        "Routine laser capsulotomy at Elmstead Ophthalmology Clinic from 1 January through 31 August 2025 inclusive.",
+        "Reliably identifiable person, procedure date and treated eye.",
+        "Records accessible under required ethics/privacy decisions and site permission."
+      ],
+      "sha256": "832dbdd5cdd2f3acc5da34720feb80f517b32001bd1eb3153d0caf2cf953e7ed"
+    },
+    {
+      "path": "population.exclusion_criteria",
+      "value": [
+        "An eye whose laser was part of an interventional research protocol.",
+        "An eye whose identity or procedure date cannot be verified."
+      ],
+      "sha256": "dc5bf84e6632148698143f0dd32db579589f84a22cc81769c17fb060db9f2b07"
+    },
+    {
+      "path": "population.eligibility_notes",
+      "value": "Exclude the person only if no eligible eye remains. Select one study eye: earliest eligible laser, right eye if both on the same date. Deduplicate patients; never switch eyes for missing data. Missing measurements affect only the relevant analysis, not cohort eligibility. Other eye disease is recorded context, not an automatic exclusion. No screening washout or other-study restriction. Pregnancy status is not collected and creates no restriction; no children.",
+      "sha256": "15ebcf3520e648daef83ccb19cab448133c93ec6eef02ad082762de0c1bd3f2e"
+    },
+    {
+      "path": "procedures.consent",
+      "value": "Request waivers of consent and privacy authorization; neither is granted. Required ethics/privacy decisions and written site permission precede access. No patient recontact or prospective enrollment.",
+      "sha256": "3df4b60ae9c0a7db6507e398dfdc744d63bcdc240d8bb93f635c34f89f323ad6"
+    },
+    {
+      "path": "procedures.methods",
+      "value": "After permissions, staff verify eligibility and index selection and abstract\nage at procedure, sex, treated eye, index date, recorded ocular diagnoses,\nvisual-acuity values with correction status/date/method, and pressure values\nwith date/method. Original records stay at the clinic.\nFor acuity, use only distance visual acuity explicitly recorded in logMAR with\nhabitual distance correction. Do not convert Snellen values, infer correction\nstatus or substitute near, uncorrected or fellow-eye acuity.\nBaseline: latest eligible value during Days -30 through -1 before index.\nSame-day procedure measurements are not eligible baseline values. If there are\nmultiple eligible measurements on the latest date, use the last time-stamped\nvalue. If time does not resolve the choice, classify baseline as ambiguous/missing.\nFollow-up: eligible value closest to Day 42 within Days 28 through 70 after index.\nIf dates are equally distant, select the earlier date. On the selected date,\nuse the last time-stamped eligible value; unresolved multiple values are\nambiguous/missing. Do not widen windows or choose a more favorable result.\nPrimary endpoint: follow-up minus baseline logMAR in the fixed study eye.\nNegative change means better recorded acuity; positive change means worse acuity.\nUse people with both selected values; report contributing people, mean change,\nstandard deviation, 95% confidence interval, median and range. This observational\nchange is not proof of a laser treatment effect.\nSecondary endpoint: proportion with at least one recorded study-eye pressure\nof 25 mmHg or higher during historical Days 1 through 7. Denominator: people\nwith at least one pressure measurement in that eye/window. Use all available\nvalues in the window and count each person at most once, regardless of the\nnumber of qualifying readings. No pressure record means missing, not no elevation.\nRetain the recorded pressure method and treatment context; do not describe the\nvalues as an untreated trajectory. No secondary pressure change endpoint.\nUse available data without imputation. Report missing, ambiguous and unavailable\nmeasurement types separately, with explicit endpoint denominators. No paired-eye\nmodel, adjusted subgroup model, confirmatory significance claim or invented\nexploratory outcome is authorized. Selection, measurement and attendance biases\nlimit interpretation.\nThe historical windows identify existing records, not scheduled research visits.\nNo new acuity or pressure test, questionnaire, phone call, clinic visit, imaging\nreview, specimen collection, genetic test or participant contact occurs.",
+      "sha256": "5fb20e36dce8ab498a0122a570c19714bc7d0f67faefc22a8236cf6af9d83b63"
+    },
+    {
+      "path": "procedures.assessment_details.acuity_selection",
+      "value": " use only distance visual acuity explicitly recorded in logMAR with\nhabitual distance correction. Do not convert Snellen values, infer correction\nstatus or substitute near, uncorrected or fellow-eye acuity.\nBaseline: latest eligible value during Days -30 through -1 before index.\nSame-day procedure measurements are not eligible baseline values. If there are\nmultiple eligible measurements on the latest date, use the last time-stamped\nvalue. If time does not resolve the choice, classify baseline as ambiguous/missing.\nFollow-up: eligible value closest to Day 42 within Days 28 through 70 after index.\nIf dates are equally distant, select the earlier date. On the selected date,\nuse the last time-stamped eligible value; unresolved multiple values are\nambiguous/missing. Do not widen windows or choose a more favorable result.\n",
+      "sha256": "022566c2bf4f544497c4ff8240104a6cdb3b197f02d7c6679ebca834d1899953"
+    },
+    {
+      "path": "procedures.assessments",
+      "value": [
+        "Historical Day 0 is the selected eye laser date, not research enrollment. Baseline Days -30 through -1; follow-up Days 28 through 70 targeting Day 42; early pressure Days 1 through 7. These are record selection windows, not visits."
+      ],
+      "sha256": "57742459036d7356b4efafcafd87af762925a5adf43ee662129f824bfa7ad85f"
+    },
+    {
+      "path": "procedures.staff_work_plan",
+      "value": "November 2026: obtain required decisions/site permission, verify eligibility,\ndeduplicate and identify study eyes. December 2026 through January 2027: abstract\nrecords. February 2027: resolve permitted source queries and lock the coded data.\nMarch through April 2027: analyze and prepare aggregate findings. Administrative\ncloseout and archiving end on 31 May 2027. These are staff tasks, not prospective\nclinical collection or recruitment phases; the historical period stays fixed.\nA record is complete when extraction and permitted queries are resolved, including\nexplicit missing/ambiguous codes. Study completion requires dataset lock and\ncompletion of the planned analyses and aggregate report. Archiving follows.\nIf access permission is withdrawn, suspend research access immediately. Resume\nonly after documented authorization is restored. If that is impossible, stop\nfurther abstraction, preserve records as required and report available data and\nlimitations. No patient recontact, new test or replacement eye may fill gaps.",
+      "sha256": "fa4fd46cb6a98c8dffc24b7019c665761e0bea68ca8aac2aecb50d736d401de9"
+    },
+    {
+      "path": "procedures.completion",
+      "value": "Record completion follows extraction and permitted query resolution, with explicit missing/ambiguous codes.",
+      "sha256": "3c33691470e9e33e492b29107ddd0e69dd759762d1be4f5a1299076370c76667"
+    },
+    {
+      "path": "procedures.study_termination",
+      "value": "If access permission is withdrawn, suspend research access immediately. Resume only after documented authorization is restored. Otherwise stop further abstraction, preserve required records and report available data/limitations. No recontact, new test or replacement eye.",
+      "sha256": "2273e6c3a80b8a29a250abf0aa25dd9eb7a910829e7297f557034d022fa18cfc"
+    },
+    {
+      "path": "procedures.specimens",
+      "value": "No new test, questionnaire, phone call, visit, imaging review, specimen or genetic test. No transfer, storage, banking or future specimen use.",
+      "sha256": "ea20c47c772a87012f8e762c2550343e51b7da051ec7e08e4bd8076547c0a726"
+    },
+    {
+      "path": "procedures.visit_schedule",
+      "value": [],
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "risks_benefits.risks",
+      "value": "Loss of confidentiality from record review; no new physical research risk.",
+      "sha256": "b53b0e4805c061f87d5422725413571724f83596b3ac4f4152d35c64cb9424c6"
+    },
+    {
+      "path": "risks_benefits.risk_mitigation",
+      "value": "Restricted access, separately stored identity keys and aggregate reporting.",
+      "sha256": "0b9e09855f82686cbe868d7fb69e17d60a41ce4795f8fd62833db195a78c0a1a"
+    },
+    {
+      "path": "risks_benefits.benefits",
+      "value": "No direct benefit; findings may inform research summaries.",
+      "sha256": "f875ca411c0aa9e8e8bbcef6cd4760e3f2ac6ed1082b575a6c954640b686510a"
+    },
+    {
+      "path": "risks_benefits.compensation_or_reimbursement",
+      "value": "None; no participant payment, reimbursement or new clinical charge. Sponsor funds staff work and analysis.",
+      "sha256": "43f752f7b00c89d2dd5740f90c00e469014018b63ead432da83558d5c8b0c86e"
+    },
+    {
+      "path": "risks_benefits.injury_handling",
+      "value": "No new injury-treatment or insurance promise. Suspected privacy incidents are handled by the PI under site policy and required reporting; no reporting-hour deadline supplied.",
+      "sha256": "e68b47ec29fe28f82fd41ec65e2aa6d7e48d8460b3d1822f990d97fca5147980"
+    },
+    {
+      "path": "safety.roles",
+      "value": [],
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "study.title",
+      "value": "Recorded Vision After Routine Laser Capsulotomy.",
+      "sha256": "d8e9b0e0cab666ac98ee618add733b3d60c208020da289d878238594408e1862"
+    },
+    {
+      "path": "study.short_title",
+      "value": "Vision After Laser Capsulotomy.",
+      "sha256": "b1759c806cb9e2c1610a4bc1724d356d9e9258363513dd2788644d8c2bf5efb4"
+    },
+    {
+      "path": "study.condition",
+      "value": "Posterior capsule opacification after cataract surgery.",
+      "sha256": "7023745709f57a153c37b55a9d1a8a02c82aa453b6770801838bb762bf64c641"
+    },
+    {
+      "path": "study.background",
+      "value": "Routine records may describe vision after laser capsulotomy, but measurement availability and methods vary. The clinic lacks a summary that preserves missingness and distinguishes people from treated eyes.",
+      "sha256": "4f019799af7a6a5cd7c6fe1eba726714ec7f8a8efc36c979bc038e3e037556c5"
+    },
+    {
+      "path": "study.unmet_need",
+      "value": "The clinic lacks a summary that preserves missingness and distinguishes people from treated eyes.",
+      "sha256": "5bbad6d4928eb4a483e79f05b96b3f86be8ef539008ce7d3878e94fa5b00763c"
+    },
+    {
+      "path": "study.hypothesis",
+      "value": "No comparative treatment hypothesis or exploratory endpoint is proposed; this review is descriptive.",
+      "sha256": "74ec4fc22cf31d9b28b6e1685f7c5871e83a79e16e8861905b75c3b8cda9b28a"
+    },
+    {
+      "path": "study.timeline",
+      "value": "November 2026: obtain required decisions/site permission, verify eligibility,\ndeduplicate and identify study eyes. December 2026 through January 2027: abstract\nrecords. February 2027: resolve permitted source queries and lock the coded data.\nMarch through April 2027: analyze and prepare aggregate findings. Administrative\ncloseout and archiving end on 31 May 2027. These are staff tasks, not prospective\nclinical collection or recruitment phases; the historical period stays fixed.\nA record is complete when extraction and permitted queries are resolved, including\nexplicit missing/ambiguous codes. Study completion requires dataset lock and\ncompletion of the planned analyses and aggregate report. Archiving follows.\nIf access permission is withdrawn, suspend research access immediately. Resume\nonly after documented authorization is restored. If that is impossible, stop\nfurther abstraction, preserve records as required and report available data and\nlimitations. No patient recontact, new test or replacement eye may fill gaps.",
+      "sha256": "fa4fd46cb6a98c8dffc24b7019c665761e0bea68ca8aac2aecb50d736d401de9"
+    },
+    {
+      "path": "study.completion",
+      "value": "A record is complete when extraction and permitted queries are resolved, including missing/ambiguous codes. Study completion requires dataset lock and completion of planned analyses and the aggregate report. Administrative closeout and archiving end on 31 May 2027.",
+      "sha256": "653018023531e5fc0047854d522c127fcc06b5c7b417f4a30d745afccbee0494"
+    },
+    {
+      "path": "procedures.assessment_details",
+      "value": {
+        "acuity_selection": " use only distance visual acuity explicitly recorded in logMAR with\nhabitual distance correction. Do not convert Snellen values, infer correction\nstatus or substitute near, uncorrected or fellow-eye acuity.\nBaseline: latest eligible value during Days -30 through -1 before index.\nSame-day procedure measurements are not eligible baseline values. If there are\nmultiple eligible measurements on the latest date, use the last time-stamped\nvalue. If time does not resolve the choice, classify baseline as ambiguous/missing.\nFollow-up: eligible value closest to Day 42 within Days 28 through 70 after index.\nIf dates are equally distant, select the earlier date. On the selected date,\nuse the last time-stamped eligible value; unresolved multiple values are\nambiguous/missing. Do not widen windows or choose a more favorable result.\n"
+      },
+      "sha256": "5842c1ebedb6a0d5b9bf6c55bfcb1a01397020ebcf62ac03b971d8de62efb48d"
+    }
+  ],
+  "approved_source": {
+    "design": {
+      "study_design": "Single-site retrospective observational cohort of 150 anticipated unique adults; no assigned intervention, randomization, masking, placebo, prospective enrollment or participant contact. Index laser procedures 1 January through 31 August 2025; historical records 2 December 2024 through 31 December 2025. One study eye per person: earliest eligible laser, right eye if same-day tie. All clinical care predates research abstraction.",
+      "number_of_sites": 1,
+      "intervention_name": "Routine laser capsulotomy (historical ordinary care only)",
+      "masking": "None"
+    },
+    "endpoints": {
+      "primary": [
+        {
+          "measure": "Recorded distance visual-acuity change in the fixed study eye",
+          "time_frame": "Baseline Days -30 through -1 to follow-up Days 28 through 70 after index, targeting Day 42",
+          "description": "Follow-up minus baseline logMAR with habitual distance correction; negative is better and positive worse; available paired values only."
+        }
+      ],
+      "secondary": [
+        {
+          "measure": "Proportion with recorded study-eye pressure of at least 25 mmHg",
+          "time_frame": "Days 1 through 7 after index",
+          "description": "At least one qualifying value among all recorded values; denominator people with at least one pressure measurement in that eye/window. Each person counted once. Missing record is not no elevation."
+        }
+      ]
+    },
+    "population": {
+      "sample_size": 150,
+      "sample_justification": "All eligible records; 150 people is a feasibility estimate, with no formal power calculation, assumed effect size or prospective attrition rate.",
+      "study_population": "Adults aged 50 through 90 at the first eligible procedure, with posterior capsule opacification and routine laser capsulotomy at the single site within the index period; one fixed study eye per unique person.",
+      "minimum_age": "50 Years",
+      "maximum_age": "90 Years",
+      "sex": "All",
+      "healthy_volunteers": "No",
+      "inclusion_criteria": [
+        "Age 50 through 90 inclusive at the first eligible procedure.",
+        "Clinician-documented posterior capsule opacification.",
+        "Routine laser capsulotomy at Elmstead Ophthalmology Clinic from 1 January through 31 August 2025 inclusive.",
+        "Reliably identifiable person, procedure date and treated eye.",
+        "Records accessible under required ethics/privacy decisions and site permission."
+      ],
+      "exclusion_criteria": [
+        "An eye whose laser was part of an interventional research protocol.",
+        "An eye whose identity or procedure date cannot be verified."
+      ],
+      "eligibility_notes": "Exclude the person only if no eligible eye remains. Select one study eye: earliest eligible laser, right eye if both on the same date. Deduplicate patients; never switch eyes for missing data. Missing measurements affect only the relevant analysis, not cohort eligibility. Other eye disease is recorded context, not an automatic exclusion. No screening washout or other-study restriction. Pregnancy status is not collected and creates no restriction; no children."
+    },
+    "procedures": {
+      "consent": "Request waivers of consent and privacy authorization; neither is granted. Required ethics/privacy decisions and written site permission precede access. No patient recontact or prospective enrollment.",
+      "methods": "After permissions, staff verify eligibility and index selection and abstract\nage at procedure, sex, treated eye, index date, recorded ocular diagnoses,\nvisual-acuity values with correction status/date/method, and pressure values\nwith date/method. Original records stay at the clinic.\nFor acuity, use only distance visual acuity explicitly recorded in logMAR with\nhabitual distance correction. Do not convert Snellen values, infer correction\nstatus or substitute near, uncorrected or fellow-eye acuity.\nBaseline: latest eligible value during Days -30 through -1 before index.\nSame-day procedure measurements are not eligible baseline values. If there are\nmultiple eligible measurements on the latest date, use the last time-stamped\nvalue. If time does not resolve the choice, classify baseline as ambiguous/missing.\nFollow-up: eligible value closest to Day 42 within Days 28 through 70 after index.\nIf dates are equally distant, select the earlier date. On the selected date,\nuse the last time-stamped eligible value; unresolved multiple values are\nambiguous/missing. Do not widen windows or choose a more favorable result.\nPrimary endpoint: follow-up minus baseline logMAR in the fixed study eye.\nNegative change means better recorded acuity; positive change means worse acuity.\nUse people with both selected values; report contributing people, mean change,\nstandard deviation, 95% confidence interval, median and range. This observational\nchange is not proof of a laser treatment effect.\nSecondary endpoint: proportion with at least one recorded study-eye pressure\nof 25 mmHg or higher during historical Days 1 through 7. Denominator: people\nwith at least one pressure measurement in that eye/window. Use all available\nvalues in the window and count each person at most once, regardless of the\nnumber of qualifying readings. No pressure record means missing, not no elevation.\nRetain the recorded pressure method and treatment context; do not describe the\nvalues as an untreated trajectory. No secondary pressure change endpoint.\nUse available data without imputation. Report missing, ambiguous and unavailable\nmeasurement types separately, with explicit endpoint denominators. No paired-eye\nmodel, adjusted subgroup model, confirmatory significance claim or invented\nexploratory outcome is authorized. Selection, measurement and attendance biases\nlimit interpretation.\nThe historical windows identify existing records, not scheduled research visits.\nNo new acuity or pressure test, questionnaire, phone call, clinic visit, imaging\nreview, specimen collection, genetic test or participant contact occurs.",
+      "assessment_details": {
+        "acuity_selection": " use only distance visual acuity explicitly recorded in logMAR with\nhabitual distance correction. Do not convert Snellen values, infer correction\nstatus or substitute near, uncorrected or fellow-eye acuity.\nBaseline: latest eligible value during Days -30 through -1 before index.\nSame-day procedure measurements are not eligible baseline values. If there are\nmultiple eligible measurements on the latest date, use the last time-stamped\nvalue. If time does not resolve the choice, classify baseline as ambiguous/missing.\nFollow-up: eligible value closest to Day 42 within Days 28 through 70 after index.\nIf dates are equally distant, select the earlier date. On the selected date,\nuse the last time-stamped eligible value; unresolved multiple values are\nambiguous/missing. Do not widen windows or choose a more favorable result.\n"
+      },
+      "assessments": [
+        "Historical Day 0 is the selected eye laser date, not research enrollment. Baseline Days -30 through -1; follow-up Days 28 through 70 targeting Day 42; early pressure Days 1 through 7. These are record selection windows, not visits."
+      ],
+      "staff_work_plan": "November 2026: obtain required decisions/site permission, verify eligibility,\ndeduplicate and identify study eyes. December 2026 through January 2027: abstract\nrecords. February 2027: resolve permitted source queries and lock the coded data.\nMarch through April 2027: analyze and prepare aggregate findings. Administrative\ncloseout and archiving end on 31 May 2027. These are staff tasks, not prospective\nclinical collection or recruitment phases; the historical period stays fixed.\nA record is complete when extraction and permitted queries are resolved, including\nexplicit missing/ambiguous codes. Study completion requires dataset lock and\ncompletion of the planned analyses and aggregate report. Archiving follows.\nIf access permission is withdrawn, suspend research access immediately. Resume\nonly after documented authorization is restored. If that is impossible, stop\nfurther abstraction, preserve records as required and report available data and\nlimitations. No patient recontact, new test or replacement eye may fill gaps.",
+      "completion": "Record completion follows extraction and permitted query resolution, with explicit missing/ambiguous codes.",
+      "study_termination": "If access permission is withdrawn, suspend research access immediately. Resume only after documented authorization is restored. Otherwise stop further abstraction, preserve required records and report available data/limitations. No recontact, new test or replacement eye.",
+      "specimens": "No new test, questionnaire, phone call, visit, imaging review, specimen or genetic test. No transfer, storage, banking or future specimen use.",
+      "visit_schedule": []
+    },
+    "risks_benefits": {
+      "risks": "Loss of confidentiality from record review; no new physical research risk.",
+      "risk_mitigation": "Restricted access, separately stored identity keys and aggregate reporting.",
+      "benefits": "No direct benefit; findings may inform research summaries.",
+      "compensation_or_reimbursement": "None; no participant payment, reimbursement or new clinical charge. Sponsor funds staff work and analysis.",
+      "injury_handling": "No new injury-treatment or insurance promise. Suspected privacy incidents are handled by the PI under site policy and required reporting; no reporting-hour deadline supplied."
+    },
+    "safety": {
+      "roles": []
+    },
+    "study": {
+      "title": "Recorded Vision After Routine Laser Capsulotomy.",
+      "short_title": "Vision After Laser Capsulotomy.",
+      "condition": "Posterior capsule opacification after cataract surgery.",
+      "background": "Routine records may describe vision after laser capsulotomy, but measurement availability and methods vary. The clinic lacks a summary that preserves missingness and distinguishes people from treated eyes.",
+      "unmet_need": "The clinic lacks a summary that preserves missingness and distinguishes people from treated eyes.",
+      "hypothesis": "No comparative treatment hypothesis or exploratory endpoint is proposed; this review is descriptive.",
+      "timeline": "November 2026: obtain required decisions/site permission, verify eligibility,\ndeduplicate and identify study eyes. December 2026 through January 2027: abstract\nrecords. February 2027: resolve permitted source queries and lock the coded data.\nMarch through April 2027: analyze and prepare aggregate findings. Administrative\ncloseout and archiving end on 31 May 2027. These are staff tasks, not prospective\nclinical collection or recruitment phases; the historical period stays fixed.\nA record is complete when extraction and permitted queries are resolved, including\nexplicit missing/ambiguous codes. Study completion requires dataset lock and\ncompletion of the planned analyses and aggregate report. Archiving follows.\nIf access permission is withdrawn, suspend research access immediately. Resume\nonly after documented authorization is restored. If that is impossible, stop\nfurther abstraction, preserve records as required and report available data and\nlimitations. No patient recontact, new test or replacement eye may fill gaps.",
+      "completion": "A record is complete when extraction and permitted queries are resolved, including missing/ambiguous codes. Study completion requires dataset lock and completion of planned analyses and the aggregate report. Administrative closeout and archiving end on 31 May 2027."
+    }
+  },
+  "source_evidence_coverage_map": {
+    "schema_version": "source-evidence-coverage-map/v1",
+    "study_type": "Retrospective",
+    "icf_template": null,
+    "entries": [
+      {
+        "source_path": "confidentiality.data_handling",
+        "approved_value_sha256": "dea669dfdecb318e452e552dfa2dcb2f12d72f72f653c858b6628327955dc93e",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "confidentiality",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "design.arms",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.design",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "design.masking",
+        "approved_value_sha256": "f2953d2931e36d0c55640f51865f8394ebe52194765d04e521017232558f871c",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.design",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "design.study_design",
+        "approved_value_sha256": "10af1ee969ec4678a736cf414b2838a815437f5b8a711924214f18eebad27945",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.bias",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.design",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "endpoints.primary",
+        "approved_value_sha256": "f5c58df105936f75ab548d3820292e197fb9ae401519717051a4d0e6fbed35f7",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "endpoints.secondary",
+        "approved_value_sha256": "4b6ae1497688fc368b1a16c9cf010d5cdd52ed003d0987afcff0433a595ba109",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "ethics",
+        "approved_value_sha256": "e9a00338d77f20e306d5a068151448ba0a20d4092c3cb270af94017f66463cdd",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "objectives.primary",
+        "approved_value_sha256": "f7834607b4eff07c523bd436b47ac3959585c46ee5c047e7e172e8390cb60fc1",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "objectives.secondary",
+        "approved_value_sha256": "86402e9c1fc41fc56e52247fe50a45214ac9b7118f0f3ca37a99b02a849f3531",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "parties.irb",
+        "approved_value_sha256": "3d1db137db64cd0aff478ed87cda8142da6ce3c088baac167d8b5047f7d08e85",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.eligibility_notes",
+        "approved_value_sha256": "15ebcf3520e648daef83ccb19cab448133c93ec6eef02ad082762de0c1bd3f2e",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.exclusion_criteria",
+        "approved_value_sha256": "9a746300b1995ea9cb74d8c239772ca32db6ee1fdf9a275818c9c32f2981a14a",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.inclusion_criteria",
+        "approved_value_sha256": "778ee63362816264933e722cc9c59ca57a2b23d340213cea6954e64356063a41",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.population",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.maximum_age",
+        "approved_value_sha256": "a052db291b4300fb560b998bdb044a2c0aee06a1618e7a77e8aea43fe774762a",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.minimum_age",
+        "approved_value_sha256": "a6b3b1872b8b41a2e390d8c0bc42d491a3beb1cd67d6ab95c14251e84b81add9",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.sample_justification",
+        "approved_value_sha256": "81ce2002607f5a206e8b06e4d4c10ed7b86d8123f4d9a8b234c3c5d5d3c49764",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "sample-size",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.sample_size",
+        "approved_value_sha256": "9ae2bdd7beedc2e766c6b76585530e16925115707dc7a06ab5ee4aa2776b2c7b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "sample-size",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.population",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.study_population",
+        "approved_value_sha256": "ebfe1a431e4b20771a13866c655bbedb1191ef89314f7dd26ee6dbc70230ff94",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.population",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.assessment_details",
+        "approved_value_sha256": "ad00ed84aeb39d60fb60ded727efb682c05d9ec49d0d4b8a5a6c39123bfb4d99",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.assessments",
+        "approved_value_sha256": "57742459036d7356b4efafcafd87af762925a5adf43ee662129f824bfa7ad85f",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.completion",
+        "approved_value_sha256": "3c33691470e9e33e492b29107ddd0e69dd759762d1be4f5a1299076370c76667",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.consent",
+        "approved_value_sha256": "3df4b60ae9c0a7db6507e398dfdc744d63bcdc240d8bb93f635c34f89f323ad6",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.discontinuation",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.enrollment",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.methods",
+        "approved_value_sha256": "5fb20e36dce8ab498a0122a570c19714bc7d0f67faefc22a8236cf6af9d83b63",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.minimum_days_before_screening_without_participation",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.replacement",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.retention",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.return_of_results",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.specimens",
+        "approved_value_sha256": "ea20c47c772a87012f8e762c2550343e51b7da051ec7e08e4bd8076547c0a726",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.staff_work_plan",
+        "approved_value_sha256": "fa4fd46cb6a98c8dffc24b7019c665761e0bea68ca8aac2aecb50d736d401de9",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.study_termination",
+        "approved_value_sha256": "2273e6c3a80b8a29a250abf0aa25dd9eb7a910829e7297f557034d022fa18cfc",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.termination",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.visit_schedule",
+        "approved_value_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.visit_schedule_table",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.benefits",
+        "approved_value_sha256": "f875ca411c0aa9e8e8bbcef6cd4760e3f2ac6ed1082b575a6c954640b686510a",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.compensation_or_reimbursement",
+        "approved_value_sha256": "43f752f7b00c89d2dd5740f90c00e469014018b63ead432da83558d5c8b0c86e",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.injury_handling",
+        "approved_value_sha256": "e68b47ec29fe28f82fd41ec65e2aa6d7e48d8460b3d1822f990d97fca5147980",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.privacy",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "confidentiality",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.risks",
+        "approved_value_sha256": "b53b0e4805c061f87d5422725413571724f83596b3ac4f4152d35c64cb9424c6",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "quality-safety",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "safety.roles",
+        "approved_value_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "quality-safety",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.analysis_plan",
+        "approved_value_sha256": "4ff56febe7026fccfd61c6bb541a1c1fcfcaec14eb20ee1574f63e28ce60ef8c",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.considerations",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.datasets",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.methodology",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.bias_minimization",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.bias",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.methodology",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.methodology",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.software",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.considerations",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "study.background",
+        "approved_value_sha256": "4f019799af7a6a5cd7c6fe1eba726714ec7f8a8efc36c979bc038e3e037556c5",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.completion",
+        "approved_value_sha256": "653018023531e5fc0047854d522c127fcc06b5c7b417f4a30d745afccbee0494",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.hypothesis",
+        "approved_value_sha256": "74ec4fc22cf31d9b28b6e1685f7c5871e83a79e16e8861905b75c3b8cda9b28a",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.references",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "study.timeline",
+        "approved_value_sha256": "fa4fd46cb6a98c8dffc24b7019c665761e0bea68ca8aac2aecb50d736d401de9",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.title",
+        "approved_value_sha256": "d8e9b0e0cab666ac98ee618add733b3d60c208020da289d878238594408e1862",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.unmet_need",
+        "approved_value_sha256": "5bbad6d4928eb4a483e79f05b96b3f86be8ef539008ce7d3878e94fa5b00763c",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          }
+        ]
+      }
+    ]
+  },
+  "evidence_checklist": [
+    {
+      "section_id": "study-procedure.enrollment",
+      "required_source_paths": [
+        "procedures.consent",
+        "procedures.enrollment",
+        "procedures.methods",
+        "procedures.assessment_details",
+        "procedures.assessments",
+        "procedures.visit_schedule_table",
+        "procedures.visit_schedule",
+        "procedures.staff_work_plan",
+        "study.timeline",
+        "procedures.completion",
+        "study.completion",
+        "procedures.study_termination",
+        "procedures.termination",
+        "procedures.retention",
+        "procedures.discontinuation",
+        "procedures.replacement",
+        "procedures.specimens",
+        "procedures.return_of_results"
+      ],
+      "approved_values": {
+        "procedures.consent": "Request waivers of consent and privacy authorization; neither is granted. Required ethics/privacy decisions and written site permission precede access. No patient recontact or prospective enrollment.",
+        "procedures.enrollment": null,
+        "procedures.methods": "After permissions, staff verify eligibility and index selection and abstract\nage at procedure, sex, treated eye, index date, recorded ocular diagnoses,\nvisual-acuity values with correction status/date/method, and pressure values\nwith date/method. Original records stay at the clinic.\nFor acuity, use only distance visual acuity explicitly recorded in logMAR with\nhabitual distance correction. Do not convert Snellen values, infer correction\nstatus or substitute near, uncorrected or fellow-eye acuity.\nBaseline: latest eligible value during Days -30 through -1 before index.\nSame-day procedure measurements are not eligible baseline values. If there are\nmultiple eligible measurements on the latest date, use the last time-stamped\nvalue. If time does not resolve the choice, classify baseline as ambiguous/missing.\nFollow-up: eligible value closest to Day 42 within Days 28 through 70 after index.\nIf dates are equally distant, select the earlier date. On the selected date,\nuse the last time-stamped eligible value; unresolved multiple values are\nambiguous/missing. Do not widen windows or choose a more favorable result.\nPrimary endpoint: follow-up minus baseline logMAR in the fixed study eye.\nNegative change means better recorded acuity; positive change means worse acuity.\nUse people with both selected values; report contributing people, mean change,\nstandard deviation, 95% confidence interval, median and range. This observational\nchange is not proof of a laser treatment effect.\nSecondary endpoint: proportion with at least one recorded study-eye pressure\nof 25 mmHg or higher during historical Days 1 through 7. Denominator: people\nwith at least one pressure measurement in that eye/window. Use all available\nvalues in the window and count each person at most once, regardless of the\nnumber of qualifying readings. No pressure record means missing, not no elevation.\nRetain the recorded pressure method and treatment context; do not describe the\nvalues as an untreated trajectory. No secondary pressure change endpoint.\nUse available data without imputation. Report missing, ambiguous and unavailable\nmeasurement types separately, with explicit endpoint denominators. No paired-eye\nmodel, adjusted subgroup model, confirmatory significance claim or invented\nexploratory outcome is authorized. Selection, measurement and attendance biases\nlimit interpretation.\nThe historical windows identify existing records, not scheduled research visits.\nNo new acuity or pressure test, questionnaire, phone call, clinic visit, imaging\nreview, specimen collection, genetic test or participant contact occurs.",
+        "procedures.assessment_details": {
+          "acuity_selection": " use only distance visual acuity explicitly recorded in logMAR with\nhabitual distance correction. Do not convert Snellen values, infer correction\nstatus or substitute near, uncorrected or fellow-eye acuity.\nBaseline: latest eligible value during Days -30 through -1 before index.\nSame-day procedure measurements are not eligible baseline values. If there are\nmultiple eligible measurements on the latest date, use the last time-stamped\nvalue. If time does not resolve the choice, classify baseline as ambiguous/missing.\nFollow-up: eligible value closest to Day 42 within Days 28 through 70 after index.\nIf dates are equally distant, select the earlier date. On the selected date,\nuse the last time-stamped eligible value; unresolved multiple values are\nambiguous/missing. Do not widen windows or choose a more favorable result.\n"
+        },
+        "procedures.assessments": [
+          "Historical Day 0 is the selected eye laser date, not research enrollment. Baseline Days -30 through -1; follow-up Days 28 through 70 targeting Day 42; early pressure Days 1 through 7. These are record selection windows, not visits."
+        ],
+        "procedures.visit_schedule_table": null,
+        "procedures.visit_schedule": [],
+        "procedures.staff_work_plan": "November 2026: obtain required decisions/site permission, verify eligibility,\ndeduplicate and identify study eyes. December 2026 through January 2027: abstract\nrecords. February 2027: resolve permitted source queries and lock the coded data.\nMarch through April 2027: analyze and prepare aggregate findings. Administrative\ncloseout and archiving end on 31 May 2027. These are staff tasks, not prospective\nclinical collection or recruitment phases; the historical period stays fixed.\nA record is complete when extraction and permitted queries are resolved, including\nexplicit missing/ambiguous codes. Study completion requires dataset lock and\ncompletion of the planned analyses and aggregate report. Archiving follows.\nIf access permission is withdrawn, suspend research access immediately. Resume\nonly after documented authorization is restored. If that is impossible, stop\nfurther abstraction, preserve records as required and report available data and\nlimitations. No patient recontact, new test or replacement eye may fill gaps.",
+        "study.timeline": "November 2026: obtain required decisions/site permission, verify eligibility,\ndeduplicate and identify study eyes. December 2026 through January 2027: abstract\nrecords. February 2027: resolve permitted source queries and lock the coded data.\nMarch through April 2027: analyze and prepare aggregate findings. Administrative\ncloseout and archiving end on 31 May 2027. These are staff tasks, not prospective\nclinical collection or recruitment phases; the historical period stays fixed.\nA record is complete when extraction and permitted queries are resolved, including\nexplicit missing/ambiguous codes. Study completion requires dataset lock and\ncompletion of the planned analyses and aggregate report. Archiving follows.\nIf access permission is withdrawn, suspend research access immediately. Resume\nonly after documented authorization is restored. If that is impossible, stop\nfurther abstraction, preserve records as required and report available data and\nlimitations. No patient recontact, new test or replacement eye may fill gaps.",
+        "procedures.completion": "Record completion follows extraction and permitted query resolution, with explicit missing/ambiguous codes.",
+        "study.completion": "A record is complete when extraction and permitted queries are resolved, including missing/ambiguous codes. Study completion requires dataset lock and completion of planned analyses and the aggregate report. Administrative closeout and archiving end on 31 May 2027.",
+        "procedures.study_termination": "If access permission is withdrawn, suspend research access immediately. Resume only after documented authorization is restored. Otherwise stop further abstraction, preserve required records and report available data/limitations. No recontact, new test or replacement eye.",
+        "procedures.termination": null,
+        "procedures.retention": null,
+        "procedures.discontinuation": null,
+        "procedures.replacement": null,
+        "procedures.specimens": "No new test, questionnaire, phone call, visit, imaging review, specimen or genetic test. No transfer, storage, banking or future specimen use.",
+        "procedures.return_of_results": null
+      }
+    }
+  ],
+  "section_contracts": [
+    {
+      "section_id": "study-procedure.enrollment",
+      "number": "8.1.",
+      "title": "Informed Consent / Subject Enrollment",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft",
+        "fixed_boilerplate"
+      ],
+      "minimum_evidence": [
+        "procedures.consent",
+        "procedures.enrollment",
+        "procedures.methods",
+        "procedures.assessment_details",
+        "procedures.assessments",
+        "procedures.visit_schedule_table",
+        "procedures.visit_schedule",
+        "procedures.staff_work_plan",
+        "study.timeline",
+        "procedures.completion",
+        "study.completion",
+        "procedures.study_termination",
+        "procedures.termination",
+        "procedures.retention",
+        "procedures.discontinuation",
+        "procedures.replacement",
+        "procedures.specimens",
+        "procedures.return_of_results"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [
+        {
+          "boilerplate_id": "retrospective-consent",
+          "text": "This retrospective study uses existing records.",
+          "sha256": "12ea7e7a93f29af8a2119703248c0aacb7345514dfda9e09a57fcf677daeed2a"
+        }
+      ],
+      "content_expectations": [
+        "Describe the approved record-review or enrollment sequence, time points, and timeline. State the supplied consent authorization, including an IRB-approved waiver when the approved source explicitly provides one. Preserve supplied retention, withdrawal, and replacement facts without implying that retrospective chart abstraction includes participant contact unless the source establishes it. Do not invent an IRB waiver or its timing.",
+        "Do not replace supplied detail with generic clinical prose.",
+        "This section owns supplied specimen handling and results-return policies. Preserve collection/coding, transfer recipients and access limits, testing purpose, specimen destruction timing and any absolute deadline, future-use/sharing/sale/commercial restrictions, and the distinction between specimen retention and derived-data retention. Distinguish individual clinical results, research/genetic results, incidental findings and aggregate summaries, including any limits, preferences, recipients and timing. Keep routine-care referral arrangements when supplied. Preserve uncertainty; absent optional policies remain absent. For records-only research, describe only the approved existing records/specimens and results policies without adding collection or participant contact.",
+        "This retrospective section owns the complete supplied record-abstraction methods and assessment details: instruments and scales, source restrictions, date anchors/windows, value selection and tie rules, ambiguous/missing values, event definitions, deduplication and evidence needed to establish zero or absence. Preserve every unique condition and exception here, with concise summaries elsewhere. Also explain supplied staff work phases, record and study completion triggers, and permission-suspension/resumption policies. These are staff tasks and historical windows, not participant visits. The retrospective template has no separate measurement section or assessment matrix; present these details as prose or lists within this section."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_items",
+      "evidence_scopes": [],
+      "approved_source_word_count": 807,
+      "reference_detail_target_words": 0,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [
+          "endpoint-measurement-methods",
+          "record-selection-methods",
+          "staff-work-plan",
+          "study-completion",
+          "access-suspension",
+          "specimen-handling",
+          "return-of-results"
+        ],
+        "brief_reference_only": [],
+        "do_not_restate": []
+      }
+    }
+  ],
+  "protocol_writing_plan": {
+    "sections": [
+      {
+        "section_id": "title-page",
+        "number": "1.",
+        "title": "TITLE PAGE"
+      },
+      {
+        "section_id": "investigator-agreement",
+        "number": "2.",
+        "title": "INVESTIGATOR AGREEMENT"
+      },
+      {
+        "section_id": "table-of-contents",
+        "number": "3.",
+        "title": "TABLE OF CONTENTS"
+      },
+      {
+        "section_id": "introduction",
+        "number": "4.",
+        "title": "INTRODUCTION"
+      },
+      {
+        "section_id": "objectives",
+        "number": "5.",
+        "title": "OBJECTIVE(S)"
+      },
+      {
+        "section_id": "subjects",
+        "number": "6.",
+        "title": "SUBJECTS"
+      },
+      {
+        "section_id": "subjects.population",
+        "number": "6.1.",
+        "title": "Subject Population"
+      },
+      {
+        "section_id": "subjects.eligibility",
+        "number": "6.2.",
+        "title": "Inclusion/Exclusion Criteria"
+      },
+      {
+        "section_id": "study-design",
+        "number": "7.",
+        "title": "STUDY DESIGN"
+      },
+      {
+        "section_id": "study-design.design",
+        "number": "7.1.",
+        "title": "Study Design"
+      },
+      {
+        "section_id": "study-design.bias",
+        "number": "7.2.",
+        "title": "Methods Used to Minimize Bias"
+      },
+      {
+        "section_id": "study-procedure",
+        "number": "8.",
+        "title": "STUDY PROCEDURE"
+      },
+      {
+        "section_id": "study-procedure.enrollment",
+        "number": "8.1.",
+        "title": "Informed Consent / Subject Enrollment"
+      },
+      {
+        "section_id": "analysis-plan",
+        "number": "9.",
+        "title": "ANALYSIS PLAN"
+      },
+      {
+        "section_id": "analysis-plan.datasets",
+        "number": "9.1.",
+        "title": "Analysis Data Sets"
+      },
+      {
+        "section_id": "analysis-plan.methodology",
+        "number": "9.2.",
+        "title": "Statistical Methodology"
+      },
+      {
+        "section_id": "analysis-plan.considerations",
+        "number": "9.3.",
+        "title": "General Statistical Considerations"
+      },
+      {
+        "section_id": "sample-size",
+        "number": "10.",
+        "title": "SAMPLE SIZE JUSTIFICATION"
+      },
+      {
+        "section_id": "confidentiality",
+        "number": "11.",
+        "title": "CONFIDENTIALITY/PUBLICATION OF THE STUDY"
+      },
+      {
+        "section_id": "quality-safety",
+        "number": "12.",
+        "title": "QUALITY COMPLAINTS AND ADVERSE EVENTS"
+      },
+      {
+        "section_id": "ethics",
+        "number": "13.",
+        "title": "GCP, ICH AND ETHICAL CONSIDERATIONS"
+      }
+    ],
+    "methods_owner": "study-procedure.enrollment",
+    "completion_owner": "study-procedure.enrollment",
+    "assessment_table_owner": null
+  },
+  "writing_examples": [],
+  "accepted_context": [],
+  "prior_target_drafts": [],
+  "findings": [],
+  "constraints": [
+    "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+    "Use only supplied approved evidence and applicable template/Fixed Clinical Boilerplate. Align shared population, groups, quantities, timing, procedures and outcomes across the Protocol, selected ICF and PRS narratives; preserve relationships and qualifications rather than copying wording.",
+    "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+    "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
+    "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
+    "Preserve supplied numbered citations next to the Protocol claims they support and their bibliography linkage. Do not invent citations; ICF explanations use plain language.",
+    "Return exactly one result for every requested section ID.",
+    "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
+    "Return structured section content, not a whole document or document markup.",
+    "Write to each section's purpose and ownership. Explain each operational rule fully in its owning section; elsewhere give only the fact needed for that section and a brief reference to the owning heading. Preserve necessary identifiers, endpoint definitions, quantities, timing anchors/windows, conditions, exceptions, safety information and client consent language. Compress repeated explanations, not clinical meaning.",
+    "Use participant-facing language for ICF sections.",
+    "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",
+    "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+    "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+    "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
+    "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+    "Use protocol_writing_plan for the active Protocol headings and method/completion owners. General Information is a compact synopsis; Objectives states purpose; Study Design owns comparisons and endpoints; Bias explains why controls matter. Place full operational rules in the named active methods_owner and completion rules in completion_owner, even when their heading differs by branch. Statistical Methodology owns calculations/models. Cross-reference only a heading listed in the plan. When assessment_table_owner is null, describe the historical windows and activities in prose or lists rather than claiming a matrix or columns are rendered.",
+    "Satisfy every section's content_expectations and cover every material value named by minimum_evidence. If the writing plan names an assessment_table_owner, its source-derived table and notes carry that inventory and adjacent prose only introduces it. Otherwise the active methods_owner carries the full historical assessment details in prose or lists.",
+    "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
+    "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+    "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+    "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+    "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+    "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays."
+  ],
+  "response_path": "hermes/responses/local-caps.draft.protocol-operations.draft.a1.5dc29078.json",
+  "generation_only_prompts": {
+    "profile": "n8n-with-brad-corrections/v1",
+    "source": {
+      "filename": "Form Fill Fillout -_ Generate Protocol + Send Gmail.json",
+      "sha256": "15b20d12597b6f0fc8829650771302fb9161d8718a96c1c631b93d0154b55b1a"
+    },
+    "prompts": [],
+    "current_instruction_targets": [
+      "study-procedure.enrollment"
+    ],
+    "editorial_corrections": {},
+    "consent_template_comments": [],
+    "adapter_instructions": [
+      "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
+      "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
+      "A list group may contain a nonempty label alongside items. That label renders as an unbulleted paragraph immediately before the group's items; use it to separate endpoint categories without turning introductions into bullets.",
+      "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
+      "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
+      "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
+      "Use protocol_writing_plan and the current section ownership instructions to tighten the retained prompts: keep Protocol synopses brief, explain each operational rule fully in its owning section and use brief heading references elsewhere. Endpoint definitions and analysis calculations remain complete where needed; ICF explanations remain self-contained for participants. Preserve every material quantity, window, exception and safety qualification.",
+      "Write final study prose, not commentary about drafting. Translate source directions into the applicable study fact: for example, 'Day 30 ratings are descriptive only' rather than an explanation about inventing registry outcomes. Omit empty category labels when no endpoint belongs to that category.",
+      "For evaluation-procedures, inspect the supplied assessment_presentation notes against the approved table. When an edit is needed, return the existing source_text/display_text/rationale shape to retain unique information without repeating the matrix. This is part of drafting, not a separate review task.",
+      "For ICF requests also follow consent_template_comments. Assess applicability from the approved source and selected family, preserving supplied conditions and existing family-owned sections. Template comments do not establish new study facts or authorization.",
+      "Use only the approved comparator, endpoints, visits, risks, benefits, statistical methods and regulatory facts. Omit legacy defaults that invent placebo, standard-of-care comparators, extra outcomes, inferred side-effect lists, dates or significance levels.",
+      "For current_instruction_targets, draft study-specific content from the approved source and current section instructions, retaining applicable fixed client language.",
+      "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses."
+    ]
+  },
+  "request_sha256": "479695c8d60e2a2fc2e960ce39d0f5621c09d0e9919c977a38e8306f189b5e11"
+}

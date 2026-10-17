@@ -1,0 +1,145 @@
+CAPS-27-08 STUDY SYNOPSIS AND OPERATIONAL SUPPLEMENT
+Version 1.0 | 17 October 2026
+
+DOCUMENTS AND STATUS
+Prepare only a retrospective protocol DOCX. No ICF or study XML is requested.
+Prepare a fresh Source of Truth for owner approval first. Research has not been
+submitted to the IRB. Waivers of consent and privacy authorization will be
+requested, but neither waiver nor approval has been granted. No approval number
+or date exists. Required ethics/privacy decisions and written site permission
+must precede research access. No patient recontact is authorized.
+
+IDENTIFICATION AND PURPOSE
+Protocol number: CAPS-27-08.
+Full title: Recorded Vision After Routine Laser Capsulotomy.
+Short title: Vision After Laser Capsulotomy.
+Study type: Retrospective. Classification: Observational cohort.
+Condition: Posterior capsule opacification after cataract surgery.
+One United States site; one records-based cohort. The laser procedures and all
+clinical care occurred independently of this research. No product, treatment,
+procedure or visit is assigned. No randomization, masking, placebo or
+investigational product is involved.
+Background: Routine records may describe vision after laser capsulotomy, but
+measurement availability and methods vary. The clinic lacks a summary that
+preserves missingness and distinguishes people from treated eyes. No bibliography
+or previous effect estimate is supplied.
+Primary objective: Describe recorded study-eye distance visual-acuity change
+from the selected historical baseline to the historical Day 42 window.
+Secondary objective: Describe recorded early pressure elevations in that eye.
+No comparative treatment hypothesis or exploratory endpoint is proposed.
+
+POPULATION, INDEX AND HISTORICAL PERIOD
+Include all eligible records, anticipated to represent 150 unique people.
+Age 50 through 90 inclusive at the first eligible procedure. All sexes eligible;
+healthy volunteers: No. Sample consecutive eligible ordinary-care records.
+Index laser capsulotomy dates: 1 January through 31 August 2025 inclusive.
+Historical records: 2 December 2024 through 31 December 2025 inclusive.
+Historical Day 0 is the selected eye's index laser date, not research enrollment.
+Inclusion: clinician-documented posterior capsule opacification, routine laser
+capsulotomy at this site in the index period, reliably identifiable person,
+procedure date and treated eye, age within range, and records accessible under
+required permissions. Exclude an eye if its laser was part of an interventional
+research protocol or if eye/date cannot be verified. If no eligible eye remains,
+exclude the person. Other eye disease is recorded context, not an automatic
+exclusion. Missing baseline, follow-up or pressure values affect only the relevant
+analysis, not cohort eligibility.
+Use one study eye per person: the eye with the earliest eligible laser procedure;
+if both eligible eyes were treated on the same date, select the right eye.
+Deduplicate patient records before coding. Keep this eye for every endpoint;
+never switch eyes to replace a missing value. Count people once, not procedures
+or eyes. There is no screening washout or restriction on other-study participation.
+Pregnancy status is not collected and creates no restriction. No children.
+The 150-person sample is a feasibility estimate for all eligible records, with
+no formal power calculation, assumed effect size or prospective attrition rate.
+
+METHODS AND OUTCOMES
+After permissions, staff verify eligibility and index selection and abstract
+age at procedure, sex, treated eye, index date, recorded ocular diagnoses,
+visual-acuity values with correction status/date/method, and pressure values
+with date/method. Original records stay at the clinic.
+For acuity, use only distance visual acuity explicitly recorded in logMAR with
+habitual distance correction. Do not convert Snellen values, infer correction
+status or substitute near, uncorrected or fellow-eye acuity.
+Baseline: latest eligible value during Days -30 through -1 before index.
+Same-day procedure measurements are not eligible baseline values. If there are
+multiple eligible measurements on the latest date, use the last time-stamped
+value. If time does not resolve the choice, classify baseline as ambiguous/missing.
+Follow-up: eligible value closest to Day 42 within Days 28 through 70 after index.
+If dates are equally distant, select the earlier date. On the selected date,
+use the last time-stamped eligible value; unresolved multiple values are
+ambiguous/missing. Do not widen windows or choose a more favorable result.
+Primary endpoint: follow-up minus baseline logMAR in the fixed study eye.
+Negative change means better recorded acuity; positive change means worse acuity.
+Use people with both selected values; report contributing people, mean change,
+standard deviation, 95% confidence interval, median and range. This observational
+change is not proof of a laser treatment effect.
+Secondary endpoint: proportion with at least one recorded study-eye pressure
+of 25 mmHg or higher during historical Days 1 through 7. Denominator: people
+with at least one pressure measurement in that eye/window. Use all available
+values in the window and count each person at most once, regardless of the
+number of qualifying readings. No pressure record means missing, not no elevation.
+Retain the recorded pressure method and treatment context; do not describe the
+values as an untreated trajectory. No secondary pressure change endpoint.
+Use available data without imputation. Report missing, ambiguous and unavailable
+measurement types separately, with explicit endpoint denominators. No paired-eye
+model, adjusted subgroup model, confirmatory significance claim or invented
+exploratory outcome is authorized. Selection, measurement and attendance biases
+limit interpretation.
+The historical windows identify existing records, not scheduled research visits.
+No new acuity or pressure test, questionnaire, phone call, clinic visit, imaging
+review, specimen collection, genetic test or participant contact occurs.
+
+STAFF WORK, COMPLETION AND PERMISSIONS
+November 2026: obtain required decisions/site permission, verify eligibility,
+deduplicate and identify study eyes. December 2026 through January 2027: abstract
+records. February 2027: resolve permitted source queries and lock the coded data.
+March through April 2027: analyze and prepare aggregate findings. Administrative
+closeout and archiving end on 31 May 2027. These are staff tasks, not prospective
+clinical collection or recruitment phases; the historical period stays fixed.
+A record is complete when extraction and permitted queries are resolved, including
+explicit missing/ambiguous codes. Study completion requires dataset lock and
+completion of the planned analyses and aggregate report. Archiving follows.
+If access permission is withdrawn, suspend research access immediately. Resume
+only after documented authorization is restored. If that is impossible, stop
+further abstraction, preserve records as required and report available data and
+limitations. No patient recontact, new test or replacement eye may fill gaps.
+
+PRIVACY, RISKS, BENEFITS AND COSTS
+Only authorized site research staff access identifiers for eligibility and
+linkage on the clinic's encrypted access-controlled drive. Keep the study-ID key
+separately. Analysts and sponsor receive study ID, age at index, relative-day
+intervals and coded clinical data, without names, contact details, birth dates,
+exact clinical dates or the identity key. Exact dates remain in restricted source
+records. Authorized monitors, IRB and legally authorized oversight bodies may
+inspect relevant originals under applicable permissions.
+Publish aggregate findings only; suppress cells below five and complementary
+cells that would reveal a suppressed count. No individual-level public dataset,
+identifying case report, sale or unrelated future research is planned.
+Retain research data, keys, permissions and abstraction logs for six years after
+31 May 2027 closeout; then destroy research copies unless a binding requirement
+requires longer. Original clinical records follow the clinic's separate policy
+and are not destroyed by this study.
+Risk is loss of confidentiality, mitigated by restricted access, separate keys
+and aggregate reporting. There is no new physical research risk, direct benefit,
+participant payment, reimbursement or new clinical charge. Sponsor funds staff
+work and analysis. No new injury-treatment or insurance promise is established.
+Suspected privacy incidents are handled by the PI under site policy and required
+ethics/privacy reporting arrangements; no reporting-hour deadline is supplied.
+There is no participant consent signature or prospective withdrawal visit under
+the requested waiver. Site privacy requests follow applicable permissions, with
+no promise to reverse already deidentified aggregate findings.
+
+PARTIES AND CONTACTS
+Sponsor: Elmstead Clinical Records Research, 1550 Research Lane, Suite 200,
+Madison, WI 53703, United States. Sponsor contact: Parker Lane, Research Director,
++1 202-555-0120, parker.lane@example.org.
+PI/site investigator: Dr. Arden Cole, MD, Principal Investigator.
+Coordinator: Quinn Harper, CCRC, Records Study Coordinator. Business phone
++1 202-555-0121; office phone +1 202-555-0122; quinn.harper@example.org.
+Site: Elmstead Ophthalmology Clinic, 920 Clinic Way, Suite 100, Madison,
+WI 53704, United States. Coordinator mailing address is the site address.
+Coordinator hours: Monday through Friday, 9 a.m. to 5 p.m. local time, not an
+emergency service. Number of sites: 1.
+IRB: Elmstead Independent Research Review Board, independent of sponsor/clinic,
+610 Review Street, Suite 300, Madison, WI 53705, United States;
++1 202-555-0123, research.rights.elmstead@example.org.

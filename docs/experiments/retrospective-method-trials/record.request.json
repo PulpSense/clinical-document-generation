@@ -1,0 +1,2416 @@
+{
+  "schema_version": "hermes-request/v2",
+  "request_id": "local-record.draft.protocol-operations.draft.a1.cbb59a8d",
+  "revision_id": "local-record",
+  "task": "section_drafting",
+  "wave": "draft",
+  "batch_id": "protocol-operations",
+  "artifact": "protocol",
+  "branch": {
+    "study_type": "Retrospective",
+    "icf_template": null
+  },
+  "topology_version": "clinical-drafting-v1",
+  "prompt_version": "section-drafting-v32-active-section-ownership",
+  "governing_resources": {
+    "approved_source_sha256": "33b51d637fb1032a92680bb9d5c90f652b827f597b8dcdf66362b15eb8a8056a",
+    "source_evidence_coverage_map": {
+      "schema_version": "source-evidence-coverage-map/v1",
+      "study_type": "Retrospective",
+      "icf_template": null,
+      "entries": [
+        {
+          "source_path": "confidentiality.data_handling",
+          "approved_value_sha256": "d3c2e64d5ca3baed9c5c23399ecc72344420efcb97dc8896d98a4f5bc32b611f",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.arms",
+          "approved_value_sha256": "36339eb14dd6a1f7b4b66a0f62ac2ab548da090dcaed507a8ddf797b8f542bfd",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.masking",
+          "approved_value_sha256": "f59fe5f0e125bd7055df6024f1404a123801a355ebea9bbf4f77de6102a78d0e",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.study_design",
+          "approved_value_sha256": "359edaedf5e149899e2c9f08fc4dd2a95a137c2a4448f7f57abc2828a55306af",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.bias",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.primary",
+          "approved_value_sha256": "478cccbfd5fea628a6bc09db851745fc2edc81cc6f7f5c2b584055f65e39f200",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.secondary",
+          "approved_value_sha256": "6212ec53ea392b4fa889600c86cf1d0ad6611779283a9ca220a750e6b41611db",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "ethics",
+          "approved_value_sha256": "d9efcf4f56eccb2ceca6a03bba05870de5470ad91746e06817988f22b185989c",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.primary",
+          "approved_value_sha256": "229493cd89ea6af79bc16d252385111d18f722bc32db9ea5929f8199f29804bf",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.secondary",
+          "approved_value_sha256": "2bc574f617bb853c4ea4c979fe7850d70d8b03ddfbf80735ee17c9eb64e35032",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "parties.irb",
+          "approved_value_sha256": "ca048867aa4e300abe414457e224dfb0d6f97553802d9d720e718178c5aa6889",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.eligibility_notes",
+          "approved_value_sha256": "d64e4698a1e78167cec9d605fb6a59b660c6009bfc4fc27354db2320b45226d9",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.exclusion_criteria",
+          "approved_value_sha256": "9e260ac4916cb99a3c25ae4aa9b27458ae8abbe979314bd3704ef8c4a0df6fa7",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.inclusion_criteria",
+          "approved_value_sha256": "05d820c0d1beb4fb8b5d8e4ba9a0f4df0c21a0989f8671ec9d8cffe0858adad6",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.maximum_age",
+          "approved_value_sha256": "aeb95e01cc8dd41968bfe5a2e4e8d3b9170e12d66104ef0331de78c272e72eaa",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.minimum_age",
+          "approved_value_sha256": "1a7b78bfa06e7859645e38eacf0cfc3aaa156a52f5337df1e1960d65aedc71a3",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_justification",
+          "approved_value_sha256": "835f538683244fc1d36592c928117017088d007c8bdbe0b10780a94ac54262d9",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_size",
+          "approved_value_sha256": "0907b1f50b44ffdc490e3917fad5bb4b4752d30a29df3178853a36a7d7d6cc0e",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.study_population",
+          "approved_value_sha256": "52d6fdcc63efad329f61ef48d29d9b49356e56a5233b6b670851046d57ad01de",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessment_details",
+          "approved_value_sha256": "9230619720b46b6e2c27a7a011a31873721d1b471d095d391ce10d91ba6c8225",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessments",
+          "approved_value_sha256": "453fcc551b3a3004c8e46d16f8eb0fb89f0f86397ec38f22e3784494f5f2a125",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.completion",
+          "approved_value_sha256": "8e02f8b1fd144d24e0822b04024c180cf42a534d69662ef07c5dcfa2012e4c02",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.consent",
+          "approved_value_sha256": "8f86391ba020a11dfd42ea68d193db16987e2ed34fd46a53755a5add5919908b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.discontinuation",
+          "approved_value_sha256": "8193ff5d2788fd5a439d3dd6913dd68436f30acf7607f3d1368c2137af953418",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.enrollment",
+          "approved_value_sha256": "24abb35b645a96a747d686b36b8393ddce8962e643d1b97c0818ceb86deb2b5d",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.methods",
+          "approved_value_sha256": "63e4faf265d44bacaa0c3a87b46131dde178a476b5e279c77d0cf6c728bb28be",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.minimum_days_before_screening_without_participation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.replacement",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.retention",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.return_of_results",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.specimens",
+          "approved_value_sha256": "71a7cd8523103fa5ddfb3b8a7b8674ba44df4fc9d4db27e48e5fdb324a240ea6",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.staff_work_plan",
+          "approved_value_sha256": "0aec2170bdbdd514d6a59b988d849e0911164bd69ededeff0ff269b0d3316464",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.study_termination",
+          "approved_value_sha256": "01b033fac7aee4e6c73aa8cc7fa272b3ca3573d3b153f33dde198f9e9eea8c78",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.termination",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule",
+          "approved_value_sha256": "82802d01a0ce4db8632b484f241de5d9426f40a128588cb94b96d64b9ff57c8d",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule_table",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.benefits",
+          "approved_value_sha256": "cd043629ff815e7720b87a6f386cba0b52918c43f9ebdc4c0053a80aff89d091",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.compensation_or_reimbursement",
+          "approved_value_sha256": "5374dbb6ca7849e9f771cbaae3c60e3559ec20562d8f09126be7a809ecf8a21b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.injury_handling",
+          "approved_value_sha256": "fd6ff3b4ae93faec45380d9802637634bb2cda456bcf767e73e468b608d3ae28",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.privacy",
+          "approved_value_sha256": "c8185c3e43ece1fa5157491772e365021d783a0bd3fa3108126584c700c3eb1c",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.risks",
+          "approved_value_sha256": "dfb59ab7c13852bb63279e5bb7d1c9bbc1e841b0d56c0490eed52d519e078254",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "safety.roles",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.analysis_plan",
+          "approved_value_sha256": "a5c1f4024f2123987497d7aa7b9bc486491733bb96b7f532a210442d1a114033",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.datasets",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.bias_minimization",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.bias",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.methodology",
+          "approved_value_sha256": "3b9f0b283ac7d443d195345a530c810b4b3dacdfea7639f54b3104fefee58898",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.software",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.background",
+          "approved_value_sha256": "5d3fb5ff3219a1c45dad594a81a1291e84620f3dc8983ecfc7d4cb764c9e335c",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.completion",
+          "approved_value_sha256": "8e02f8b1fd144d24e0822b04024c180cf42a534d69662ef07c5dcfa2012e4c02",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.hypothesis",
+          "approved_value_sha256": "3ac6fa219a09ddc207c9dd13cb7ad80201ce2531d9b27d9bb8d139ce34ced3b1",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.references",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.timeline",
+          "approved_value_sha256": "489c08f447b42fe8b10e7bad0f0e6e5aa986c92a97d0b84a3845e7525d16c6fd",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.title",
+          "approved_value_sha256": "df36b9c5acb60db790793bcd5047c7394301ea23687610c99735bdb85266ecb7",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.unmet_need",
+          "approved_value_sha256": "4cc464d2431d87fe65b97fd33bba2ae3764ff00bcc653ca3a1908b587d4cd362",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            }
+          ]
+        }
+      ]
+    },
+    "contracted_template_bundle": {
+      "schema_version": "contracted-template-bundle/v2",
+      "selection": {
+        "study_type": "Retrospective",
+        "icf_family": null
+      },
+      "contracted_templates": {
+        "protocol": {
+          "path": "assets/client-templates/docx/retrospective-protocol.template.docx",
+          "sha256": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e"
+        }
+      },
+      "client_template_authorities": {
+        "protocol": {
+          "path": "assets/client-templates/reference/protocol-reference.docx",
+          "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+        }
+      },
+      "document_section_contract": {
+        "version": "clinical-documents-v2.52-retrospective-method-ownership",
+        "sha256": "68217443f38f50daa8f6c0c13b310dfdd7e70c90305a75db2a44d337ce9c9e06"
+      },
+      "fixed_clinical_boilerplate": {
+        "version": "clinical-boilerplate-v14",
+        "path": "references/fixed-clinical-boilerplate.json",
+        "sha256": "54c99f136eef6596fb697a5c84a01b639f00adba443144e9fda823221028c5b6"
+      },
+      "drafting_examples": {
+        "path": "references/drafting-examples.json",
+        "sha256": "04dceabdfaac70b0bd2f4da89c0e54132d3ede262fe7c25edeafed9c267d112b"
+      },
+      "sterling_clause_contract": null,
+      "approved_font_plan": {
+        "version": "approved-font-plan/v1",
+        "available_font_policy": "preserve",
+        "missing_font_policy": "approved_packaged_substitute",
+        "unknown_inventory_policy": "preserve_then_resolve_by_smoke_render",
+        "approved_fallbacks": {
+          "aptos": "Liberation Sans",
+          "arial": "Liberation Sans",
+          "arial unicode ms": "Liberation Sans",
+          "calibri": "Liberation Sans",
+          "courier new": "Liberation Mono",
+          "dejavu sans": "Liberation Sans",
+          "helvetica": "Liberation Sans",
+          "noto sans": "Liberation Sans",
+          "noto sans symbols": "Liberation Sans",
+          "segoe ui symbol": "Liberation Sans",
+          "symbol": "Liberation Sans",
+          "times new roman": "Liberation Serif",
+          "verdana": "Liberation Sans"
+        },
+        "packaged_families": {
+          "Liberation Mono": "LiberationMono-Regular.ttf",
+          "Liberation Sans": "LiberationSans-Regular.ttf",
+          "Liberation Serif": "LiberationSerif-Regular.ttf"
+        },
+        "packaged_font_assets": {
+          "assets/fallback-fonts/LiberationMono-Bold.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-Bold.ttf",
+            "sha256": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb"
+          },
+          "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-BoldItalic.ttf",
+            "sha256": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130"
+          },
+          "assets/fallback-fonts/LiberationMono-Italic.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-Italic.ttf",
+            "sha256": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1"
+          },
+          "assets/fallback-fonts/LiberationMono-Regular.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-Regular.ttf",
+            "sha256": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1"
+          },
+          "assets/fallback-fonts/LiberationSans-Bold.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-Bold.ttf",
+            "sha256": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173"
+          },
+          "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-BoldItalic.ttf",
+            "sha256": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee"
+          },
+          "assets/fallback-fonts/LiberationSans-Italic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-Italic.ttf",
+            "sha256": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0"
+          },
+          "assets/fallback-fonts/LiberationSans-Regular.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-Regular.ttf",
+            "sha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8"
+          },
+          "assets/fallback-fonts/LiberationSerif-Bold.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-Bold.ttf",
+            "sha256": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce"
+          },
+          "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf",
+            "sha256": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7"
+          },
+          "assets/fallback-fonts/LiberationSerif-Italic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-Italic.ttf",
+            "sha256": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e"
+          },
+          "assets/fallback-fonts/LiberationSerif-Regular.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-Regular.ttf",
+            "sha256": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74"
+          }
+        },
+        "sha256": "4a4fa12e026266c53b3e16a62033195b480b86395b158ae7f39a778e6c32f3d1"
+      },
+      "layout_preservation_baseline": {
+        "schema_version": "layout-preservation-baseline/v1",
+        "artifacts": {
+          "protocol": {
+            "contracted_template": {
+              "path": "assets/client-templates/docx/retrospective-protocol.template.docx",
+              "sha256": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e"
+            },
+            "client_template_authority": {
+              "path": "assets/client-templates/reference/protocol-reference.docx",
+              "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+            }
+          }
+        },
+        "sha256": "31e813f49d9f8fbc6c626497bc7f31d6d6e52024a85f3e96a958c7d6a448457e"
+      },
+      "prs_authority": null,
+      "resource_hashes": {
+        "assets/client-templates/docx/retrospective-protocol.template.docx": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e",
+        "assets/client-templates/reference/protocol-reference.docx": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b",
+        "assets/fallback-fonts/LiberationMono-Bold.ttf": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb",
+        "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130",
+        "assets/fallback-fonts/LiberationMono-Italic.ttf": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1",
+        "assets/fallback-fonts/LiberationMono-Regular.ttf": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1",
+        "assets/fallback-fonts/LiberationSans-Bold.ttf": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173",
+        "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee",
+        "assets/fallback-fonts/LiberationSans-Italic.ttf": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0",
+        "assets/fallback-fonts/LiberationSans-Regular.ttf": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8",
+        "assets/fallback-fonts/LiberationSerif-Bold.ttf": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce",
+        "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7",
+        "assets/fallback-fonts/LiberationSerif-Italic.ttf": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e",
+        "assets/fallback-fonts/LiberationSerif-Regular.ttf": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74",
+        "references/drafting-examples.json": "04dceabdfaac70b0bd2f4da89c0e54132d3ede262fe7c25edeafed9c267d112b",
+        "references/fixed-clinical-boilerplate.json": "54c99f136eef6596fb697a5c84a01b639f00adba443144e9fda823221028c5b6"
+      },
+      "identity_sha256": "581960305bc0a7567235554cffa8806bfb8bc42603dcde38fc8345150b4fe30a"
+    },
+    "implementation_sha256": {
+      "scripts/contracts.py": "4a201d151f770d2f8a7a803d3ad2b63ce163530e9a575adb53ac251836c93be7",
+      "scripts/drafting.py": "9c4e3477a7a73441f70a24dfc83de89454c92acb9159e611c4e3aed19b51cb5b",
+      "scripts/prs_xml.py": "1aad04586410b2f177bc616d7747431b5145795fb014a330827cb560c01adc03",
+      "scripts/rendering.py": "b436a871e87abefa0d5bfda0555996bf15e9fe02c8d6a57a28ec5c0fea7502b9",
+      "scripts/workflow.py": "eef4c882a96780e481fa7d90fc3b6e0fd51a2cf4da23c6152cf0d4184842e09c",
+      "scripts/output_recovery.py": "c7e46b9885bb3a8c117af4afda77e2e126f0b12a45c6e58ab4037a84173b0b41"
+    },
+    "topology_version": "clinical-drafting-v1",
+    "prompt_version": "section-drafting-v32-active-section-ownership",
+    "producer_policy": "nonempty-model-id",
+    "generation_only_prompts_sha256": "2114b96a474b288208b62e0031a8c2b665387969e6be89af0f8c355493419181"
+  },
+  "attempts": {
+    "study-procedure.enrollment": 1
+  },
+  "approved_input": [
+    {
+      "path": "design.study_design",
+      "value": "Study type: Retrospective. Classification: Observational cohort. Time perspective: Retrospective. Number of sites: 1, in the United States. Condition: Clinician-documented dry eye disease. The study reviews existing routine-care records. It assigns no treatment, product, procedure or care schedule. There is no randomization, masking, placebo, investigational product, prospective enrollment or participant contact. One records-based cohort; no assigned arms or comparison product. The index event is the person's first qualifying routine-care dry eye management encounter in the index period. Different ordinary-care choices are recorded characteristics, not research assignments or evidence of treatment efficacy.",
+      "sha256": "359edaedf5e149899e2c9f08fc4dd2a95a137c2a4448f7f57abc2828a55306af"
+    },
+    {
+      "path": "design.study_design_summary",
+      "value": "Single-site retrospective observational review of existing ordinary-care records in one person-level cohort; no treatment assignment, contact, enrollment, new visits or comparison product.",
+      "sha256": "f06c38e9071e659e9a86a6854ace477b245ed0caf1373d5ee1da3d68dc404851"
+    },
+    {
+      "path": "design.number_of_sites",
+      "value": "1",
+      "sha256": "391552c099c101b131feaf24c5795a6a15bc8ec82015424e0d2b4274a369a0bf"
+    },
+    {
+      "path": "design.masking",
+      "value": "None; no masking.",
+      "sha256": "f59fe5f0e125bd7055df6024f1404a123801a355ebea9bbf4f77de6102a78d0e"
+    },
+    {
+      "path": "design.arms",
+      "value": [
+        {
+          "description": "One records-based cohort of all eligible unique adults; anticipate 180 persons. No assigned arms or comparison product; ordinary-care choices are recorded characteristics, not research assignments.",
+          "name": "Ordinary-care record cohort"
+        }
+      ],
+      "sha256": "04e8813b3cd28f58887c2b0b3da9f6337d0429ee7ed1016dac1e347d7f659a9d"
+    },
+    {
+      "path": "design.controls",
+      "value": "No assigned comparison product or placebo.",
+      "sha256": "9fe0b771afbabe5bd034d26a48365f15bcc057f8109d41c7dd62da18ae46d8cd"
+    },
+    {
+      "path": "design.intervention_description",
+      "value": "No assigned treatment, product, procedure or care schedule; ordinary care is unaffected.",
+      "sha256": "32d0b1971d7cdfa5bf0ad827e89c0264ba5b820aea5db3caf967db957e44bf2e"
+    },
+    {
+      "path": "design.data_sources",
+      "value": "Index encounters: 1 January 2024 through 30 September 2025 inclusive. Accessible historical record period: 18 December 2023 through 31 December 2025 inclusive. This covers the baseline and follow-up windows for all index dates. Historical Day 0 is the index ordinary-care encounter, not research enrollment. Baseline selection window: Days -14 through 0 relative to that encounter. Historical Day 60 outcome selection window: Days 45 through 90 after index. Care-change observation window: Days 1 through 90 after index. These are record-selection windows, not scheduled visits or a requirement for people to attend at those times. All clinical data predate research abstraction. Staff will not contact people or arrange new care to fill gaps.",
+      "sha256": "87f584ee0cd088d5b66483c4008beac5a6675264f0166e16034ee5aac3389ade"
+    },
+    {
+      "path": "endpoints.primary",
+      "value": [
+        {
+          "analysis_method": "Include people with both selected scores. Report the contributing number of people, mean change, standard deviation, 95% confidence interval, median and range.",
+          "description": "Primary outcome: Recorded symptom-score change, follow-up minus baseline, on 0–100, using the selected baseline and Days 45–90 score. Negative change means symptom reduction; positive change means worsening. Include people with both selected scores. Report the contributing number of people, mean change, standard deviation, 95% confidence interval, median and range.",
+          "label": "Recorded symptom-score change (follow-up minus baseline)",
+          "time_frame": "Selected baseline Days -14 through 0 and historical Day 60 selection window Days 45 through 90 after the index ordinary-care encounter."
+        }
+      ],
+      "sha256": "fa8718f52bf55f11372f90163d18204b751f2b377ab402337a8819450884e2ef"
+    },
+    {
+      "path": "endpoints.secondary",
+      "value": [
+        {
+          "analysis_method": "Denominator: people with both selected scores; numerator: change <= -20. Descriptive threshold only, not a validated responder definition.",
+          "description": "Secondary outcome 1: Proportion with at least a 20-point decrease in the same score. Denominator: people with both selected scores; numerator: change <= -20. This is a supplied descriptive threshold, not a validated responder definition or a guarantee of meaningful clinical benefit.",
+          "label": "Proportion with at least a 20-point recorded symptom-score decrease",
+          "time_frame": "Baseline Days -14 through 0 to historical follow-up Days 45 through 90 after index."
+        },
+        {
+          "analysis_method": "Use people with sufficient care documentation; report denominator explicitly. Report supported zero counts and unknown status separately; use the supplied event and deduplication rules.",
+          "description": "Secondary outcome 2: Number of documented clinician-directed dry eye care changes per person on Days 1–90 after index. Report counts using the stated event rules. Report separately those with a supported zero count and those whose care-change status is unknown. Use people with sufficient care documentation as the analysis denominator; report that denominator explicitly.",
+          "label": "Documented clinician-directed dry eye care changes per person",
+          "time_frame": "Historical Days 1 through 90 after index."
+        }
+      ],
+      "sha256": "7873165b90ad37a6cddeb864e6bc6a67ce7c2eed5f0c6871ea1519b4e4be968c"
+    },
+    {
+      "path": "endpoints.other",
+      "value": [
+        {
+          "analysis_method": "Linear model adjusted for baseline symptom score and age; wearer-minus-nonwearer adjusted difference and 95% confidence interval. Unknown status excluded from comparison, retained in cohort summaries.",
+          "description": "Exploratory outcome: Association of index contact-lens status with paired symptom change. Compare documented wearers and documented nonwearers using a linear model adjusted for baseline symptom score and age. Report the wearer-minus-nonwearer adjusted difference with a 95% confidence interval. A positive difference means less symptom reduction or more worsening among documented wearers, not proof of harm from lenses. Unknown status remains in cohort summaries but is excluded from this comparison; report its count and reason.",
+          "label": "Exploratory association of documented index contact-lens status with paired symptom change",
+          "time_frame": "Contact-lens status at index; selected baseline Days -14 through 0 and historical follow-up Days 45 through 90."
+        }
+      ],
+      "sha256": "2016b782f27dad2a09804aedc652b88e443628f60bcd4ea55df4ee65f5cf58f7"
+    },
+    {
+      "path": "population.study_population",
+      "value": "Include all eligible records; anticipate 180 unique adults at the single site. The person is the enrollment and analysis unit. The symptom rating concerns both eyes together; no eye-level cohort, separate-eye outcome or paired-eye model is specified. Multiple encounters for one person do not create new participants. Age: 18 through 85 years inclusive at the index encounter. All sexes eligible. Healthy volunteers: No. Sampling: Consecutive eligible records in the fixed period.",
+      "sha256": "52d6fdcc63efad329f61ef48d29d9b49356e56a5233b6b670851046d57ad01de"
+    },
+    {
+      "path": "population.sample_size",
+      "value": "180",
+      "sha256": "0907b1f50b44ffdc490e3917fad5bb4b4752d30a29df3178853a36a7d7d6cc0e"
+    },
+    {
+      "path": "population.sampling_method",
+      "value": "Consecutive eligible records in the fixed period; include all eligible records.",
+      "sha256": "0d035ccc9e7d99b8391652cb07c4c6d50c4b0c9ec0a8eb3e41d1397b837b3cff"
+    },
+    {
+      "path": "population.minimum_age",
+      "value": "18 Years",
+      "sha256": "1a7b78bfa06e7859645e38eacf0cfc3aaa156a52f5337df1e1960d65aedc71a3"
+    },
+    {
+      "path": "population.maximum_age",
+      "value": "85 Years",
+      "sha256": "aeb95e01cc8dd41968bfe5a2e4e8d3b9170e12d66104ef0331de78c272e72eaa"
+    },
+    {
+      "path": "population.sex",
+      "value": "All",
+      "sha256": "663175a9c461a96d6f0252fc22dbb8ed4951e7a6fc0e31546823bcc69d6021d1"
+    },
+    {
+      "path": "population.healthy_volunteers",
+      "value": "No",
+      "sha256": "b2cbc4e2e5545a6c43f6f8cc8f0e4766773fa6c83d238076313b6fa1e349caf6"
+    },
+    {
+      "path": "population.inclusion_criteria",
+      "value": [
+        "Age 18 through 85 at index.",
+        "Clinician-documented dry eye disease.",
+        "A routine-care encounter during the index period documenting a dry eye care plan, including an explicitly documented decision to continue existing care.",
+        "Accessible records identifying the person and index date reliably.",
+        "Access authorized by the site and required ethics/privacy decisions."
+      ],
+      "sha256": "939eb60fd0fdbe286d74ba7ff614e9d5b0815e1da21da274487ca366fbb31554"
+    },
+    {
+      "path": "population.exclusion_criteria",
+      "value": [
+        "The person or index date cannot be reliably established after source verification.",
+        "The putative index encounter was part of an interventional research protocol, rather than ordinary clinical care."
+      ],
+      "sha256": "aa80ec384ed7854d54478cbd20651606f88fac59decdc0252d59444d8e8e9dda"
+    },
+    {
+      "path": "population.eligibility_notes",
+      "value": [
+        "The person is the enrollment and analysis unit. The symptom rating concerns both eyes together; no eye-level cohort, separate-eye outcome or paired-eye model is specified. Multiple encounters for one person do not create new participants.",
+        "Use only the first qualifying index encounter per person. Deduplicate records using the clinic's patient identifier before assigning a study ID.",
+        "Missing symptom scores, uncertain contact-lens status and incomplete subsequent care documentation do not exclude an otherwise eligible person. They affect only the relevant analysis denominator. Prior surgery, medication use and ordinary-care changes are recorded characteristics, not automatic exclusions. There is no research screening, nonparticipation interval, washout or restriction on other research participation. Pregnancy status is not collected and creates no eligibility restriction. No child records are included."
+      ],
+      "sha256": "d8066d9d5af9a990e669a24f4067c244ab74e34a3fecfe443d6e9e2eecef0d37"
+    },
+    {
+      "path": "population.sample_justification",
+      "value": "Sample justification: All eligible records in the fixed index period constitute the sample; 180 people is a feasibility estimate. Report actual counts and exclusions. There is no formal power calculation, assumed effect size, recruitment quota or prospective loss-to-follow-up allowance.",
+      "sha256": "835f538683244fc1d36592c928117017088d007c8bdbe0b10780a94ac54262d9"
+    },
+    {
+      "path": "procedures.consent",
+      "value": "Request waivers of informed consent and privacy authorization for the records-only review. The application will describe privacy protections and the burden and selection bias of recontacting former clinic patients. No waiver or approval is currently granted. If permissions are not granted, the investigator must obtain an authorized revised study plan before research access; this document does not authorize a switch to contacting patients.",
+      "sha256": "8f86391ba020a11dfd42ea68d193db16987e2ed34fd46a53755a5add5919908b"
+    },
+    {
+      "path": "procedures.enrollment",
+      "value": "No prospective enrollment, recruitment, participant contact or research screening. Person-level records are identified only after required permissions; use the first qualifying index encounter per person and deduplicate before study ID assignment.",
+      "sha256": "24abb35b645a96a747d686b36b8393ddce8962e643d1b97c0818ceb86deb2b5d"
+    },
+    {
+      "path": "procedures.assessments",
+      "value": [
+        "Historical Day 0 is the index ordinary-care encounter, not research enrollment. Baseline selection window: Days -14 through 0 relative to that encounter. Historical Day 60 outcome selection window: Days 45 through 90 after index. Care-change observation window: Days 1 through 90 after index. These are record-selection windows, not scheduled visits or a requirement for people to attend at those times. All clinical data predate research abstraction. Staff will not contact people or arrange new care to fill gaps.",
+        "No new examination, pressure or vision test, questionnaire, telephone call, clinic visit, specimen collection, genetic test or imaging re-reading is performed. There is no specimen transfer, storage, banking or future specimen use."
+      ],
+      "sha256": "c5835acaf1c5afd2fcd5166b578cf5679a6cf265af01ac7325ff1b21da4767d4"
+    },
+    {
+      "path": "procedures.methods",
+      "value": "After the required permissions, staff verify eligibility, deduplicate records, assign study IDs and abstract age at index, sex, index date, documented contact-lens status, the ordinary-care plan, recorded symptom ratings with dates, and subsequent clinician-directed care changes. Original records remain at the clinic. The clinic's existing symptom field asks: 'Over the past seven days, how severe were your dry eye symptoms overall?' It uses 0, no symptoms, through 100, worst imaginable symptoms. Higher is worse. No validation claim is supplied. Use only that recorded scale; do not convert other questionnaires, infer a rating from narrative notes or treat absent scores as zero. For baseline, use the latest eligible score in Days -14 through 0. A Day 0 score must be explicitly recorded before the index care decision; otherwise it is not an eligible baseline. If multiple scores occur on the selected date, use the latest time-stamped eligible score. If ordering cannot be resolved, mark the baseline as ambiguous and missing rather than choosing arbitrarily. For follow-up, select the eligible score closest to historical Day 60 within Days 45 through 90; ties between dates use the earlier date. If multiple scores occur on that date, use the last time-stamped score. If times cannot resolve multiple values, mark that outcome value ambiguous and missing. Retain the care received as documented. Recorded change does not estimate an untreated symptom trajectory or prove that index care was effective.",
+      "sha256": "63e4faf265d44bacaa0c3a87b46131dde178a476b5e279c77d0cf6c728bb28be"
+    },
+    {
+      "path": "procedures.assessment_details.symptom_instrument_and_selection",
+      "value": "The clinic's existing symptom field asks: 'Over the past seven days, how severe were your dry eye symptoms overall?' It uses 0, no symptoms, through 100, worst imaginable symptoms. Higher is worse. No validation claim is supplied. Use only that recorded scale; do not convert other questionnaires, infer a rating from narrative notes or treat absent scores as zero. For baseline, use the latest eligible score in Days -14 through 0. A Day 0 score must be explicitly recorded before the index care decision; otherwise it is not an eligible baseline. If multiple scores occur on the selected date, use the latest time-stamped eligible score. If ordering cannot be resolved, mark the baseline as ambiguous and missing rather than choosing arbitrarily. For follow-up, select the eligible score closest to historical Day 60 within Days 45 through 90; ties between dates use the earlier date. If multiple scores occur on that date, use the last time-stamped score. If times cannot resolve multiple values, mark that outcome value ambiguous and missing. Retain the care received as documented. Recorded change does not estimate an untreated symptom trajectory or prove that index care was effective.",
+      "sha256": "392db2eee3655092567f0507f37764d2c7b08d4dd6340a2bd4526cbb649ed5e0"
+    },
+    {
+      "path": "procedures.assessment_details.contact_lens_status",
+      "value": "Contact-lens status has three categories: explicitly documented wearer, explicitly documented nonwearer, and unknown/not documented. Do not infer wear from a prescription or collapse unknown into nonwearer.",
+      "sha256": "a354a9f3f2d6977094a620f79dfc9c41d486c639dd2d58d7269acd8c81ef48a5"
+    },
+    {
+      "path": "procedures.assessment_details.care_change_definition_and_counting",
+      "value": "A care change is a clinician-directed start, stop or dose-frequency change of dry eye medication or a clinician-directed start/stop of a non-drug dry eye care measure. A refill alone, appointment booking or administrative note is not a care change. Count one coordinated adjustment on the same date as one event, even when several measures change. Deduplicate reports by patient, date and clinical event; retain an uncertain event as uncertain, not a definite change. A zero-change count requires explicit documentation that care remained unchanged covering the interval. Absence of a subsequent record alone is unknown, not zero.",
+      "sha256": "ae546e37d16996f2318a5309d0f618daf86f436f8aad667279b2940a20eca77a"
+    },
+    {
+      "path": "procedures.visit_schedule",
+      "value": [
+        {
+          "participant_visit": "False",
+          "procedures": "Recorded baseline symptom score",
+          "timing": "Days -14 through 0 relative to index ordinary-care encounter (not a research visit)",
+          "visit": "Historical baseline record selection (not a research visit)"
+        },
+        {
+          "participant_visit": "False",
+          "procedures": "Eligibility and person-level index identification; Recorded age and sex; Documented contact-lens status; Recorded ordinary-care plan",
+          "timing": "Day 0; first qualifying ordinary-care encounter, 1 January 2024 through 30 September 2025",
+          "visit": "Historical index record review (not a research visit)"
+        },
+        {
+          "participant_visit": "False",
+          "procedures": "Recorded follow-up symptom score",
+          "timing": "Days 45 through 90 after index; target historical Day 60 (not a research visit)",
+          "visit": "Historical follow-up record selection (not a research visit)"
+        },
+        {
+          "participant_visit": "False",
+          "procedures": "Documented clinician-directed care changes",
+          "timing": "Days 1 through 90 after index (not a research visit)",
+          "visit": "Historical care-change record review (not a research visit)"
+        }
+      ],
+      "sha256": "6fcd51b80fba3042d78437183314be700eab40e65cae2d745ad732d6e5aa9b0a"
+    },
+    {
+      "path": "procedures.staff_work_plan",
+      "value": "November 2026: Obtain required approvals and site access permission, verify record availability and eligibility, and deduplicate the cohort. December 2026 through February 2027: Abstract and verify historical records. March 2027: Resolve permitted source queries and lock the coded dataset. April through May 2027: Analyze and prepare aggregate findings. Administrative closeout: 30 June 2027, with reconciliation and secure archiving. These are future staff tasks, not new clinical data collection, enrollment, follow-up visits or recruitment dates. Do not extend the historical record period.",
+      "sha256": "0aec2170bdbdd514d6a59b988d849e0911164bd69ededeff0ff269b0d3316464"
+    },
+    {
+      "path": "procedures.completion",
+      "value": "A record's abstraction is complete when required extraction and permitted queries are resolved, including explicit missing/ambiguous codes. Study completion occurs when the coded dataset is locked and planned analyses/reporting are complete; administrative archiving ends by 30 June 2027. Unavailable source data are reported, not replaced with participant recontact or new tests.",
+      "sha256": "8e02f8b1fd144d24e0822b04024c180cf42a534d69662ef07c5dcfa2012e4c02"
+    },
+    {
+      "path": "procedures.study_termination",
+      "value": "The investigator may suspend research access if a required permission is withdrawn or a privacy incident requires suspension under site policy. Preserve legally required records and obtain the required authorization before resuming. Do not add participant-level clinical stopping criteria to this records-only review.",
+      "sha256": "01b033fac7aee4e6c73aa8cc7fa272b3ca3573d3b153f33dde198f9e9eea8c78"
+    },
+    {
+      "path": "procedures.discontinuation",
+      "value": "Because this protocol requests a waiver and has no direct participation, there is no participant signature process or prospective withdrawal visit. Any site privacy request is handled through the site and applicable permissions, without promising that previously deidentified aggregate analyses can be reversed.",
+      "sha256": "8193ff5d2788fd5a439d3dd6913dd68436f30acf7607f3d1368c2137af953418"
+    },
+    {
+      "path": "procedures.unscheduled_visits",
+      "value": "None: no participant contact, new examination, tests or visits are performed or arranged to fill missing records.",
+      "sha256": "6f7c5071b2423e34dfb698abd42b367259899e04a120dbf88abe3b90f1a59925"
+    },
+    {
+      "path": "procedures.specimens",
+      "value": "No new examination, pressure or vision test, questionnaire, telephone call, clinic visit, specimen collection, genetic test or imaging re-reading is performed. There is no specimen transfer, storage, banking or future specimen use.",
+      "sha256": "71a7cd8523103fa5ddfb3b8a7b8674ba44df4fc9d4db27e48e5fdb324a240ea6"
+    },
+    {
+      "path": "procedures.termination",
+      "value": null,
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "path": "risks_benefits.risks",
+      "value": "Research risk is loss of confidentiality from record access and linkage. The research performs no new physical intervention or assessment.",
+      "sha256": "dfb59ab7c13852bb63279e5bb7d1c9bbc1e841b0d56c0490eed52d519e078254"
+    },
+    {
+      "path": "risks_benefits.risk_mitigation",
+      "value": "Secure access, separate keys and aggregate reporting mitigate privacy risk.",
+      "sha256": "c47153115587345ea5120363def08bb79435b49d10d9df02d3f3380d0bce7d6c"
+    },
+    {
+      "path": "risks_benefits.benefits",
+      "value": "No direct benefit to people whose records are reviewed is expected; findings may inform future research and documentation practices. Ordinary care is unaffected.",
+      "sha256": "cd043629ff815e7720b87a6f386cba0b52918c43f9ebdc4c0053a80aff89d091"
+    },
+    {
+      "path": "risks_benefits.payment",
+      "value": "There is no recruitment, consent appointment, participant payment, compensation, travel reimbursement, new clinical charge or research treatment.",
+      "sha256": "5374dbb6ca7849e9f771cbaae3c60e3559ec20562d8f09126be7a809ecf8a21b"
+    },
+    {
+      "path": "risks_benefits.costs",
+      "value": "There is no recruitment, consent appointment, participant payment, compensation, travel reimbursement, new clinical charge or research treatment. The sponsor pays staff abstraction and analysis costs. No new research-injury treatment program or insurance promise is established for this records-only project.",
+      "sha256": "2ec2436837ad1690cc66d8bb2560bf54ee64ef38b1bc46f25fd57c32ab492b7b"
+    },
+    {
+      "path": "risks_benefits.alternatives",
+      "value": "Ordinary care is unaffected; no research treatment or direct participation.",
+      "sha256": "0f312d40281db33560a0cc12606362bacf9937e1ff3bba42014169856dbe26ce"
+    },
+    {
+      "path": "risks_benefits.privacy",
+      "value": "Authorized site research staff access identifying source records and perform linkage within the clinic's encrypted access-controlled environment. The identity key is stored separately from the coded dataset. Signed access agreements and abstraction logs remain at the clinic. Analysts and sponsor receive coded data only, with age at index and relative-day intervals rather than names, contact details, birth dates or exact clinical dates. Exact dates remain in restricted site records for eligibility and window verification. No Social Security numbers or genetic information are abstracted. Authorized monitors, the reviewing IRB and legally authorized oversight bodies may inspect relevant original records for oversight. Reports contain aggregate results; suppress public cells with fewer than five people and complementary cells that would reveal the suppressed count. Do not publish individual-level data or identifying case descriptions. Retain the coded study dataset, identity key, access approvals and abstraction logs securely for five years after administrative closeout on 30 June 2027, then destroy research copies unless a binding requirement requires longer. Original clinical records follow the clinic's separate ordinary retention policy; the study does not order their destruction. No sale, public individual-data sharing, unrelated future research, commercial specimens or banking is planned. Because this protocol requests a waiver and has no direct participation, there is no participant signature process or prospective withdrawal visit. Any site privacy request is handled through the site and applicable permissions, without promising that previously deidentified aggregate analyses can be reversed.",
+      "sha256": "c8185c3e43ece1fa5157491772e365021d783a0bd3fa3108126584c700c3eb1c"
+    },
+    {
+      "path": "risks_benefits.injury_handling",
+      "value": "No new research-injury treatment program or insurance promise is established for this records-only project. The investigator handles suspected privacy incidents under site policy and applicable ethics/privacy reporting requirements; no study-specific reporting hour count has been supplied. Do not invent physical adverse-event collection, follow-up examinations or new contact obligations.",
+      "sha256": "fd6ff3b4ae93faec45380d9802637634bb2cda456bcf767e73e468b608d3ae28"
+    },
+    {
+      "path": "risks_benefits.compensation_or_reimbursement",
+      "value": "There is no recruitment, consent appointment, participant payment, compensation, travel reimbursement, new clinical charge or research treatment.",
+      "sha256": "5374dbb6ca7849e9f771cbaae3c60e3559ec20562d8f09126be7a809ecf8a21b"
+    },
+    {
+      "path": "safety.general_information",
+      "value": "Research risk is loss of confidentiality from record access and linkage. The research performs no new physical intervention or assessment. Secure access, separate keys and aggregate reporting mitigate privacy risk. No direct benefit to people whose records are reviewed is expected; findings may inform future research and documentation practices. Ordinary care is unaffected. There is no recruitment, consent appointment, participant payment, compensation, travel reimbursement, new clinical charge or research treatment. The sponsor pays staff abstraction and analysis costs. No new research-injury treatment program or insurance promise is established for this records-only project. The investigator handles suspected privacy incidents under site policy and applicable ethics/privacy reporting requirements; no study-specific reporting hour count has been supplied. Do not invent physical adverse-event collection, follow-up examinations or new contact obligations.",
+      "sha256": "cb50bf688b4b031f23f7aa3a49938350f97753dd225934d0f828b97ca33b721b"
+    },
+    {
+      "path": "safety.monitoring",
+      "value": "The investigator handles suspected privacy incidents under site policy and applicable ethics/privacy reporting requirements; no study-specific reporting hour count has been supplied. Do not invent physical adverse-event collection, follow-up examinations or new contact obligations.",
+      "sha256": "5159dedaa0f9d7453ae48921bb137fedf4193ea18f6b06b493041765a8af7f10"
+    },
+    {
+      "path": "safety.adverse_events",
+      "value": "No prospective safety endpoints or physical adverse-event collection; privacy incidents handled under site policy and applicable ethics/privacy reporting requirements. No study-specific reporting hour count supplied.",
+      "sha256": "f10724813520a20acefcbd6db89a1c037ed2ab237eb2f442c579cba5155b9ec2"
+    },
+    {
+      "path": "safety.follow_up",
+      "value": "No follow-up examinations, new contact obligations or new tests. Missing source data are reported, not replaced by participant recontact.",
+      "sha256": "bd8fbc593435f474b0578117059fd739dfe64280d1b8d845081324a6f5898eb6"
+    },
+    {
+      "path": "study.title",
+      "value": "Recorded Symptoms and Care Changes After Routine Dry Eye Management.",
+      "sha256": "df36b9c5acb60db790793bcd5047c7394301ea23687610c99735bdb85266ecb7"
+    },
+    {
+      "path": "study.short_title",
+      "value": "Symptoms After Dry Eye Care.",
+      "sha256": "2d6d446d2b62fbbe24b86a8a87632d4f5cf1e2316cc587ec90e52220dbaafdcc"
+    },
+    {
+      "path": "study.condition",
+      "value": "Clinician-documented dry eye disease.",
+      "sha256": "feb47f2c6f9b8f99c48b0eb298971275897f826ed375036b6c54fcb4ebbfa792"
+    },
+    {
+      "path": "study.background",
+      "value": "Existing records may describe symptoms and subsequent care, but clinic attendance, questionnaire completeness and prescribing documentation vary. The clinic lacks a combined account that separates recorded symptom change from missing follow-up and undocumented care changes. No bibliography, published effect size or validated instrument reference is supplied.",
+      "sha256": "5d3fb5ff3219a1c45dad594a81a1291e84620f3dc8983ecfc7d4cb764c9e335c"
+    },
+    {
+      "path": "study.unmet_need",
+      "value": "Source-derived for owner review: The clinic needs a combined account of recorded dry eye symptom change and subsequent care that distinguishes missing follow-up and undocumented care changes from observed outcomes. This follows directly from the supplied background; no new clinical claim or published evidence is added.",
+      "sha256": "4cc464d2431d87fe65b97fd33bba2ae3764ff00bcc653ca3a1908b587d4cd362"
+    },
+    {
+      "path": "study.hypothesis",
+      "value": "Hypothesis: People explicitly documented as contact-lens wearers will have a smaller recorded symptom reduction than people explicitly documented as nonwearers. This is an exploratory association hypothesis, not an established effect or a claim that contact lenses or any treatment caused the observed changes.",
+      "sha256": "3ac6fa219a09ddc207c9dd13cb7ad80201ce2531d9b27d9bb8d139ce34ced3b1"
+    },
+    {
+      "path": "study.timeline.historical_index_period",
+      "value": "Index encounters: 1 January 2024 through 30 September 2025 inclusive.",
+      "sha256": "5d0464c7d30061ab14af730f293e9bc7bd6fc418c430c618725a84f9315774ce"
+    },
+    {
+      "path": "study.timeline.accessible_historical_record_period",
+      "value": "Accessible historical record period: 18 December 2023 through 31 December 2025 inclusive. This covers the baseline and follow-up windows for all index dates.",
+      "sha256": "21d9340034f8d971e0ec6474fa38ac353b47ab81d9e8fb02ecf857f593a7aef3"
+    },
+    {
+      "path": "study.timeline.historical_anchor_and_windows",
+      "value": "Historical Day 0 is the index ordinary-care encounter, not research enrollment. Baseline selection window: Days -14 through 0 relative to that encounter. Historical Day 60 outcome selection window: Days 45 through 90 after index. Care-change observation window: Days 1 through 90 after index. These are record-selection windows, not scheduled visits or a requirement for people to attend at those times. All clinical data predate research abstraction. Staff will not contact people or arrange new care to fill gaps.",
+      "sha256": "e8525bca82ebdbd597b847344b3d26ab8c828c8ae50d37cfc6928186392e41b3"
+    },
+    {
+      "path": "study.timeline.future_staff_work_plan",
+      "value": "November 2026: Obtain required approvals and site access permission, verify record availability and eligibility, and deduplicate the cohort. December 2026 through February 2027: Abstract and verify historical records. March 2027: Resolve permitted source queries and lock the coded dataset. April through May 2027: Analyze and prepare aggregate findings. Administrative closeout: 30 June 2027, with reconciliation and secure archiving. These are future staff tasks, not new clinical data collection, enrollment, follow-up visits or recruitment dates. Do not extend the historical record period.",
+      "sha256": "0aec2170bdbdd514d6a59b988d849e0911164bd69ededeff0ff269b0d3316464"
+    },
+    {
+      "path": "study.completion",
+      "value": "A record's abstraction is complete when required extraction and permitted queries are resolved, including explicit missing/ambiguous codes. Study completion occurs when the coded dataset is locked and planned analyses/reporting are complete; administrative archiving ends by 30 June 2027. Unavailable source data are reported, not replaced with participant recontact or new tests.",
+      "sha256": "8e02f8b1fd144d24e0822b04024c180cf42a534d69662ef07c5dcfa2012e4c02"
+    },
+    {
+      "path": "procedures.assessment_details",
+      "value": {
+        "symptom_instrument_and_selection": "The clinic's existing symptom field asks: 'Over the past seven days, how severe were your dry eye symptoms overall?' It uses 0, no symptoms, through 100, worst imaginable symptoms. Higher is worse. No validation claim is supplied. Use only that recorded scale; do not convert other questionnaires, infer a rating from narrative notes or treat absent scores as zero. For baseline, use the latest eligible score in Days -14 through 0. A Day 0 score must be explicitly recorded before the index care decision; otherwise it is not an eligible baseline. If multiple scores occur on the selected date, use the latest time-stamped eligible score. If ordering cannot be resolved, mark the baseline as ambiguous and missing rather than choosing arbitrarily. For follow-up, select the eligible score closest to historical Day 60 within Days 45 through 90; ties between dates use the earlier date. If multiple scores occur on that date, use the last time-stamped score. If times cannot resolve multiple values, mark that outcome value ambiguous and missing. Retain the care received as documented. Recorded change does not estimate an untreated symptom trajectory or prove that index care was effective.",
+        "contact_lens_status": "Contact-lens status has three categories: explicitly documented wearer, explicitly documented nonwearer, and unknown/not documented. Do not infer wear from a prescription or collapse unknown into nonwearer.",
+        "care_change_definition_and_counting": "A care change is a clinician-directed start, stop or dose-frequency change of dry eye medication or a clinician-directed start/stop of a non-drug dry eye care measure. A refill alone, appointment booking or administrative note is not a care change. Count one coordinated adjustment on the same date as one event, even when several measures change. Deduplicate reports by patient, date and clinical event; retain an uncertain event as uncertain, not a definite change. A zero-change count requires explicit documentation that care remained unchanged covering the interval. Absence of a subsequent record alone is unknown, not zero."
+      },
+      "sha256": "8a5d0a1f9df0f7c1d67a749e87eca1bd3445fcac8357189757761482d18830f8"
+    },
+    {
+      "path": "study.timeline",
+      "value": {
+        "historical_index_period": "Index encounters: 1 January 2024 through 30 September 2025 inclusive.",
+        "accessible_historical_record_period": "Accessible historical record period: 18 December 2023 through 31 December 2025 inclusive. This covers the baseline and follow-up windows for all index dates.",
+        "historical_anchor_and_windows": "Historical Day 0 is the index ordinary-care encounter, not research enrollment. Baseline selection window: Days -14 through 0 relative to that encounter. Historical Day 60 outcome selection window: Days 45 through 90 after index. Care-change observation window: Days 1 through 90 after index. These are record-selection windows, not scheduled visits or a requirement for people to attend at those times. All clinical data predate research abstraction. Staff will not contact people or arrange new care to fill gaps.",
+        "future_staff_work_plan": "November 2026: Obtain required approvals and site access permission, verify record availability and eligibility, and deduplicate the cohort. December 2026 through February 2027: Abstract and verify historical records. March 2027: Resolve permitted source queries and lock the coded dataset. April through May 2027: Analyze and prepare aggregate findings. Administrative closeout: 30 June 2027, with reconciliation and secure archiving. These are future staff tasks, not new clinical data collection, enrollment, follow-up visits or recruitment dates. Do not extend the historical record period."
+      },
+      "sha256": "a3e43256ded4f13587b09338cefc34b97f7e64002a9eb9cce782470e0c9c3420"
+    }
+  ],
+  "approved_source": {
+    "design": {
+      "study_design": "Study type: Retrospective. Classification: Observational cohort. Time perspective: Retrospective. Number of sites: 1, in the United States. Condition: Clinician-documented dry eye disease. The study reviews existing routine-care records. It assigns no treatment, product, procedure or care schedule. There is no randomization, masking, placebo, investigational product, prospective enrollment or participant contact. One records-based cohort; no assigned arms or comparison product. The index event is the person's first qualifying routine-care dry eye management encounter in the index period. Different ordinary-care choices are recorded characteristics, not research assignments or evidence of treatment efficacy.",
+      "study_design_summary": "Single-site retrospective observational review of existing ordinary-care records in one person-level cohort; no treatment assignment, contact, enrollment, new visits or comparison product.",
+      "number_of_sites": "1",
+      "masking": "None; no masking.",
+      "arms": [
+        {
+          "description": "One records-based cohort of all eligible unique adults; anticipate 180 persons. No assigned arms or comparison product; ordinary-care choices are recorded characteristics, not research assignments.",
+          "name": "Ordinary-care record cohort"
+        }
+      ],
+      "controls": "No assigned comparison product or placebo.",
+      "intervention_description": "No assigned treatment, product, procedure or care schedule; ordinary care is unaffected.",
+      "data_sources": "Index encounters: 1 January 2024 through 30 September 2025 inclusive. Accessible historical record period: 18 December 2023 through 31 December 2025 inclusive. This covers the baseline and follow-up windows for all index dates. Historical Day 0 is the index ordinary-care encounter, not research enrollment. Baseline selection window: Days -14 through 0 relative to that encounter. Historical Day 60 outcome selection window: Days 45 through 90 after index. Care-change observation window: Days 1 through 90 after index. These are record-selection windows, not scheduled visits or a requirement for people to attend at those times. All clinical data predate research abstraction. Staff will not contact people or arrange new care to fill gaps."
+    },
+    "endpoints": {
+      "primary": [
+        {
+          "analysis_method": "Include people with both selected scores. Report the contributing number of people, mean change, standard deviation, 95% confidence interval, median and range.",
+          "description": "Primary outcome: Recorded symptom-score change, follow-up minus baseline, on 0–100, using the selected baseline and Days 45–90 score. Negative change means symptom reduction; positive change means worsening. Include people with both selected scores. Report the contributing number of people, mean change, standard deviation, 95% confidence interval, median and range.",
+          "label": "Recorded symptom-score change (follow-up minus baseline)",
+          "time_frame": "Selected baseline Days -14 through 0 and historical Day 60 selection window Days 45 through 90 after the index ordinary-care encounter."
+        }
+      ],
+      "secondary": [
+        {
+          "analysis_method": "Denominator: people with both selected scores; numerator: change <= -20. Descriptive threshold only, not a validated responder definition.",
+          "description": "Secondary outcome 1: Proportion with at least a 20-point decrease in the same score. Denominator: people with both selected scores; numerator: change <= -20. This is a supplied descriptive threshold, not a validated responder definition or a guarantee of meaningful clinical benefit.",
+          "label": "Proportion with at least a 20-point recorded symptom-score decrease",
+          "time_frame": "Baseline Days -14 through 0 to historical follow-up Days 45 through 90 after index."
+        },
+        {
+          "analysis_method": "Use people with sufficient care documentation; report denominator explicitly. Report supported zero counts and unknown status separately; use the supplied event and deduplication rules.",
+          "description": "Secondary outcome 2: Number of documented clinician-directed dry eye care changes per person on Days 1–90 after index. Report counts using the stated event rules. Report separately those with a supported zero count and those whose care-change status is unknown. Use people with sufficient care documentation as the analysis denominator; report that denominator explicitly.",
+          "label": "Documented clinician-directed dry eye care changes per person",
+          "time_frame": "Historical Days 1 through 90 after index."
+        }
+      ],
+      "other": [
+        {
+          "analysis_method": "Linear model adjusted for baseline symptom score and age; wearer-minus-nonwearer adjusted difference and 95% confidence interval. Unknown status excluded from comparison, retained in cohort summaries.",
+          "description": "Exploratory outcome: Association of index contact-lens status with paired symptom change. Compare documented wearers and documented nonwearers using a linear model adjusted for baseline symptom score and age. Report the wearer-minus-nonwearer adjusted difference with a 95% confidence interval. A positive difference means less symptom reduction or more worsening among documented wearers, not proof of harm from lenses. Unknown status remains in cohort summaries but is excluded from this comparison; report its count and reason.",
+          "label": "Exploratory association of documented index contact-lens status with paired symptom change",
+          "time_frame": "Contact-lens status at index; selected baseline Days -14 through 0 and historical follow-up Days 45 through 90."
+        }
+      ]
+    },
+    "population": {
+      "study_population": "Include all eligible records; anticipate 180 unique adults at the single site. The person is the enrollment and analysis unit. The symptom rating concerns both eyes together; no eye-level cohort, separate-eye outcome or paired-eye model is specified. Multiple encounters for one person do not create new participants. Age: 18 through 85 years inclusive at the index encounter. All sexes eligible. Healthy volunteers: No. Sampling: Consecutive eligible records in the fixed period.",
+      "sample_size": "180",
+      "sampling_method": "Consecutive eligible records in the fixed period; include all eligible records.",
+      "minimum_age": "18 Years",
+      "maximum_age": "85 Years",
+      "sex": "All",
+      "healthy_volunteers": "No",
+      "inclusion_criteria": [
+        "Age 18 through 85 at index.",
+        "Clinician-documented dry eye disease.",
+        "A routine-care encounter during the index period documenting a dry eye care plan, including an explicitly documented decision to continue existing care.",
+        "Accessible records identifying the person and index date reliably.",
+        "Access authorized by the site and required ethics/privacy decisions."
+      ],
+      "exclusion_criteria": [
+        "The person or index date cannot be reliably established after source verification.",
+        "The putative index encounter was part of an interventional research protocol, rather than ordinary clinical care."
+      ],
+      "eligibility_notes": [
+        "The person is the enrollment and analysis unit. The symptom rating concerns both eyes together; no eye-level cohort, separate-eye outcome or paired-eye model is specified. Multiple encounters for one person do not create new participants.",
+        "Use only the first qualifying index encounter per person. Deduplicate records using the clinic's patient identifier before assigning a study ID.",
+        "Missing symptom scores, uncertain contact-lens status and incomplete subsequent care documentation do not exclude an otherwise eligible person. They affect only the relevant analysis denominator. Prior surgery, medication use and ordinary-care changes are recorded characteristics, not automatic exclusions. There is no research screening, nonparticipation interval, washout or restriction on other research participation. Pregnancy status is not collected and creates no eligibility restriction. No child records are included."
+      ],
+      "sample_justification": "Sample justification: All eligible records in the fixed index period constitute the sample; 180 people is a feasibility estimate. Report actual counts and exclusions. There is no formal power calculation, assumed effect size, recruitment quota or prospective loss-to-follow-up allowance."
+    },
+    "procedures": {
+      "consent": "Request waivers of informed consent and privacy authorization for the records-only review. The application will describe privacy protections and the burden and selection bias of recontacting former clinic patients. No waiver or approval is currently granted. If permissions are not granted, the investigator must obtain an authorized revised study plan before research access; this document does not authorize a switch to contacting patients.",
+      "enrollment": "No prospective enrollment, recruitment, participant contact or research screening. Person-level records are identified only after required permissions; use the first qualifying index encounter per person and deduplicate before study ID assignment.",
+      "assessments": [
+        "Historical Day 0 is the index ordinary-care encounter, not research enrollment. Baseline selection window: Days -14 through 0 relative to that encounter. Historical Day 60 outcome selection window: Days 45 through 90 after index. Care-change observation window: Days 1 through 90 after index. These are record-selection windows, not scheduled visits or a requirement for people to attend at those times. All clinical data predate research abstraction. Staff will not contact people or arrange new care to fill gaps.",
+        "No new examination, pressure or vision test, questionnaire, telephone call, clinic visit, specimen collection, genetic test or imaging re-reading is performed. There is no specimen transfer, storage, banking or future specimen use."
+      ],
+      "methods": "After the required permissions, staff verify eligibility, deduplicate records, assign study IDs and abstract age at index, sex, index date, documented contact-lens status, the ordinary-care plan, recorded symptom ratings with dates, and subsequent clinician-directed care changes. Original records remain at the clinic. The clinic's existing symptom field asks: 'Over the past seven days, how severe were your dry eye symptoms overall?' It uses 0, no symptoms, through 100, worst imaginable symptoms. Higher is worse. No validation claim is supplied. Use only that recorded scale; do not convert other questionnaires, infer a rating from narrative notes or treat absent scores as zero. For baseline, use the latest eligible score in Days -14 through 0. A Day 0 score must be explicitly recorded before the index care decision; otherwise it is not an eligible baseline. If multiple scores occur on the selected date, use the latest time-stamped eligible score. If ordering cannot be resolved, mark the baseline as ambiguous and missing rather than choosing arbitrarily. For follow-up, select the eligible score closest to historical Day 60 within Days 45 through 90; ties between dates use the earlier date. If multiple scores occur on that date, use the last time-stamped score. If times cannot resolve multiple values, mark that outcome value ambiguous and missing. Retain the care received as documented. Recorded change does not estimate an untreated symptom trajectory or prove that index care was effective.",
+      "assessment_details": {
+        "symptom_instrument_and_selection": "The clinic's existing symptom field asks: 'Over the past seven days, how severe were your dry eye symptoms overall?' It uses 0, no symptoms, through 100, worst imaginable symptoms. Higher is worse. No validation claim is supplied. Use only that recorded scale; do not convert other questionnaires, infer a rating from narrative notes or treat absent scores as zero. For baseline, use the latest eligible score in Days -14 through 0. A Day 0 score must be explicitly recorded before the index care decision; otherwise it is not an eligible baseline. If multiple scores occur on the selected date, use the latest time-stamped eligible score. If ordering cannot be resolved, mark the baseline as ambiguous and missing rather than choosing arbitrarily. For follow-up, select the eligible score closest to historical Day 60 within Days 45 through 90; ties between dates use the earlier date. If multiple scores occur on that date, use the last time-stamped score. If times cannot resolve multiple values, mark that outcome value ambiguous and missing. Retain the care received as documented. Recorded change does not estimate an untreated symptom trajectory or prove that index care was effective.",
+        "contact_lens_status": "Contact-lens status has three categories: explicitly documented wearer, explicitly documented nonwearer, and unknown/not documented. Do not infer wear from a prescription or collapse unknown into nonwearer.",
+        "care_change_definition_and_counting": "A care change is a clinician-directed start, stop or dose-frequency change of dry eye medication or a clinician-directed start/stop of a non-drug dry eye care measure. A refill alone, appointment booking or administrative note is not a care change. Count one coordinated adjustment on the same date as one event, even when several measures change. Deduplicate reports by patient, date and clinical event; retain an uncertain event as uncertain, not a definite change. A zero-change count requires explicit documentation that care remained unchanged covering the interval. Absence of a subsequent record alone is unknown, not zero."
+      },
+      "visit_schedule": [
+        {
+          "participant_visit": "False",
+          "procedures": "Recorded baseline symptom score",
+          "timing": "Days -14 through 0 relative to index ordinary-care encounter (not a research visit)",
+          "visit": "Historical baseline record selection (not a research visit)"
+        },
+        {
+          "participant_visit": "False",
+          "procedures": "Eligibility and person-level index identification; Recorded age and sex; Documented contact-lens status; Recorded ordinary-care plan",
+          "timing": "Day 0; first qualifying ordinary-care encounter, 1 January 2024 through 30 September 2025",
+          "visit": "Historical index record review (not a research visit)"
+        },
+        {
+          "participant_visit": "False",
+          "procedures": "Recorded follow-up symptom score",
+          "timing": "Days 45 through 90 after index; target historical Day 60 (not a research visit)",
+          "visit": "Historical follow-up record selection (not a research visit)"
+        },
+        {
+          "participant_visit": "False",
+          "procedures": "Documented clinician-directed care changes",
+          "timing": "Days 1 through 90 after index (not a research visit)",
+          "visit": "Historical care-change record review (not a research visit)"
+        }
+      ],
+      "staff_work_plan": "November 2026: Obtain required approvals and site access permission, verify record availability and eligibility, and deduplicate the cohort. December 2026 through February 2027: Abstract and verify historical records. March 2027: Resolve permitted source queries and lock the coded dataset. April through May 2027: Analyze and prepare aggregate findings. Administrative closeout: 30 June 2027, with reconciliation and secure archiving. These are future staff tasks, not new clinical data collection, enrollment, follow-up visits or recruitment dates. Do not extend the historical record period.",
+      "completion": "A record's abstraction is complete when required extraction and permitted queries are resolved, including explicit missing/ambiguous codes. Study completion occurs when the coded dataset is locked and planned analyses/reporting are complete; administrative archiving ends by 30 June 2027. Unavailable source data are reported, not replaced with participant recontact or new tests.",
+      "study_termination": "The investigator may suspend research access if a required permission is withdrawn or a privacy incident requires suspension under site policy. Preserve legally required records and obtain the required authorization before resuming. Do not add participant-level clinical stopping criteria to this records-only review.",
+      "discontinuation": "Because this protocol requests a waiver and has no direct participation, there is no participant signature process or prospective withdrawal visit. Any site privacy request is handled through the site and applicable permissions, without promising that previously deidentified aggregate analyses can be reversed.",
+      "unscheduled_visits": "None: no participant contact, new examination, tests or visits are performed or arranged to fill missing records.",
+      "specimens": "No new examination, pressure or vision test, questionnaire, telephone call, clinic visit, specimen collection, genetic test or imaging re-reading is performed. There is no specimen transfer, storage, banking or future specimen use.",
+      "termination": null
+    },
+    "risks_benefits": {
+      "risks": "Research risk is loss of confidentiality from record access and linkage. The research performs no new physical intervention or assessment.",
+      "risk_mitigation": "Secure access, separate keys and aggregate reporting mitigate privacy risk.",
+      "benefits": "No direct benefit to people whose records are reviewed is expected; findings may inform future research and documentation practices. Ordinary care is unaffected.",
+      "payment": "There is no recruitment, consent appointment, participant payment, compensation, travel reimbursement, new clinical charge or research treatment.",
+      "costs": "There is no recruitment, consent appointment, participant payment, compensation, travel reimbursement, new clinical charge or research treatment. The sponsor pays staff abstraction and analysis costs. No new research-injury treatment program or insurance promise is established for this records-only project.",
+      "alternatives": "Ordinary care is unaffected; no research treatment or direct participation.",
+      "privacy": "Authorized site research staff access identifying source records and perform linkage within the clinic's encrypted access-controlled environment. The identity key is stored separately from the coded dataset. Signed access agreements and abstraction logs remain at the clinic. Analysts and sponsor receive coded data only, with age at index and relative-day intervals rather than names, contact details, birth dates or exact clinical dates. Exact dates remain in restricted site records for eligibility and window verification. No Social Security numbers or genetic information are abstracted. Authorized monitors, the reviewing IRB and legally authorized oversight bodies may inspect relevant original records for oversight. Reports contain aggregate results; suppress public cells with fewer than five people and complementary cells that would reveal the suppressed count. Do not publish individual-level data or identifying case descriptions. Retain the coded study dataset, identity key, access approvals and abstraction logs securely for five years after administrative closeout on 30 June 2027, then destroy research copies unless a binding requirement requires longer. Original clinical records follow the clinic's separate ordinary retention policy; the study does not order their destruction. No sale, public individual-data sharing, unrelated future research, commercial specimens or banking is planned. Because this protocol requests a waiver and has no direct participation, there is no participant signature process or prospective withdrawal visit. Any site privacy request is handled through the site and applicable permissions, without promising that previously deidentified aggregate analyses can be reversed.",
+      "injury_handling": "No new research-injury treatment program or insurance promise is established for this records-only project. The investigator handles suspected privacy incidents under site policy and applicable ethics/privacy reporting requirements; no study-specific reporting hour count has been supplied. Do not invent physical adverse-event collection, follow-up examinations or new contact obligations.",
+      "compensation_or_reimbursement": "There is no recruitment, consent appointment, participant payment, compensation, travel reimbursement, new clinical charge or research treatment."
+    },
+    "safety": {
+      "general_information": "Research risk is loss of confidentiality from record access and linkage. The research performs no new physical intervention or assessment. Secure access, separate keys and aggregate reporting mitigate privacy risk. No direct benefit to people whose records are reviewed is expected; findings may inform future research and documentation practices. Ordinary care is unaffected. There is no recruitment, consent appointment, participant payment, compensation, travel reimbursement, new clinical charge or research treatment. The sponsor pays staff abstraction and analysis costs. No new research-injury treatment program or insurance promise is established for this records-only project. The investigator handles suspected privacy incidents under site policy and applicable ethics/privacy reporting requirements; no study-specific reporting hour count has been supplied. Do not invent physical adverse-event collection, follow-up examinations or new contact obligations.",
+      "monitoring": "The investigator handles suspected privacy incidents under site policy and applicable ethics/privacy reporting requirements; no study-specific reporting hour count has been supplied. Do not invent physical adverse-event collection, follow-up examinations or new contact obligations.",
+      "adverse_events": "No prospective safety endpoints or physical adverse-event collection; privacy incidents handled under site policy and applicable ethics/privacy reporting requirements. No study-specific reporting hour count supplied.",
+      "follow_up": "No follow-up examinations, new contact obligations or new tests. Missing source data are reported, not replaced by participant recontact."
+    },
+    "study": {
+      "title": "Recorded Symptoms and Care Changes After Routine Dry Eye Management.",
+      "short_title": "Symptoms After Dry Eye Care.",
+      "condition": "Clinician-documented dry eye disease.",
+      "background": "Existing records may describe symptoms and subsequent care, but clinic attendance, questionnaire completeness and prescribing documentation vary. The clinic lacks a combined account that separates recorded symptom change from missing follow-up and undocumented care changes. No bibliography, published effect size or validated instrument reference is supplied.",
+      "unmet_need": "Source-derived for owner review: The clinic needs a combined account of recorded dry eye symptom change and subsequent care that distinguishes missing follow-up and undocumented care changes from observed outcomes. This follows directly from the supplied background; no new clinical claim or published evidence is added.",
+      "hypothesis": "Hypothesis: People explicitly documented as contact-lens wearers will have a smaller recorded symptom reduction than people explicitly documented as nonwearers. This is an exploratory association hypothesis, not an established effect or a claim that contact lenses or any treatment caused the observed changes.",
+      "timeline": {
+        "historical_index_period": "Index encounters: 1 January 2024 through 30 September 2025 inclusive.",
+        "accessible_historical_record_period": "Accessible historical record period: 18 December 2023 through 31 December 2025 inclusive. This covers the baseline and follow-up windows for all index dates.",
+        "historical_anchor_and_windows": "Historical Day 0 is the index ordinary-care encounter, not research enrollment. Baseline selection window: Days -14 through 0 relative to that encounter. Historical Day 60 outcome selection window: Days 45 through 90 after index. Care-change observation window: Days 1 through 90 after index. These are record-selection windows, not scheduled visits or a requirement for people to attend at those times. All clinical data predate research abstraction. Staff will not contact people or arrange new care to fill gaps.",
+        "future_staff_work_plan": "November 2026: Obtain required approvals and site access permission, verify record availability and eligibility, and deduplicate the cohort. December 2026 through February 2027: Abstract and verify historical records. March 2027: Resolve permitted source queries and lock the coded dataset. April through May 2027: Analyze and prepare aggregate findings. Administrative closeout: 30 June 2027, with reconciliation and secure archiving. These are future staff tasks, not new clinical data collection, enrollment, follow-up visits or recruitment dates. Do not extend the historical record period."
+      },
+      "completion": "A record's abstraction is complete when required extraction and permitted queries are resolved, including explicit missing/ambiguous codes. Study completion occurs when the coded dataset is locked and planned analyses/reporting are complete; administrative archiving ends by 30 June 2027. Unavailable source data are reported, not replaced with participant recontact or new tests."
+    }
+  },
+  "source_evidence_coverage_map": {
+    "schema_version": "source-evidence-coverage-map/v1",
+    "study_type": "Retrospective",
+    "icf_template": null,
+    "entries": [
+      {
+        "source_path": "confidentiality.data_handling",
+        "approved_value_sha256": "d3c2e64d5ca3baed9c5c23399ecc72344420efcb97dc8896d98a4f5bc32b611f",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "confidentiality",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "design.arms",
+        "approved_value_sha256": "36339eb14dd6a1f7b4b66a0f62ac2ab548da090dcaed507a8ddf797b8f542bfd",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.design",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "design.masking",
+        "approved_value_sha256": "f59fe5f0e125bd7055df6024f1404a123801a355ebea9bbf4f77de6102a78d0e",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.design",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "design.study_design",
+        "approved_value_sha256": "359edaedf5e149899e2c9f08fc4dd2a95a137c2a4448f7f57abc2828a55306af",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.bias",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.design",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "endpoints.primary",
+        "approved_value_sha256": "478cccbfd5fea628a6bc09db851745fc2edc81cc6f7f5c2b584055f65e39f200",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "endpoints.secondary",
+        "approved_value_sha256": "6212ec53ea392b4fa889600c86cf1d0ad6611779283a9ca220a750e6b41611db",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "ethics",
+        "approved_value_sha256": "d9efcf4f56eccb2ceca6a03bba05870de5470ad91746e06817988f22b185989c",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "objectives.primary",
+        "approved_value_sha256": "229493cd89ea6af79bc16d252385111d18f722bc32db9ea5929f8199f29804bf",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "objectives.secondary",
+        "approved_value_sha256": "2bc574f617bb853c4ea4c979fe7850d70d8b03ddfbf80735ee17c9eb64e35032",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "parties.irb",
+        "approved_value_sha256": "ca048867aa4e300abe414457e224dfb0d6f97553802d9d720e718178c5aa6889",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.eligibility_notes",
+        "approved_value_sha256": "d64e4698a1e78167cec9d605fb6a59b660c6009bfc4fc27354db2320b45226d9",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.exclusion_criteria",
+        "approved_value_sha256": "9e260ac4916cb99a3c25ae4aa9b27458ae8abbe979314bd3704ef8c4a0df6fa7",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.inclusion_criteria",
+        "approved_value_sha256": "05d820c0d1beb4fb8b5d8e4ba9a0f4df0c21a0989f8671ec9d8cffe0858adad6",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.population",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.maximum_age",
+        "approved_value_sha256": "aeb95e01cc8dd41968bfe5a2e4e8d3b9170e12d66104ef0331de78c272e72eaa",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.minimum_age",
+        "approved_value_sha256": "1a7b78bfa06e7859645e38eacf0cfc3aaa156a52f5337df1e1960d65aedc71a3",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.sample_justification",
+        "approved_value_sha256": "835f538683244fc1d36592c928117017088d007c8bdbe0b10780a94ac54262d9",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "sample-size",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.sample_size",
+        "approved_value_sha256": "0907b1f50b44ffdc490e3917fad5bb4b4752d30a29df3178853a36a7d7d6cc0e",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "sample-size",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.population",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.study_population",
+        "approved_value_sha256": "52d6fdcc63efad329f61ef48d29d9b49356e56a5233b6b670851046d57ad01de",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.population",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.assessment_details",
+        "approved_value_sha256": "9230619720b46b6e2c27a7a011a31873721d1b471d095d391ce10d91ba6c8225",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.assessments",
+        "approved_value_sha256": "453fcc551b3a3004c8e46d16f8eb0fb89f0f86397ec38f22e3784494f5f2a125",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.completion",
+        "approved_value_sha256": "8e02f8b1fd144d24e0822b04024c180cf42a534d69662ef07c5dcfa2012e4c02",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.consent",
+        "approved_value_sha256": "8f86391ba020a11dfd42ea68d193db16987e2ed34fd46a53755a5add5919908b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.discontinuation",
+        "approved_value_sha256": "8193ff5d2788fd5a439d3dd6913dd68436f30acf7607f3d1368c2137af953418",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.enrollment",
+        "approved_value_sha256": "24abb35b645a96a747d686b36b8393ddce8962e643d1b97c0818ceb86deb2b5d",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.methods",
+        "approved_value_sha256": "63e4faf265d44bacaa0c3a87b46131dde178a476b5e279c77d0cf6c728bb28be",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.minimum_days_before_screening_without_participation",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.replacement",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.retention",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.return_of_results",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.specimens",
+        "approved_value_sha256": "71a7cd8523103fa5ddfb3b8a7b8674ba44df4fc9d4db27e48e5fdb324a240ea6",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.staff_work_plan",
+        "approved_value_sha256": "0aec2170bdbdd514d6a59b988d849e0911164bd69ededeff0ff269b0d3316464",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.study_termination",
+        "approved_value_sha256": "01b033fac7aee4e6c73aa8cc7fa272b3ca3573d3b153f33dde198f9e9eea8c78",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.termination",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.visit_schedule",
+        "approved_value_sha256": "82802d01a0ce4db8632b484f241de5d9426f40a128588cb94b96d64b9ff57c8d",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.visit_schedule_table",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.benefits",
+        "approved_value_sha256": "cd043629ff815e7720b87a6f386cba0b52918c43f9ebdc4c0053a80aff89d091",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.compensation_or_reimbursement",
+        "approved_value_sha256": "5374dbb6ca7849e9f771cbaae3c60e3559ec20562d8f09126be7a809ecf8a21b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.injury_handling",
+        "approved_value_sha256": "fd6ff3b4ae93faec45380d9802637634bb2cda456bcf767e73e468b608d3ae28",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.privacy",
+        "approved_value_sha256": "c8185c3e43ece1fa5157491772e365021d783a0bd3fa3108126584c700c3eb1c",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "confidentiality",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.risks",
+        "approved_value_sha256": "dfb59ab7c13852bb63279e5bb7d1c9bbc1e841b0d56c0490eed52d519e078254",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "quality-safety",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "safety.roles",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "quality-safety",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.analysis_plan",
+        "approved_value_sha256": "a5c1f4024f2123987497d7aa7b9bc486491733bb96b7f532a210442d1a114033",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.considerations",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.datasets",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.methodology",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.bias_minimization",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.bias",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.methodology",
+        "approved_value_sha256": "3b9f0b283ac7d443d195345a530c810b4b3dacdfea7639f54b3104fefee58898",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.methodology",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.software",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.considerations",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "study.background",
+        "approved_value_sha256": "5d3fb5ff3219a1c45dad594a81a1291e84620f3dc8983ecfc7d4cb764c9e335c",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.completion",
+        "approved_value_sha256": "8e02f8b1fd144d24e0822b04024c180cf42a534d69662ef07c5dcfa2012e4c02",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.hypothesis",
+        "approved_value_sha256": "3ac6fa219a09ddc207c9dd13cb7ad80201ce2531d9b27d9bb8d139ce34ced3b1",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.references",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "study.timeline",
+        "approved_value_sha256": "489c08f447b42fe8b10e7bad0f0e6e5aa986c92a97d0b84a3845e7525d16c6fd",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.title",
+        "approved_value_sha256": "df36b9c5acb60db790793bcd5047c7394301ea23687610c99735bdb85266ecb7",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.unmet_need",
+        "approved_value_sha256": "4cc464d2431d87fe65b97fd33bba2ae3764ff00bcc653ca3a1908b587d4cd362",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          }
+        ]
+      }
+    ]
+  },
+  "evidence_checklist": [
+    {
+      "section_id": "study-procedure.enrollment",
+      "required_source_paths": [
+        "procedures.consent",
+        "procedures.enrollment",
+        "procedures.methods",
+        "procedures.assessment_details",
+        "procedures.assessments",
+        "procedures.visit_schedule_table",
+        "procedures.visit_schedule",
+        "procedures.staff_work_plan",
+        "study.timeline",
+        "procedures.completion",
+        "study.completion",
+        "procedures.study_termination",
+        "procedures.termination",
+        "procedures.retention",
+        "procedures.discontinuation",
+        "procedures.replacement",
+        "procedures.specimens",
+        "procedures.return_of_results"
+      ],
+      "approved_values": {
+        "procedures.consent": "Request waivers of informed consent and privacy authorization for the records-only review. The application will describe privacy protections and the burden and selection bias of recontacting former clinic patients. No waiver or approval is currently granted. If permissions are not granted, the investigator must obtain an authorized revised study plan before research access; this document does not authorize a switch to contacting patients.",
+        "procedures.enrollment": "No prospective enrollment, recruitment, participant contact or research screening. Person-level records are identified only after required permissions; use the first qualifying index encounter per person and deduplicate before study ID assignment.",
+        "procedures.methods": "After the required permissions, staff verify eligibility, deduplicate records, assign study IDs and abstract age at index, sex, index date, documented contact-lens status, the ordinary-care plan, recorded symptom ratings with dates, and subsequent clinician-directed care changes. Original records remain at the clinic. The clinic's existing symptom field asks: 'Over the past seven days, how severe were your dry eye symptoms overall?' It uses 0, no symptoms, through 100, worst imaginable symptoms. Higher is worse. No validation claim is supplied. Use only that recorded scale; do not convert other questionnaires, infer a rating from narrative notes or treat absent scores as zero. For baseline, use the latest eligible score in Days -14 through 0. A Day 0 score must be explicitly recorded before the index care decision; otherwise it is not an eligible baseline. If multiple scores occur on the selected date, use the latest time-stamped eligible score. If ordering cannot be resolved, mark the baseline as ambiguous and missing rather than choosing arbitrarily. For follow-up, select the eligible score closest to historical Day 60 within Days 45 through 90; ties between dates use the earlier date. If multiple scores occur on that date, use the last time-stamped score. If times cannot resolve multiple values, mark that outcome value ambiguous and missing. Retain the care received as documented. Recorded change does not estimate an untreated symptom trajectory or prove that index care was effective.",
+        "procedures.assessment_details": {
+          "symptom_instrument_and_selection": "The clinic's existing symptom field asks: 'Over the past seven days, how severe were your dry eye symptoms overall?' It uses 0, no symptoms, through 100, worst imaginable symptoms. Higher is worse. No validation claim is supplied. Use only that recorded scale; do not convert other questionnaires, infer a rating from narrative notes or treat absent scores as zero. For baseline, use the latest eligible score in Days -14 through 0. A Day 0 score must be explicitly recorded before the index care decision; otherwise it is not an eligible baseline. If multiple scores occur on the selected date, use the latest time-stamped eligible score. If ordering cannot be resolved, mark the baseline as ambiguous and missing rather than choosing arbitrarily. For follow-up, select the eligible score closest to historical Day 60 within Days 45 through 90; ties between dates use the earlier date. If multiple scores occur on that date, use the last time-stamped score. If times cannot resolve multiple values, mark that outcome value ambiguous and missing. Retain the care received as documented. Recorded change does not estimate an untreated symptom trajectory or prove that index care was effective.",
+          "contact_lens_status": "Contact-lens status has three categories: explicitly documented wearer, explicitly documented nonwearer, and unknown/not documented. Do not infer wear from a prescription or collapse unknown into nonwearer.",
+          "care_change_definition_and_counting": "A care change is a clinician-directed start, stop or dose-frequency change of dry eye medication or a clinician-directed start/stop of a non-drug dry eye care measure. A refill alone, appointment booking or administrative note is not a care change. Count one coordinated adjustment on the same date as one event, even when several measures change. Deduplicate reports by patient, date and clinical event; retain an uncertain event as uncertain, not a definite change. A zero-change count requires explicit documentation that care remained unchanged covering the interval. Absence of a subsequent record alone is unknown, not zero."
+        },
+        "procedures.assessments": [
+          "Historical Day 0 is the index ordinary-care encounter, not research enrollment. Baseline selection window: Days -14 through 0 relative to that encounter. Historical Day 60 outcome selection window: Days 45 through 90 after index. Care-change observation window: Days 1 through 90 after index. These are record-selection windows, not scheduled visits or a requirement for people to attend at those times. All clinical data predate research abstraction. Staff will not contact people or arrange new care to fill gaps.",
+          "No new examination, pressure or vision test, questionnaire, telephone call, clinic visit, specimen collection, genetic test or imaging re-reading is performed. There is no specimen transfer, storage, banking or future specimen use."
+        ],
+        "procedures.visit_schedule_table": null,
+        "procedures.visit_schedule": [
+          {
+            "participant_visit": "False",
+            "procedures": "Recorded baseline symptom score",
+            "timing": "Days -14 through 0 relative to index ordinary-care encounter (not a research visit)",
+            "visit": "Historical baseline record selection (not a research visit)"
+          },
+          {
+            "participant_visit": "False",
+            "procedures": "Eligibility and person-level index identification; Recorded age and sex; Documented contact-lens status; Recorded ordinary-care plan",
+            "timing": "Day 0; first qualifying ordinary-care encounter, 1 January 2024 through 30 September 2025",
+            "visit": "Historical index record review (not a research visit)"
+          },
+          {
+            "participant_visit": "False",
+            "procedures": "Recorded follow-up symptom score",
+            "timing": "Days 45 through 90 after index; target historical Day 60 (not a research visit)",
+            "visit": "Historical follow-up record selection (not a research visit)"
+          },
+          {
+            "participant_visit": "False",
+            "procedures": "Documented clinician-directed care changes",
+            "timing": "Days 1 through 90 after index (not a research visit)",
+            "visit": "Historical care-change record review (not a research visit)"
+          }
+        ],
+        "procedures.staff_work_plan": "November 2026: Obtain required approvals and site access permission, verify record availability and eligibility, and deduplicate the cohort. December 2026 through February 2027: Abstract and verify historical records. March 2027: Resolve permitted source queries and lock the coded dataset. April through May 2027: Analyze and prepare aggregate findings. Administrative closeout: 30 June 2027, with reconciliation and secure archiving. These are future staff tasks, not new clinical data collection, enrollment, follow-up visits or recruitment dates. Do not extend the historical record period.",
+        "study.timeline": {
+          "historical_index_period": "Index encounters: 1 January 2024 through 30 September 2025 inclusive.",
+          "accessible_historical_record_period": "Accessible historical record period: 18 December 2023 through 31 December 2025 inclusive. This covers the baseline and follow-up windows for all index dates.",
+          "historical_anchor_and_windows": "Historical Day 0 is the index ordinary-care encounter, not research enrollment. Baseline selection window: Days -14 through 0 relative to that encounter. Historical Day 60 outcome selection window: Days 45 through 90 after index. Care-change observation window: Days 1 through 90 after index. These are record-selection windows, not scheduled visits or a requirement for people to attend at those times. All clinical data predate research abstraction. Staff will not contact people or arrange new care to fill gaps.",
+          "future_staff_work_plan": "November 2026: Obtain required approvals and site access permission, verify record availability and eligibility, and deduplicate the cohort. December 2026 through February 2027: Abstract and verify historical records. March 2027: Resolve permitted source queries and lock the coded dataset. April through May 2027: Analyze and prepare aggregate findings. Administrative closeout: 30 June 2027, with reconciliation and secure archiving. These are future staff tasks, not new clinical data collection, enrollment, follow-up visits or recruitment dates. Do not extend the historical record period."
+        },
+        "procedures.completion": "A record's abstraction is complete when required extraction and permitted queries are resolved, including explicit missing/ambiguous codes. Study completion occurs when the coded dataset is locked and planned analyses/reporting are complete; administrative archiving ends by 30 June 2027. Unavailable source data are reported, not replaced with participant recontact or new tests.",
+        "study.completion": "A record's abstraction is complete when required extraction and permitted queries are resolved, including explicit missing/ambiguous codes. Study completion occurs when the coded dataset is locked and planned analyses/reporting are complete; administrative archiving ends by 30 June 2027. Unavailable source data are reported, not replaced with participant recontact or new tests.",
+        "procedures.study_termination": "The investigator may suspend research access if a required permission is withdrawn or a privacy incident requires suspension under site policy. Preserve legally required records and obtain the required authorization before resuming. Do not add participant-level clinical stopping criteria to this records-only review.",
+        "procedures.termination": null,
+        "procedures.retention": null,
+        "procedures.discontinuation": "Because this protocol requests a waiver and has no direct participation, there is no participant signature process or prospective withdrawal visit. Any site privacy request is handled through the site and applicable permissions, without promising that previously deidentified aggregate analyses can be reversed.",
+        "procedures.replacement": null,
+        "procedures.specimens": "No new examination, pressure or vision test, questionnaire, telephone call, clinic visit, specimen collection, genetic test or imaging re-reading is performed. There is no specimen transfer, storage, banking or future specimen use.",
+        "procedures.return_of_results": null
+      }
+    }
+  ],
+  "section_contracts": [
+    {
+      "section_id": "study-procedure.enrollment",
+      "number": "8.1.",
+      "title": "Informed Consent / Subject Enrollment",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft",
+        "fixed_boilerplate"
+      ],
+      "minimum_evidence": [
+        "procedures.consent",
+        "procedures.enrollment",
+        "procedures.methods",
+        "procedures.assessment_details",
+        "procedures.assessments",
+        "procedures.visit_schedule_table",
+        "procedures.visit_schedule",
+        "procedures.staff_work_plan",
+        "study.timeline",
+        "procedures.completion",
+        "study.completion",
+        "procedures.study_termination",
+        "procedures.termination",
+        "procedures.retention",
+        "procedures.discontinuation",
+        "procedures.replacement",
+        "procedures.specimens",
+        "procedures.return_of_results"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [
+        {
+          "boilerplate_id": "retrospective-consent",
+          "text": "This retrospective study uses existing records.",
+          "sha256": "12ea7e7a93f29af8a2119703248c0aacb7345514dfda9e09a57fcf677daeed2a"
+        }
+      ],
+      "content_expectations": [
+        "Describe the approved record-review or enrollment sequence, time points, and timeline. State the supplied consent authorization, including an IRB-approved waiver when the approved source explicitly provides one. Preserve supplied retention, withdrawal, and replacement facts without implying that retrospective chart abstraction includes participant contact unless the source establishes it. Do not invent an IRB waiver or its timing.",
+        "Do not replace supplied detail with generic clinical prose.",
+        "This section owns supplied specimen handling and results-return policies. Preserve collection/coding, transfer recipients and access limits, testing purpose, specimen destruction timing and any absolute deadline, future-use/sharing/sale/commercial restrictions, and the distinction between specimen retention and derived-data retention. Distinguish individual clinical results, research/genetic results, incidental findings and aggregate summaries, including any limits, preferences, recipients and timing. Keep routine-care referral arrangements when supplied. Preserve uncertainty; absent optional policies remain absent. For records-only research, describe only the approved existing records/specimens and results policies without adding collection or participant contact.",
+        "This retrospective section owns the complete supplied record-abstraction methods and assessment details: instruments and scales, source restrictions, date anchors/windows, value selection and tie rules, ambiguous/missing values, event definitions, deduplication and evidence needed to establish zero or absence. Preserve every unique condition and exception here, with concise summaries elsewhere. Also explain supplied staff work phases, record and study completion triggers, and permission-suspension/resumption policies. These are staff tasks and historical windows, not participant visits. The retrospective template has no separate measurement section or assessment matrix; present these details as prose or lists within this section."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_items",
+      "evidence_scopes": [],
+      "approved_source_word_count": 1115,
+      "reference_detail_target_words": 0,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [
+          "endpoint-measurement-methods",
+          "record-selection-methods",
+          "staff-work-plan",
+          "study-completion",
+          "access-suspension",
+          "specimen-handling",
+          "return-of-results"
+        ],
+        "brief_reference_only": [],
+        "do_not_restate": []
+      }
+    }
+  ],
+  "protocol_writing_plan": {
+    "sections": [
+      {
+        "section_id": "title-page",
+        "number": "1.",
+        "title": "TITLE PAGE"
+      },
+      {
+        "section_id": "investigator-agreement",
+        "number": "2.",
+        "title": "INVESTIGATOR AGREEMENT"
+      },
+      {
+        "section_id": "table-of-contents",
+        "number": "3.",
+        "title": "TABLE OF CONTENTS"
+      },
+      {
+        "section_id": "introduction",
+        "number": "4.",
+        "title": "INTRODUCTION"
+      },
+      {
+        "section_id": "objectives",
+        "number": "5.",
+        "title": "OBJECTIVE(S)"
+      },
+      {
+        "section_id": "subjects",
+        "number": "6.",
+        "title": "SUBJECTS"
+      },
+      {
+        "section_id": "subjects.population",
+        "number": "6.1.",
+        "title": "Subject Population"
+      },
+      {
+        "section_id": "subjects.eligibility",
+        "number": "6.2.",
+        "title": "Inclusion/Exclusion Criteria"
+      },
+      {
+        "section_id": "study-design",
+        "number": "7.",
+        "title": "STUDY DESIGN"
+      },
+      {
+        "section_id": "study-design.design",
+        "number": "7.1.",
+        "title": "Study Design"
+      },
+      {
+        "section_id": "study-design.bias",
+        "number": "7.2.",
+        "title": "Methods Used to Minimize Bias"
+      },
+      {
+        "section_id": "study-procedure",
+        "number": "8.",
+        "title": "STUDY PROCEDURE"
+      },
+      {
+        "section_id": "study-procedure.enrollment",
+        "number": "8.1.",
+        "title": "Informed Consent / Subject Enrollment"
+      },
+      {
+        "section_id": "analysis-plan",
+        "number": "9.",
+        "title": "ANALYSIS PLAN"
+      },
+      {
+        "section_id": "analysis-plan.datasets",
+        "number": "9.1.",
+        "title": "Analysis Data Sets"
+      },
+      {
+        "section_id": "analysis-plan.methodology",
+        "number": "9.2.",
+        "title": "Statistical Methodology"
+      },
+      {
+        "section_id": "analysis-plan.considerations",
+        "number": "9.3.",
+        "title": "General Statistical Considerations"
+      },
+      {
+        "section_id": "sample-size",
+        "number": "10.",
+        "title": "SAMPLE SIZE JUSTIFICATION"
+      },
+      {
+        "section_id": "confidentiality",
+        "number": "11.",
+        "title": "CONFIDENTIALITY/PUBLICATION OF THE STUDY"
+      },
+      {
+        "section_id": "quality-safety",
+        "number": "12.",
+        "title": "QUALITY COMPLAINTS AND ADVERSE EVENTS"
+      },
+      {
+        "section_id": "ethics",
+        "number": "13.",
+        "title": "GCP, ICH AND ETHICAL CONSIDERATIONS"
+      }
+    ],
+    "methods_owner": "study-procedure.enrollment",
+    "completion_owner": "study-procedure.enrollment",
+    "assessment_table_owner": null
+  },
+  "writing_examples": [],
+  "accepted_context": [],
+  "prior_target_drafts": [],
+  "findings": [],
+  "constraints": [
+    "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+    "Use only supplied approved evidence and applicable template/Fixed Clinical Boilerplate. Align shared population, groups, quantities, timing, procedures and outcomes across the Protocol, selected ICF and PRS narratives; preserve relationships and qualifications rather than copying wording.",
+    "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+    "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
+    "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
+    "Preserve supplied numbered citations next to the Protocol claims they support and their bibliography linkage. Do not invent citations; ICF explanations use plain language.",
+    "Return exactly one result for every requested section ID.",
+    "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
+    "Return structured section content, not a whole document or document markup.",
+    "Write to each section's purpose and ownership. Explain each operational rule fully in its owning section; elsewhere give only the fact needed for that section and a brief reference to the owning heading. Preserve necessary identifiers, endpoint definitions, quantities, timing anchors/windows, conditions, exceptions, safety information and client consent language. Compress repeated explanations, not clinical meaning.",
+    "Use participant-facing language for ICF sections.",
+    "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",
+    "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+    "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+    "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
+    "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+    "Use protocol_writing_plan for the active Protocol headings and method/completion owners. General Information is a compact synopsis; Objectives states purpose; Study Design owns comparisons and endpoints; Bias explains why controls matter. Place full operational rules in the named active methods_owner and completion rules in completion_owner, even when their heading differs by branch. Statistical Methodology owns calculations/models. Cross-reference only a heading listed in the plan. When assessment_table_owner is null, describe the historical windows and activities in prose or lists rather than claiming a matrix or columns are rendered.",
+    "Satisfy every section's content_expectations and cover every material value named by minimum_evidence. If the writing plan names an assessment_table_owner, its source-derived table and notes carry that inventory and adjacent prose only introduces it. Otherwise the active methods_owner carries the full historical assessment details in prose or lists.",
+    "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
+    "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+    "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+    "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+    "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+    "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays."
+  ],
+  "response_path": "hermes/responses/local-record.draft.protocol-operations.draft.a1.cbb59a8d.json",
+  "generation_only_prompts": {
+    "profile": "n8n-with-brad-corrections/v1",
+    "source": {
+      "filename": "Form Fill Fillout -_ Generate Protocol + Send Gmail.json",
+      "sha256": "15b20d12597b6f0fc8829650771302fb9161d8718a96c1c631b93d0154b55b1a"
+    },
+    "prompts": [],
+    "current_instruction_targets": [
+      "study-procedure.enrollment"
+    ],
+    "editorial_corrections": {},
+    "consent_template_comments": [],
+    "adapter_instructions": [
+      "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
+      "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
+      "A list group may contain a nonempty label alongside items. That label renders as an unbulleted paragraph immediately before the group's items; use it to separate endpoint categories without turning introductions into bullets.",
+      "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
+      "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
+      "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
+      "Use protocol_writing_plan and the current section ownership instructions to tighten the retained prompts: keep Protocol synopses brief, explain each operational rule fully in its owning section and use brief heading references elsewhere. Endpoint definitions and analysis calculations remain complete where needed; ICF explanations remain self-contained for participants. Preserve every material quantity, window, exception and safety qualification.",
+      "Write final study prose, not commentary about drafting. Translate source directions into the applicable study fact: for example, 'Day 30 ratings are descriptive only' rather than an explanation about inventing registry outcomes. Omit empty category labels when no endpoint belongs to that category.",
+      "For evaluation-procedures, inspect the supplied assessment_presentation notes against the approved table. When an edit is needed, return the existing source_text/display_text/rationale shape to retain unique information without repeating the matrix. This is part of drafting, not a separate review task.",
+      "For ICF requests also follow consent_template_comments. Assess applicability from the approved source and selected family, preserving supplied conditions and existing family-owned sections. Template comments do not establish new study facts or authorization.",
+      "Use only the approved comparator, endpoints, visits, risks, benefits, statistical methods and regulatory facts. Omit legacy defaults that invent placebo, standard-of-care comparators, extra outcomes, inferred side-effect lists, dates or significance levels.",
+      "For current_instruction_targets, draft study-specific content from the approved source and current section instructions, retaining applicable fixed client language.",
+      "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses."
+    ]
+  },
+  "request_sha256": "6c2523dad6537c45d2ac54cdec522fc85b9ecc89e13ad0c912c63930dc6c1534"
+}

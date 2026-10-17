@@ -61,7 +61,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v31-concise-protocol"
+PROMPT_VERSION = "section-drafting-v32-active-section-ownership"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "rendering.py", "workflow.py", "output_recovery.py")
 
@@ -111,6 +111,20 @@ def _request_ledger_path(revision_dir: Path, request_id: str) -> Path:
     return revision_dir / "request-ledger" / f"{request_id}.json"
 
 
+def _protocol_writing_plan(reference: Mapping[str, Any]) -> dict[str, Any]:
+    sections = protocol_contract(canonical_study_type(get_path(reference, "meta.study_type")) or "")
+    ids = {section.section_id for section in sections}
+    return {
+        "sections": [{"section_id": section.section_id, "number": section.number, "title": section.title}
+                     for section in sections],
+        "methods_owner": ("study-procedure.measurements" if "study-procedure.measurements" in ids
+                          else "study-procedure.enrollment"),
+        "completion_owner": ("endpoint-criteria.study-completion" if "endpoint-criteria.study-completion" in ids
+                             else "study-procedure.enrollment"),
+        "assessment_table_owner": "evaluation-procedures" if "evaluation-procedures" in ids else None,
+    }
+
+
 def _request_constraints() -> list[str]:
     return [
         "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
@@ -129,8 +143,8 @@ def _request_constraints() -> list[str]:
         "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
         "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
         "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
-        "Protocol General Information is a compact synopsis; Objectives states the study purpose and objectives; Study Design owns the design, comparisons and grouped endpoint inventory. Study Methods and Measurements owns detailed measurement, exposure-counting, study-eye and historical-record selection rules; Visits and Examinations owns contact mode, timing and scheduled activities. Bias describes the purpose of controls with brief references to their methods, rather than repeating those instructions. Analysis Data Sets owns which observations enter analyses; Statistical Methodology owns calculations, models and interpretation. Retain complete methods once, using the actual owning headings for references.",
-        "Satisfy every section's content_expectations and cover every material value named by minimum_evidence, except that Section 15's source-derived table and notes carry its detailed inventory. Its adjacent prose should briefly introduce the table without restating its rows or notes.",
+        "Use protocol_writing_plan for the active Protocol headings and method/completion owners. General Information is a compact synopsis; Objectives states purpose; Study Design owns comparisons and endpoints; Bias explains why controls matter. Place full operational rules in the named active methods_owner and completion rules in completion_owner, even when their heading differs by branch. Statistical Methodology owns calculations/models. Cross-reference only a heading listed in the plan. When assessment_table_owner is null, describe the historical windows and activities in prose or lists rather than claiming a matrix or columns are rendered.",
+        "Satisfy every section's content_expectations and cover every material value named by minimum_evidence. If the writing plan names an assessment_table_owner, its source-derived table and notes carry that inventory and adjacent prose only introduces it. Otherwise the active methods_owner carries the full historical assessment details in prose or lists.",
         "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
         "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
@@ -463,7 +477,7 @@ def generation_only_prompt_payload(repo_root: Path, reference: Mapping[str, Any]
             "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
             "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
             "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
-            "Use the current section ownership instructions to tighten the retained prompts: keep Protocol synopses brief, explain each operational rule fully in its owning section and use brief heading references elsewhere. Endpoint definitions and analysis calculations remain complete where needed; ICF explanations remain self-contained for participants. Preserve every material quantity, window, exception and safety qualification.",
+            "Use protocol_writing_plan and the current section ownership instructions to tighten the retained prompts: keep Protocol synopses brief, explain each operational rule fully in its owning section and use brief heading references elsewhere. Endpoint definitions and analysis calculations remain complete where needed; ICF explanations remain self-contained for participants. Preserve every material quantity, window, exception and safety qualification.",
             "Write final study prose, not commentary about drafting. Translate source directions into the applicable study fact: for example, 'Day 30 ratings are descriptive only' rather than an explanation about inventing registry outcomes. Omit empty category labels when no endpoint belongs to that category.",
             "For evaluation-procedures, inspect the supplied assessment_presentation notes against the approved table. When an edit is needed, return the existing source_text/display_text/rationale shape to retain unique information without repeating the matrix. This is part of drafting, not a separate review task.",
             "For ICF requests also follow consent_template_comments. Assess applicability from the approved source and selected family, preserving supplied conditions and existing family-owned sections. Template comments do not establish new study facts or authorization.",
@@ -1048,6 +1062,7 @@ def create_drafting_request(
             for section in sections
         ],
         "section_contracts": sections,
+        "protocol_writing_plan": _protocol_writing_plan(reference),
         "writing_examples": [example for example in examples["examples"]
                              if example["section_id"] in targets],
         "accepted_context": accepted_context(revision_dir, batch, governing),

@@ -1,0 +1,165 @@
+{
+  "meta": {
+    "study_type": "Retrospective",
+    "protocol_number": "CAPS-27-08",
+    "version": "1.0",
+    "date": "17 Oct 2026",
+    "document_set": [
+      "protocol_docx"
+    ]
+  },
+  "study": {
+    "title": "Recorded Vision After Routine Laser Capsulotomy.",
+    "short_title": "Vision After Laser Capsulotomy.",
+    "condition": "Posterior capsule opacification after cataract surgery.",
+    "background": "Routine records may describe vision after laser capsulotomy, but measurement availability and methods vary. The clinic lacks a summary that preserves missingness and distinguishes people from treated eyes.",
+    "unmet_need": "The clinic lacks a summary that preserves missingness and distinguishes people from treated eyes.",
+    "hypothesis": "No comparative treatment hypothesis or exploratory endpoint is proposed; this review is descriptive.",
+    "timeline": "November 2026: obtain required decisions/site permission, verify eligibility,\ndeduplicate and identify study eyes. December 2026 through January 2027: abstract\nrecords. February 2027: resolve permitted source queries and lock the coded data.\nMarch through April 2027: analyze and prepare aggregate findings. Administrative\ncloseout and archiving end on 31 May 2027. These are staff tasks, not prospective\nclinical collection or recruitment phases; the historical period stays fixed.\nA record is complete when extraction and permitted queries are resolved, including\nexplicit missing/ambiguous codes. Study completion requires dataset lock and\ncompletion of the planned analyses and aggregate report. Archiving follows.\nIf access permission is withdrawn, suspend research access immediately. Resume\nonly after documented authorization is restored. If that is impossible, stop\nfurther abstraction, preserve records as required and report available data and\nlimitations. No patient recontact, new test or replacement eye may fill gaps.",
+    "completion": "A record is complete when extraction and permitted queries are resolved, including missing/ambiguous codes. Study completion requires dataset lock and completion of planned analyses and the aggregate report. Administrative closeout and archiving end on 31 May 2027."
+  },
+  "design": {
+    "study_design": "Single-site retrospective observational cohort of 150 anticipated unique adults; no assigned intervention, randomization, masking, placebo, prospective enrollment or participant contact. Index laser procedures 1 January through 31 August 2025; historical records 2 December 2024 through 31 December 2025. One study eye per person: earliest eligible laser, right eye if same-day tie. All clinical care predates research abstraction.",
+    "number_of_sites": 1,
+    "intervention_name": "Routine laser capsulotomy (historical ordinary care only)",
+    "masking": "None"
+  },
+  "population": {
+    "sample_size": 150,
+    "sample_justification": "All eligible records; 150 people is a feasibility estimate, with no formal power calculation, assumed effect size or prospective attrition rate.",
+    "study_population": "Adults aged 50 through 90 at the first eligible procedure, with posterior capsule opacification and routine laser capsulotomy at the single site within the index period; one fixed study eye per unique person.",
+    "minimum_age": "50 Years",
+    "maximum_age": "90 Years",
+    "sex": "All",
+    "healthy_volunteers": "No",
+    "inclusion_criteria": [
+      "Age 50 through 90 inclusive at the first eligible procedure.",
+      "Clinician-documented posterior capsule opacification.",
+      "Routine laser capsulotomy at Elmstead Ophthalmology Clinic from 1 January through 31 August 2025 inclusive.",
+      "Reliably identifiable person, procedure date and treated eye.",
+      "Records accessible under required ethics/privacy decisions and site permission."
+    ],
+    "exclusion_criteria": [
+      "An eye whose laser was part of an interventional research protocol.",
+      "An eye whose identity or procedure date cannot be verified."
+    ],
+    "eligibility_notes": "Exclude the person only if no eligible eye remains. Select one study eye: earliest eligible laser, right eye if both on the same date. Deduplicate patients; never switch eyes for missing data. Missing measurements affect only the relevant analysis, not cohort eligibility. Other eye disease is recorded context, not an automatic exclusion. No screening washout or other-study restriction. Pregnancy status is not collected and creates no restriction; no children."
+  },
+  "objectives": {
+    "primary": "Describe recorded study-eye distance visual-acuity change from the selected historical baseline to the historical Day 42 window.",
+    "secondary": "Describe recorded early pressure elevations in the selected study eye."
+  },
+  "endpoints": {
+    "primary": [
+      {
+        "measure": "Recorded distance visual-acuity change in the fixed study eye",
+        "time_frame": "Baseline Days -30 through -1 to follow-up Days 28 through 70 after index, targeting Day 42",
+        "description": "Follow-up minus baseline logMAR with habitual distance correction; negative is better and positive worse; available paired values only."
+      }
+    ],
+    "secondary": [
+      {
+        "measure": "Proportion with recorded study-eye pressure of at least 25 mmHg",
+        "time_frame": "Days 1 through 7 after index",
+        "description": "At least one qualifying value among all recorded values; denominator people with at least one pressure measurement in that eye/window. Each person counted once. Missing record is not no elevation."
+      }
+    ]
+  },
+  "procedures": {
+    "consent": "Request waivers of consent and privacy authorization; neither is granted. Required ethics/privacy decisions and written site permission precede access. No patient recontact or prospective enrollment.",
+    "methods": "After permissions, staff verify eligibility and index selection and abstract\nage at procedure, sex, treated eye, index date, recorded ocular diagnoses,\nvisual-acuity values with correction status/date/method, and pressure values\nwith date/method. Original records stay at the clinic.\nFor acuity, use only distance visual acuity explicitly recorded in logMAR with\nhabitual distance correction. Do not convert Snellen values, infer correction\nstatus or substitute near, uncorrected or fellow-eye acuity.\nBaseline: latest eligible value during Days -30 through -1 before index.\nSame-day procedure measurements are not eligible baseline values. If there are\nmultiple eligible measurements on the latest date, use the last time-stamped\nvalue. If time does not resolve the choice, classify baseline as ambiguous/missing.\nFollow-up: eligible value closest to Day 42 within Days 28 through 70 after index.\nIf dates are equally distant, select the earlier date. On the selected date,\nuse the last time-stamped eligible value; unresolved multiple values are\nambiguous/missing. Do not widen windows or choose a more favorable result.\nPrimary endpoint: follow-up minus baseline logMAR in the fixed study eye.\nNegative change means better recorded acuity; positive change means worse acuity.\nUse people with both selected values; report contributing people, mean change,\nstandard deviation, 95% confidence interval, median and range. This observational\nchange is not proof of a laser treatment effect.\nSecondary endpoint: proportion with at least one recorded study-eye pressure\nof 25 mmHg or higher during historical Days 1 through 7. Denominator: people\nwith at least one pressure measurement in that eye/window. Use all available\nvalues in the window and count each person at most once, regardless of the\nnumber of qualifying readings. No pressure record means missing, not no elevation.\nRetain the recorded pressure method and treatment context; do not describe the\nvalues as an untreated trajectory. No secondary pressure change endpoint.\nUse available data without imputation. Report missing, ambiguous and unavailable\nmeasurement types separately, with explicit endpoint denominators. No paired-eye\nmodel, adjusted subgroup model, confirmatory significance claim or invented\nexploratory outcome is authorized. Selection, measurement and attendance biases\nlimit interpretation.\nThe historical windows identify existing records, not scheduled research visits.\nNo new acuity or pressure test, questionnaire, phone call, clinic visit, imaging\nreview, specimen collection, genetic test or participant contact occurs.",
+    "assessment_details": {
+      "acuity_selection": " use only distance visual acuity explicitly recorded in logMAR with\nhabitual distance correction. Do not convert Snellen values, infer correction\nstatus or substitute near, uncorrected or fellow-eye acuity.\nBaseline: latest eligible value during Days -30 through -1 before index.\nSame-day procedure measurements are not eligible baseline values. If there are\nmultiple eligible measurements on the latest date, use the last time-stamped\nvalue. If time does not resolve the choice, classify baseline as ambiguous/missing.\nFollow-up: eligible value closest to Day 42 within Days 28 through 70 after index.\nIf dates are equally distant, select the earlier date. On the selected date,\nuse the last time-stamped eligible value; unresolved multiple values are\nambiguous/missing. Do not widen windows or choose a more favorable result.\n"
+    },
+    "assessments": [
+      "Historical Day 0 is the selected eye laser date, not research enrollment. Baseline Days -30 through -1; follow-up Days 28 through 70 targeting Day 42; early pressure Days 1 through 7. These are record selection windows, not visits."
+    ],
+    "staff_work_plan": "November 2026: obtain required decisions/site permission, verify eligibility,\ndeduplicate and identify study eyes. December 2026 through January 2027: abstract\nrecords. February 2027: resolve permitted source queries and lock the coded data.\nMarch through April 2027: analyze and prepare aggregate findings. Administrative\ncloseout and archiving end on 31 May 2027. These are staff tasks, not prospective\nclinical collection or recruitment phases; the historical period stays fixed.\nA record is complete when extraction and permitted queries are resolved, including\nexplicit missing/ambiguous codes. Study completion requires dataset lock and\ncompletion of the planned analyses and aggregate report. Archiving follows.\nIf access permission is withdrawn, suspend research access immediately. Resume\nonly after documented authorization is restored. If that is impossible, stop\nfurther abstraction, preserve records as required and report available data and\nlimitations. No patient recontact, new test or replacement eye may fill gaps.",
+    "completion": "Record completion follows extraction and permitted query resolution, with explicit missing/ambiguous codes.",
+    "study_termination": "If access permission is withdrawn, suspend research access immediately. Resume only after documented authorization is restored. Otherwise stop further abstraction, preserve required records and report available data/limitations. No recontact, new test or replacement eye.",
+    "specimens": "No new test, questionnaire, phone call, visit, imaging review, specimen or genetic test. No transfer, storage, banking or future specimen use.",
+    "visit_schedule": []
+  },
+  "statistics": {
+    "analysis_plan": "Primary paired follow-up-minus-baseline logMAR: contributing people, mean change, standard deviation, 95% confidence interval, median and range. Negative change means better acuity. Secondary: numerator and denominator with observed study-eye pressure in Days 1\u20137, counting each person once. Use available data without imputation; report missing, ambiguous and unavailable measurement types separately. No paired-eye or subgroup model, additional exploratory outcome or confirmatory/causal claim."
+  },
+  "risks_benefits": {
+    "risks": "Loss of confidentiality from record review; no new physical research risk.",
+    "risk_mitigation": "Restricted access, separately stored identity keys and aggregate reporting.",
+    "benefits": "No direct benefit; findings may inform research summaries.",
+    "compensation_or_reimbursement": "None; no participant payment, reimbursement or new clinical charge. Sponsor funds staff work and analysis.",
+    "injury_handling": "No new injury-treatment or insurance promise. Suspected privacy incidents are handled by the PI under site policy and required reporting; no reporting-hour deadline supplied."
+  },
+  "confidentiality": {
+    "data_handling": "Only authorized site research staff access identifiers for eligibility and\nlinkage on the clinic's encrypted access-controlled drive. Keep the study-ID key\nseparately. Analysts and sponsor receive study ID, age at index, relative-day\nintervals and coded clinical data, without names, contact details, birth dates,\nexact clinical dates or the identity key. Exact dates remain in restricted source\nrecords. Authorized monitors, IRB and legally authorized oversight bodies may\ninspect relevant originals under applicable permissions.\nPublish aggregate findings only; suppress cells below five and complementary\ncells that would reveal a suppressed count. No individual-level public dataset,\nidentifying case report, sale or unrelated future research is planned.\nRetain research data, keys, permissions and abstraction logs for six years after\n31 May 2027 closeout; then destroy research copies unless a binding requirement\nrequires longer. Original clinical records follow the clinic's separate policy\nand are not destroyed by this study.\nRisk is loss of confidentiality, mitigated by restricted access, separate keys\nand aggregate reporting. There is no new physical research risk, direct benefit,\nparticipant payment, reimbursement or new clinical charge. Sponsor funds staff\nwork and analysis. No new injury-treatment or insurance promise is established.\nSuspected privacy incidents are handled by the PI under site policy and required\nethics/privacy reporting arrangements; no reporting-hour deadline is supplied.\nThere is no participant consent signature or prospective withdrawal visit under\nthe requested waiver. Site privacy requests follow applicable permissions, with\nno promise to reverse already deidentified aggregate findings."
+  },
+  "ethics": {
+    "approval_status": "Not yet submitted; no approval, approval number or date.",
+    "consent_waiver_status": "Requested, not granted.",
+    "privacy_authorization_waiver_status": "Requested, not granted."
+  },
+  "parties": {
+    "sponsor": {
+      "name": "Elmstead Clinical Records Research",
+      "address": "1550 Research Lane, Suite 200, Madison, WI 53703, United States",
+      "contact": {
+        "name": "Parker Lane",
+        "title": "Research Director",
+        "phone": "+1 202-555-0120",
+        "email": "parker.lane@example.org"
+      }
+    },
+    "principal_investigator": {
+      "name": "Dr. Arden Cole",
+      "degrees": "MD",
+      "title": "Principal Investigator"
+    },
+    "study_coordinator": {
+      "name": "Quinn Harper",
+      "title": "Records Study Coordinator",
+      "degrees": "CCRC",
+      "business_phone": "+1 202-555-0121",
+      "office_phone": "+1 202-555-0122",
+      "email": "quinn.harper@example.org"
+    },
+    "irb": {
+      "name": "Elmstead Independent Research Review Board",
+      "affiliation": "Independent of sponsor and clinic",
+      "address": "610 Review Street, Suite 300, Madison, WI 53705, United States",
+      "phone": "+1 202-555-0123",
+      "email": "research.rights.elmstead@example.org"
+    }
+  },
+  "sites": [
+    {
+      "facility": {
+        "name": "Elmstead Ophthalmology Clinic",
+        "address": "920 Clinic Way, Suite 100, Madison, WI 53704, United States",
+        "city": "Madison",
+        "state": "WI",
+        "zip": "53704",
+        "country": "United States"
+      },
+      "investigator": {
+        "name": "Dr. Arden Cole",
+        "degrees": "MD",
+        "title": "Principal Investigator"
+      },
+      "contact": {
+        "name": "Quinn Harper",
+        "title": "Records Study Coordinator",
+        "business_phone": "+1 202-555-0121",
+        "office_phone": "+1 202-555-0122",
+        "email": "quinn.harper@example.org"
+      }
+    }
+  ],
+  "safety": {
+    "roles": []
+  },
+  "regulatory": {
+    "prs": {
+      "study_type": "Observational"
+    }
+  }
+}

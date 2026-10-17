@@ -1,0 +1,18 @@
+{
+  "record": {
+    "request_sha256": "69010575cff8826aa0a874430f764b7fa59ef613de4b35d89eb545d99150275a",
+    "response_sha256": "af0524ec8d06a04cabcf1fd08aec5836ae2dd6194ab151c361ebeaaf70d957ca",
+    "content_review": "Codex manual comparison with retained input/source; unique operational rules retained; local trial only"
+  },
+  "chart": {
+    "request_sha256": "0de60db9a6eda25188bb2b48708ae7e63559fc09abd58f80f1d320b4af1c3974",
+    "response_sha256": "05bcf7396cefe5322ccbf1a61f782a65a06dc09b0815106a1c52a623e925e2a5",
+    "content_review": "Codex manual comparison with retained input/source; unique operational rules retained; local trial only"
+  },
+  "caps": {
+    "request_sha256": "a71ba3c07be22ddbfb25060cba850ce5b4a12868da3ce5bc5af12b92ebc463fd",
+    "response_sha256": "a7d1e37c5cb174b8b1fbe345f0dfc517d2599566e8730e6ef95d58f4403ede83",
+    "content_review": "Codex manual comparison with retained input/source; unique operational rules retained; local trial only"
+  },
+  "original_n8n_library_unchanged": true
+}

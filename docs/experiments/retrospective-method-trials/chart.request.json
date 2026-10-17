@@ -1,0 +1,1939 @@
+{
+  "schema_version": "hermes-request/v2",
+  "request_id": "local-chart.draft.protocol-operations.draft.a1.ad13890c",
+  "revision_id": "local-chart",
+  "task": "section_drafting",
+  "wave": "draft",
+  "batch_id": "protocol-operations",
+  "artifact": "protocol",
+  "branch": {
+    "study_type": "Retrospective",
+    "icf_template": null
+  },
+  "topology_version": "clinical-drafting-v1",
+  "prompt_version": "section-drafting-v32-active-section-ownership",
+  "governing_resources": {
+    "approved_source_sha256": null,
+    "source_evidence_coverage_map": {
+      "schema_version": "source-evidence-coverage-map/v1",
+      "study_type": "Retrospective",
+      "icf_template": null,
+      "entries": [
+        {
+          "source_path": "confidentiality.data_handling",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "design.arms",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "design.masking",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "design.study_design",
+          "approved_value_sha256": "cf931d5485bdb2a6c39b8ed186d9086956661c89e37971fb6d8fa69314ddf2f7",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.bias",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.primary",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.secondary",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "ethics",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.primary",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.secondary",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "parties.irb",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.eligibility_notes",
+          "approved_value_sha256": "f93d8f1698a2b19889cd504c1c9c14349bef42e03ab6043dacd7c0941715d043",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.exclusion_criteria",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.inclusion_criteria",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.maximum_age",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.minimum_age",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_justification",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_size",
+          "approved_value_sha256": "fac88eb1948c30473009a816a09d6b7bddc5c35ede6e59fd67888c82f6420821",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.study_population",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessment_details",
+          "approved_value_sha256": "b2a97345bdfa30dc51e798f8403c46ebfbe98e4e81919510432bd17bac1c0895",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessments",
+          "approved_value_sha256": "f04b7319684875ff0e41c24ead878f363ef21ee72e25ff073dd708e9d8108301",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.completion",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.consent",
+          "approved_value_sha256": "7358cd219a5a0bd5e8026a6b849bfee9a65743428f27e5b97086b5aa88998f51",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.discontinuation",
+          "approved_value_sha256": "4591cacb725da47d998b5c676152ae32aaeee329ed4387eceae2b60cc6af5984",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.enrollment",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.methods",
+          "approved_value_sha256": "c79be9a3054f24be4efb54970679eef5a1cb895676d4a1118aff33748010a28c",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.minimum_days_before_screening_without_participation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.eligibility",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.replacement",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.retention",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.return_of_results",
+          "approved_value_sha256": "af1dec044484737ced33b8dbedf1caa1fdb0b9c424ded38524e3cc47bacbe1e8",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.specimens",
+          "approved_value_sha256": "f55c69b3e24456bfad519bf797aa13b968bceaa89702049566c5a70aa652b009",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.staff_work_plan",
+          "approved_value_sha256": "3d46e338ee8fe66fecd3838548974692bf0830fc8c402701bf508db428194125",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.study_termination",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.termination",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule_table",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.benefits",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.compensation_or_reimbursement",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.injury_handling",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.privacy",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.risks",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "safety.roles",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.analysis_plan",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.datasets",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.bias_minimization",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.bias",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.methodology",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.software",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.background",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.completion",
+          "approved_value_sha256": "c6406c1d6b7907032cce8394836cb9bed720d5109ee0083b018a6ddc585fe12e",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.hypothesis",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.references",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.timeline",
+          "approved_value_sha256": "3d46e338ee8fe66fecd3838548974692bf0830fc8c402701bf508db428194125",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.enrollment",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.title",
+          "approved_value_sha256": "73190376e9ac63256f17c585abd2d2345791146d893906a68eedb35cdba8c2c8",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.unmet_need",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": false
+            }
+          ]
+        }
+      ]
+    },
+    "contracted_template_bundle": {
+      "schema_version": "contracted-template-bundle/v2",
+      "selection": {
+        "study_type": "Retrospective",
+        "icf_family": null
+      },
+      "contracted_templates": {
+        "protocol": {
+          "path": "assets/client-templates/docx/retrospective-protocol.template.docx",
+          "sha256": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e"
+        }
+      },
+      "client_template_authorities": {
+        "protocol": {
+          "path": "assets/client-templates/reference/protocol-reference.docx",
+          "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+        }
+      },
+      "document_section_contract": {
+        "version": "clinical-documents-v2.52-retrospective-method-ownership",
+        "sha256": "68217443f38f50daa8f6c0c13b310dfdd7e70c90305a75db2a44d337ce9c9e06"
+      },
+      "fixed_clinical_boilerplate": {
+        "version": "clinical-boilerplate-v14",
+        "path": "references/fixed-clinical-boilerplate.json",
+        "sha256": "54c99f136eef6596fb697a5c84a01b639f00adba443144e9fda823221028c5b6"
+      },
+      "drafting_examples": {
+        "path": "references/drafting-examples.json",
+        "sha256": "04dceabdfaac70b0bd2f4da89c0e54132d3ede262fe7c25edeafed9c267d112b"
+      },
+      "sterling_clause_contract": null,
+      "approved_font_plan": {
+        "version": "approved-font-plan/v1",
+        "available_font_policy": "preserve",
+        "missing_font_policy": "approved_packaged_substitute",
+        "unknown_inventory_policy": "preserve_then_resolve_by_smoke_render",
+        "approved_fallbacks": {
+          "aptos": "Liberation Sans",
+          "arial": "Liberation Sans",
+          "arial unicode ms": "Liberation Sans",
+          "calibri": "Liberation Sans",
+          "courier new": "Liberation Mono",
+          "dejavu sans": "Liberation Sans",
+          "helvetica": "Liberation Sans",
+          "noto sans": "Liberation Sans",
+          "noto sans symbols": "Liberation Sans",
+          "segoe ui symbol": "Liberation Sans",
+          "symbol": "Liberation Sans",
+          "times new roman": "Liberation Serif",
+          "verdana": "Liberation Sans"
+        },
+        "packaged_families": {
+          "Liberation Mono": "LiberationMono-Regular.ttf",
+          "Liberation Sans": "LiberationSans-Regular.ttf",
+          "Liberation Serif": "LiberationSerif-Regular.ttf"
+        },
+        "packaged_font_assets": {
+          "assets/fallback-fonts/LiberationMono-Bold.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-Bold.ttf",
+            "sha256": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb"
+          },
+          "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-BoldItalic.ttf",
+            "sha256": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130"
+          },
+          "assets/fallback-fonts/LiberationMono-Italic.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-Italic.ttf",
+            "sha256": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1"
+          },
+          "assets/fallback-fonts/LiberationMono-Regular.ttf": {
+            "path": "assets/fallback-fonts/LiberationMono-Regular.ttf",
+            "sha256": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1"
+          },
+          "assets/fallback-fonts/LiberationSans-Bold.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-Bold.ttf",
+            "sha256": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173"
+          },
+          "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-BoldItalic.ttf",
+            "sha256": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee"
+          },
+          "assets/fallback-fonts/LiberationSans-Italic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-Italic.ttf",
+            "sha256": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0"
+          },
+          "assets/fallback-fonts/LiberationSans-Regular.ttf": {
+            "path": "assets/fallback-fonts/LiberationSans-Regular.ttf",
+            "sha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8"
+          },
+          "assets/fallback-fonts/LiberationSerif-Bold.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-Bold.ttf",
+            "sha256": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce"
+          },
+          "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf",
+            "sha256": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7"
+          },
+          "assets/fallback-fonts/LiberationSerif-Italic.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-Italic.ttf",
+            "sha256": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e"
+          },
+          "assets/fallback-fonts/LiberationSerif-Regular.ttf": {
+            "path": "assets/fallback-fonts/LiberationSerif-Regular.ttf",
+            "sha256": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74"
+          }
+        },
+        "sha256": "4a4fa12e026266c53b3e16a62033195b480b86395b158ae7f39a778e6c32f3d1"
+      },
+      "layout_preservation_baseline": {
+        "schema_version": "layout-preservation-baseline/v1",
+        "artifacts": {
+          "protocol": {
+            "contracted_template": {
+              "path": "assets/client-templates/docx/retrospective-protocol.template.docx",
+              "sha256": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e"
+            },
+            "client_template_authority": {
+              "path": "assets/client-templates/reference/protocol-reference.docx",
+              "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+            }
+          }
+        },
+        "sha256": "31e813f49d9f8fbc6c626497bc7f31d6d6e52024a85f3e96a958c7d6a448457e"
+      },
+      "prs_authority": null,
+      "resource_hashes": {
+        "assets/client-templates/docx/retrospective-protocol.template.docx": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e",
+        "assets/client-templates/reference/protocol-reference.docx": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b",
+        "assets/fallback-fonts/LiberationMono-Bold.ttf": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb",
+        "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130",
+        "assets/fallback-fonts/LiberationMono-Italic.ttf": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1",
+        "assets/fallback-fonts/LiberationMono-Regular.ttf": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1",
+        "assets/fallback-fonts/LiberationSans-Bold.ttf": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173",
+        "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee",
+        "assets/fallback-fonts/LiberationSans-Italic.ttf": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0",
+        "assets/fallback-fonts/LiberationSans-Regular.ttf": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8",
+        "assets/fallback-fonts/LiberationSerif-Bold.ttf": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce",
+        "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7",
+        "assets/fallback-fonts/LiberationSerif-Italic.ttf": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e",
+        "assets/fallback-fonts/LiberationSerif-Regular.ttf": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74",
+        "references/drafting-examples.json": "04dceabdfaac70b0bd2f4da89c0e54132d3ede262fe7c25edeafed9c267d112b",
+        "references/fixed-clinical-boilerplate.json": "54c99f136eef6596fb697a5c84a01b639f00adba443144e9fda823221028c5b6"
+      },
+      "identity_sha256": "581960305bc0a7567235554cffa8806bfb8bc42603dcde38fc8345150b4fe30a"
+    },
+    "implementation_sha256": {
+      "scripts/contracts.py": "4a201d151f770d2f8a7a803d3ad2b63ce163530e9a575adb53ac251836c93be7",
+      "scripts/drafting.py": "9c4e3477a7a73441f70a24dfc83de89454c92acb9159e611c4e3aed19b51cb5b",
+      "scripts/prs_xml.py": "1aad04586410b2f177bc616d7747431b5145795fb014a330827cb560c01adc03",
+      "scripts/rendering.py": "b436a871e87abefa0d5bfda0555996bf15e9fe02c8d6a57a28ec5c0fea7502b9",
+      "scripts/workflow.py": "eef4c882a96780e481fa7d90fc3b6e0fd51a2cf4da23c6152cf0d4184842e09c",
+      "scripts/output_recovery.py": "c7e46b9885bb3a8c117af4afda77e2e126f0b12a45c6e58ab4037a84173b0b41"
+    },
+    "topology_version": "clinical-drafting-v1",
+    "prompt_version": "section-drafting-v32-active-section-ownership",
+    "producer_policy": "nonempty-model-id",
+    "generation_only_prompts_sha256": "2114b96a474b288208b62e0031a8c2b665387969e6be89af0f8c355493419181"
+  },
+  "attempts": {
+    "study-procedure.enrollment": 1
+  },
+  "approved_input": [
+    {
+      "path": "design.study_design",
+      "value": "Retrospective observational cohort at two United States sites; no assigned treatment or participant contact. Historical care and eye-specific surgery anchors are distinct from future staff abstraction.",
+      "sha256": "cf931d5485bdb2a6c39b8ed186d9086956661c89e37971fb6d8fa69314ddf2f7"
+    },
+    {
+      "path": "population.sample_size",
+      "value": "240 anticipated unique people and approximately 360 eligible operated eyes.",
+      "sha256": "fac88eb1948c30473009a816a09d6b7bddc5c35ede6e59fd67888c82f6420821"
+    },
+    {
+      "path": "population.eligibility_notes",
+      "value": "Retain an eligible eye if the other eye is excluded; exclude the person only when no eligible eye remains. Missing measurements affect analyses, not cohort eligibility.",
+      "sha256": "f93d8f1698a2b19889cd504c1c9c14349bef42e03ab6043dacd7c0941715d043"
+    },
+    {
+      "path": "procedures.methods",
+      "value": "Research staff will access records only after required ethics/privacy decisions\nand written site permissions. Staff will verify eligibility, link duplicate\nrecords, assign study IDs and abstract the following existing information:\nage at operation, sex, eye laterality, operation date, operating site, documented\ndiabetes status, documented glaucoma diagnosis, pressure-lowering medication\nuse at baseline, pressure measurements and their dates/methods, and new\npressure-lowering medication prescriptions within 45 days after surgery.\nUse the recorded pressure value in mmHg and retain the recorded method.\nNo research pressure test, vision test, questionnaire, telephone call, clinic\nvisit, specimen collection or other new participant procedure is performed.\nNo specimens are accessed, transferred or stored. No genetic information or\nlaboratory testing is included. No imaging re-reading is planned.\nFor the baseline, choose the latest measurement strictly before surgery within\nthe specified 90-day window. In the Day 30 window, choose the measurement closest\nto postoperative Day 30; if equally distant, choose the earlier date. For the\nearly window, use all recorded pressure measurements to determine whether any\nvalue reaches the specified threshold; one eye is counted only once even if\nseveral measurements meet that threshold. For baseline and Day 30 selection, if two pressure values on the selected\ndate have different times, use the later recorded time. If time cannot resolve\nmultiple values, retain the source ambiguity as missing for that outcome\nrather than choosing a value without a documented rule.\nRetain measurements recorded before or after treatment as documented; these\nobservational summaries do not represent untreated pressure trajectories.\nThe research abstraction schedule is staff work: eligibility/query review in\nNovember 2026, abstraction through January 2027, and verification/query closure\nin February 2027. Do not turn these work phases into participant visits.\n",
+      "sha256": "c79be9a3054f24be4efb54970679eef5a1cb895676d4a1118aff33748010a28c"
+    },
+    {
+      "path": "procedures.assessment_details.outcome_definitions",
+      "value": "Primary outcome: Mean eye-level change in intraocular pressure, mmHg, from the\nselected preoperative baseline to the selected historical Day 30 value\n(postoperative Days 21–45). Change is Day 30 minus baseline; positive change\nmeans a higher recorded pressure, not clinical improvement. Use eyes with both\nselected measurements. Report the number of contributing eyes and unique people.\nSecondary outcome 1: Proportion of eyes with at least one recorded intraocular\npressure of 25 mmHg or higher on postoperative Days 1–7. Denominator: eligible\neyes with at least one pressure measurement in that window. Multiple qualifying\nmeasurements in one eye count as one eye meeting the outcome.\nSecondary outcome 2: Proportion of eyes with a newly prescribed pressure-lowering\nmedication during postoperative Days 0–45. Denominator: eligible eyes with\nmedication documentation sufficient to assess initiation in that window.\nA new medication means a drug not listed for that eye at baseline; changing the\ndose of an existing drug does not count. A prescription does not establish\nadherence. Record eye-specific prescribing; an unresolved laterality is missing\nfor this outcome rather than assigned to both eyes.\nExploratory outcome: Association of documented diabetes status with eye-level\npressure change over the primary outcome interval. Diabetes is classified as\ndocumented present, explicitly documented absent, or unknown. Unknown status\nis reported separately and is not recoded as absence.\nNo other outcomes or treatment comparisons are specified.\n",
+      "sha256": "3290d93a3bb7a31312c68cce81c75355c001a8f181d68d3c637464980af2ea5b"
+    },
+    {
+      "path": "procedures.assessments",
+      "value": "Eligible routine-care cataract operations: 1 January 2024 through 15 August 2026,\ninclusive. Historical record window: 3 October 2023 through 30 September 2026,\ninclusive. This includes the preoperative baseline window for the earliest\neligible operation and all postoperative windows for the latest operation.\nHistorical Day 0 means the operation date for each eye, not research enrollment.\nBaseline: Last documented intraocular pressure for that eye within 90 calendar\ndays before its operation, excluding measurements on the operation date.\nEarly postoperative window: Days 1 through 7 after that eye's operation.\nDay 30 outcome window: Days 21 through 45 after that eye's operation.\nThese are historical record-selection windows, not scheduled research visits.\nAll relevant clinical care predates research record abstraction. No additional\nfollow-up is requested to obtain a missing measurement.\n",
+      "sha256": "f04b7319684875ff0e41c24ead878f363ef21ee72e25ff073dd708e9d8108301"
+    },
+    {
+      "path": "procedures.consent",
+      "value": "Reviewing body: Meridian Independent Research Review Board, independent of the\nsponsor and clinics. A waiver of informed consent and a waiver of individual\nprivacy authorization will be requested for this records-only review. Neither\nwaiver is granted yet. Research record access and abstraction cannot start\nuntil the required decisions and site permissions are documented. Do not\nrepresent a requested waiver as an approval or invent approval details.\nNo participant contact or re-consent is authorized by this study plan. If the\nreviewing body does not permit the requested records-only approach, revise the\nstudy plan through its normal review process before proceeding; do not add\nparticipant visits or generate an ICF as an automatic substitute.\n",
+      "sha256": "7358cd219a5a0bd5e8026a6b849bfee9a65743428f27e5b97086b5aa88998f51"
+    },
+    {
+      "path": "procedures.staff_work_plan",
+      "value": "Historical care dates: as specified above; record cutoff 30 September 2026.\nPlanned first research record access: 2 November 2026, subject to the required\nethics/privacy decisions and site permissions. These are research-work dates,\nnot dates of patient treatment or recruitment appointments.\nPrimary-outcome abstraction expected complete: 29 January 2027.\nAll record abstraction and source-query verification expected complete:\n26 February 2027. This defines completion of research data collection.\nAnalysis and administrative closeout planned by 31 March 2027. Closeout includes\nquery resolution, duplicate-record reconciliation, disposition/count review,\nfinal coded dataset lock, analysis and archival access review. Administrative\ncloseout does not extend historical clinical follow-up.\nCurrent study status: Research abstraction not started. No ethics approval or\nwaiver identifier, approval date or public registration identifier is supplied.\nNo actual study approval is represented by this synopsis.\n\nSPONSOR, STUDY STAFF AND TWO SITES\nSponsor: Meridian Ophthalmic Outcomes Research, 410 Research Avenue, Suite 210,\nBaltimore, MD 21202, United States.\nSponsor contact: Morgan Lane, Research Director, +1 202-555-0180,\nmorgan.lane@example.org.\nOverall principal investigator: Dr. Avery Brooks, MD, Principal Investigator.\nOverall study coordinator: Casey Reed, CCRC, Research Data Coordinator.\nBusiness phone: +1 202-555-0181. Office phone: +1 202-555-0182.\nEmail: casey.reed@example.org. Mailing address: Site 1 below.\n\nSite 1 facility: Meridian Eye Clinic, 520 Charles Street, Suite 110,\nBaltimore, MD 21201, United States.\nSite 1 investigator: Dr. Avery Brooks, MD, Principal Investigator.\nSite 1 contact: Casey Reed, CCRC, Research Data Coordinator; business\n+1 202-555-0181, office +1 202-555-0182, casey.reed@example.org.\n\nSite 2 facility: Severn Ophthalmology Center, 630 Severn Avenue, Suite 220,\nAnnapolis, MD 21401, United States.\nSite 2 investigator: Dr. Riley Chen, MD, Site Investigator.\nSite 2 contact: Jordan Blake, CCRC, Site Data Coordinator; business\n+1 202-555-0183, office +1 202-555-0184, jordan.blake@example.org.\nThese are staff research contacts available Monday–Friday, 9 a.m.–5 p.m. local\ntime, not participant scheduling or emergency lines.\n\nIRB CONTACT\nMeridian Independent Research Review Board.\nAffiliation: Independent IRB, unaffiliated with the sponsor and clinics.\nAddress: 740 Review Road, Suite 310, Baltimore, MD 21203, United States.\nPhone: +1 202-555-0185. Email: research.rights@example.org.\nThis contact handles research-rights questions and study oversight concerns.\n",
+      "sha256": "3d46e338ee8fe66fecd3838548974692bf0830fc8c402701bf508db428194125"
+    },
+    {
+      "path": "procedures.discontinuation",
+      "value": " there is no prospective\ncompletion visit or withdrawal appointment. If access to a record is restricted\nbefore abstraction, omit that record and document why. If an authorization or\nethics decision later requires removal of identifiable research data, follow\nthat decision and document the effect on analysis populations. This plan does\nnot promise that already aggregated results can be withdrawn or contact people\nto obtain retrospective withdrawal instructions. No replacement recruitment.\n",
+      "sha256": "4591cacb725da47d998b5c676152ae32aaeee329ed4387eceae2b60cc6af5984"
+    },
+    {
+      "path": "procedures.return_of_results",
+      "value": " or clinical alert service. This\nreview generates no validated clinical report or new clinical test. Historical\nfindings do not trigger new participant contact under this protocol. Aggregate\nresults may be made available through clinic notices after analysis; obtaining\na summary is not an additional research assessment or follow-up requirement.\n",
+      "sha256": "af1dec044484737ced33b8dbedf1caa1fdb0b9c424ded38524e3cc47bacbe1e8"
+    },
+    {
+      "path": "procedures.specimens",
+      "value": "No new participant test, contact, specimen collection, transfer/storage, genetic testing or imaging re-reading is planned.",
+      "sha256": "f55c69b3e24456bfad519bf797aa13b968bceaa89702049566c5a70aa652b009"
+    },
+    {
+      "path": "study.title",
+      "value": "Recorded Intraocular Pressure After Routine Cataract Surgery: A Retrospective Multisite Medical Record Review.",
+      "sha256": "73190376e9ac63256f17c585abd2d2345791146d893906a68eedb35cdba8c2c8"
+    },
+    {
+      "path": "study.short_title",
+      "value": "Eye Pressure After Cataract Surgery.",
+      "sha256": "6c7c757aba08cd5463e8ef11858bd880daf3c8ad604cd12217b50d789ce04b27"
+    },
+    {
+      "path": "study.timeline",
+      "value": "Historical care dates: as specified above; record cutoff 30 September 2026.\nPlanned first research record access: 2 November 2026, subject to the required\nethics/privacy decisions and site permissions. These are research-work dates,\nnot dates of patient treatment or recruitment appointments.\nPrimary-outcome abstraction expected complete: 29 January 2027.\nAll record abstraction and source-query verification expected complete:\n26 February 2027. This defines completion of research data collection.\nAnalysis and administrative closeout planned by 31 March 2027. Closeout includes\nquery resolution, duplicate-record reconciliation, disposition/count review,\nfinal coded dataset lock, analysis and archival access review. Administrative\ncloseout does not extend historical clinical follow-up.\nCurrent study status: Research abstraction not started. No ethics approval or\nwaiver identifier, approval date or public registration identifier is supplied.\nNo actual study approval is represented by this synopsis.\n\nSPONSOR, STUDY STAFF AND TWO SITES\nSponsor: Meridian Ophthalmic Outcomes Research, 410 Research Avenue, Suite 210,\nBaltimore, MD 21202, United States.\nSponsor contact: Morgan Lane, Research Director, +1 202-555-0180,\nmorgan.lane@example.org.\nOverall principal investigator: Dr. Avery Brooks, MD, Principal Investigator.\nOverall study coordinator: Casey Reed, CCRC, Research Data Coordinator.\nBusiness phone: +1 202-555-0181. Office phone: +1 202-555-0182.\nEmail: casey.reed@example.org. Mailing address: Site 1 below.\n\nSite 1 facility: Meridian Eye Clinic, 520 Charles Street, Suite 110,\nBaltimore, MD 21201, United States.\nSite 1 investigator: Dr. Avery Brooks, MD, Principal Investigator.\nSite 1 contact: Casey Reed, CCRC, Research Data Coordinator; business\n+1 202-555-0181, office +1 202-555-0182, casey.reed@example.org.\n\nSite 2 facility: Severn Ophthalmology Center, 630 Severn Avenue, Suite 220,\nAnnapolis, MD 21401, United States.\nSite 2 investigator: Dr. Riley Chen, MD, Site Investigator.\nSite 2 contact: Jordan Blake, CCRC, Site Data Coordinator; business\n+1 202-555-0183, office +1 202-555-0184, jordan.blake@example.org.\nThese are staff research contacts available Monday–Friday, 9 a.m.–5 p.m. local\ntime, not participant scheduling or emergency lines.\n\nIRB CONTACT\nMeridian Independent Research Review Board.\nAffiliation: Independent IRB, unaffiliated with the sponsor and clinics.\nAddress: 740 Review Road, Suite 310, Baltimore, MD 21203, United States.\nPhone: +1 202-555-0185. Email: research.rights@example.org.\nThis contact handles research-rights questions and study oversight concerns.\n",
+      "sha256": "3d46e338ee8fe66fecd3838548974692bf0830fc8c402701bf508db428194125"
+    },
+    {
+      "path": "study.completion",
+      "value": "All record abstraction and source-query verification by 26 February 2027 defines research data collection completion. Analysis and administrative closeout by 31 March 2027 includes reconciliation, disposition/count review, final coded dataset lock, analysis and archival access review.",
+      "sha256": "c6406c1d6b7907032cce8394836cb9bed720d5109ee0083b018a6ddc585fe12e"
+    },
+    {
+      "path": "procedures.assessment_details",
+      "value": {
+        "outcome_definitions": "Primary outcome: Mean eye-level change in intraocular pressure, mmHg, from the\nselected preoperative baseline to the selected historical Day 30 value\n(postoperative Days 21–45). Change is Day 30 minus baseline; positive change\nmeans a higher recorded pressure, not clinical improvement. Use eyes with both\nselected measurements. Report the number of contributing eyes and unique people.\nSecondary outcome 1: Proportion of eyes with at least one recorded intraocular\npressure of 25 mmHg or higher on postoperative Days 1–7. Denominator: eligible\neyes with at least one pressure measurement in that window. Multiple qualifying\nmeasurements in one eye count as one eye meeting the outcome.\nSecondary outcome 2: Proportion of eyes with a newly prescribed pressure-lowering\nmedication during postoperative Days 0–45. Denominator: eligible eyes with\nmedication documentation sufficient to assess initiation in that window.\nA new medication means a drug not listed for that eye at baseline; changing the\ndose of an existing drug does not count. A prescription does not establish\nadherence. Record eye-specific prescribing; an unresolved laterality is missing\nfor this outcome rather than assigned to both eyes.\nExploratory outcome: Association of documented diabetes status with eye-level\npressure change over the primary outcome interval. Diabetes is classified as\ndocumented present, explicitly documented absent, or unknown. Unknown status\nis reported separately and is not recoded as absence.\nNo other outcomes or treatment comparisons are specified.\n"
+      },
+      "sha256": "64bfcff8dd8524592685090be835303ac9eacba5fcbedcf84fd661121b0e7282"
+    }
+  ],
+  "approved_source": {
+    "design": {
+      "study_design": "Retrospective observational cohort at two United States sites; no assigned treatment or participant contact. Historical care and eye-specific surgery anchors are distinct from future staff abstraction."
+    },
+    "population": {
+      "sample_size": "240 anticipated unique people and approximately 360 eligible operated eyes.",
+      "eligibility_notes": "Retain an eligible eye if the other eye is excluded; exclude the person only when no eligible eye remains. Missing measurements affect analyses, not cohort eligibility."
+    },
+    "procedures": {
+      "methods": "Research staff will access records only after required ethics/privacy decisions\nand written site permissions. Staff will verify eligibility, link duplicate\nrecords, assign study IDs and abstract the following existing information:\nage at operation, sex, eye laterality, operation date, operating site, documented\ndiabetes status, documented glaucoma diagnosis, pressure-lowering medication\nuse at baseline, pressure measurements and their dates/methods, and new\npressure-lowering medication prescriptions within 45 days after surgery.\nUse the recorded pressure value in mmHg and retain the recorded method.\nNo research pressure test, vision test, questionnaire, telephone call, clinic\nvisit, specimen collection or other new participant procedure is performed.\nNo specimens are accessed, transferred or stored. No genetic information or\nlaboratory testing is included. No imaging re-reading is planned.\nFor the baseline, choose the latest measurement strictly before surgery within\nthe specified 90-day window. In the Day 30 window, choose the measurement closest\nto postoperative Day 30; if equally distant, choose the earlier date. For the\nearly window, use all recorded pressure measurements to determine whether any\nvalue reaches the specified threshold; one eye is counted only once even if\nseveral measurements meet that threshold. For baseline and Day 30 selection, if two pressure values on the selected\ndate have different times, use the later recorded time. If time cannot resolve\nmultiple values, retain the source ambiguity as missing for that outcome\nrather than choosing a value without a documented rule.\nRetain measurements recorded before or after treatment as documented; these\nobservational summaries do not represent untreated pressure trajectories.\nThe research abstraction schedule is staff work: eligibility/query review in\nNovember 2026, abstraction through January 2027, and verification/query closure\nin February 2027. Do not turn these work phases into participant visits.\n",
+      "assessment_details": {
+        "outcome_definitions": "Primary outcome: Mean eye-level change in intraocular pressure, mmHg, from the\nselected preoperative baseline to the selected historical Day 30 value\n(postoperative Days 21–45). Change is Day 30 minus baseline; positive change\nmeans a higher recorded pressure, not clinical improvement. Use eyes with both\nselected measurements. Report the number of contributing eyes and unique people.\nSecondary outcome 1: Proportion of eyes with at least one recorded intraocular\npressure of 25 mmHg or higher on postoperative Days 1–7. Denominator: eligible\neyes with at least one pressure measurement in that window. Multiple qualifying\nmeasurements in one eye count as one eye meeting the outcome.\nSecondary outcome 2: Proportion of eyes with a newly prescribed pressure-lowering\nmedication during postoperative Days 0–45. Denominator: eligible eyes with\nmedication documentation sufficient to assess initiation in that window.\nA new medication means a drug not listed for that eye at baseline; changing the\ndose of an existing drug does not count. A prescription does not establish\nadherence. Record eye-specific prescribing; an unresolved laterality is missing\nfor this outcome rather than assigned to both eyes.\nExploratory outcome: Association of documented diabetes status with eye-level\npressure change over the primary outcome interval. Diabetes is classified as\ndocumented present, explicitly documented absent, or unknown. Unknown status\nis reported separately and is not recoded as absence.\nNo other outcomes or treatment comparisons are specified.\n"
+      },
+      "assessments": "Eligible routine-care cataract operations: 1 January 2024 through 15 August 2026,\ninclusive. Historical record window: 3 October 2023 through 30 September 2026,\ninclusive. This includes the preoperative baseline window for the earliest\neligible operation and all postoperative windows for the latest operation.\nHistorical Day 0 means the operation date for each eye, not research enrollment.\nBaseline: Last documented intraocular pressure for that eye within 90 calendar\ndays before its operation, excluding measurements on the operation date.\nEarly postoperative window: Days 1 through 7 after that eye's operation.\nDay 30 outcome window: Days 21 through 45 after that eye's operation.\nThese are historical record-selection windows, not scheduled research visits.\nAll relevant clinical care predates research record abstraction. No additional\nfollow-up is requested to obtain a missing measurement.\n",
+      "consent": "Reviewing body: Meridian Independent Research Review Board, independent of the\nsponsor and clinics. A waiver of informed consent and a waiver of individual\nprivacy authorization will be requested for this records-only review. Neither\nwaiver is granted yet. Research record access and abstraction cannot start\nuntil the required decisions and site permissions are documented. Do not\nrepresent a requested waiver as an approval or invent approval details.\nNo participant contact or re-consent is authorized by this study plan. If the\nreviewing body does not permit the requested records-only approach, revise the\nstudy plan through its normal review process before proceeding; do not add\nparticipant visits or generate an ICF as an automatic substitute.\n",
+      "staff_work_plan": "Historical care dates: as specified above; record cutoff 30 September 2026.\nPlanned first research record access: 2 November 2026, subject to the required\nethics/privacy decisions and site permissions. These are research-work dates,\nnot dates of patient treatment or recruitment appointments.\nPrimary-outcome abstraction expected complete: 29 January 2027.\nAll record abstraction and source-query verification expected complete:\n26 February 2027. This defines completion of research data collection.\nAnalysis and administrative closeout planned by 31 March 2027. Closeout includes\nquery resolution, duplicate-record reconciliation, disposition/count review,\nfinal coded dataset lock, analysis and archival access review. Administrative\ncloseout does not extend historical clinical follow-up.\nCurrent study status: Research abstraction not started. No ethics approval or\nwaiver identifier, approval date or public registration identifier is supplied.\nNo actual study approval is represented by this synopsis.\n\nSPONSOR, STUDY STAFF AND TWO SITES\nSponsor: Meridian Ophthalmic Outcomes Research, 410 Research Avenue, Suite 210,\nBaltimore, MD 21202, United States.\nSponsor contact: Morgan Lane, Research Director, +1 202-555-0180,\nmorgan.lane@example.org.\nOverall principal investigator: Dr. Avery Brooks, MD, Principal Investigator.\nOverall study coordinator: Casey Reed, CCRC, Research Data Coordinator.\nBusiness phone: +1 202-555-0181. Office phone: +1 202-555-0182.\nEmail: casey.reed@example.org. Mailing address: Site 1 below.\n\nSite 1 facility: Meridian Eye Clinic, 520 Charles Street, Suite 110,\nBaltimore, MD 21201, United States.\nSite 1 investigator: Dr. Avery Brooks, MD, Principal Investigator.\nSite 1 contact: Casey Reed, CCRC, Research Data Coordinator; business\n+1 202-555-0181, office +1 202-555-0182, casey.reed@example.org.\n\nSite 2 facility: Severn Ophthalmology Center, 630 Severn Avenue, Suite 220,\nAnnapolis, MD 21401, United States.\nSite 2 investigator: Dr. Riley Chen, MD, Site Investigator.\nSite 2 contact: Jordan Blake, CCRC, Site Data Coordinator; business\n+1 202-555-0183, office +1 202-555-0184, jordan.blake@example.org.\nThese are staff research contacts available Monday–Friday, 9 a.m.–5 p.m. local\ntime, not participant scheduling or emergency lines.\n\nIRB CONTACT\nMeridian Independent Research Review Board.\nAffiliation: Independent IRB, unaffiliated with the sponsor and clinics.\nAddress: 740 Review Road, Suite 310, Baltimore, MD 21203, United States.\nPhone: +1 202-555-0185. Email: research.rights@example.org.\nThis contact handles research-rights questions and study oversight concerns.\n",
+      "discontinuation": " there is no prospective\ncompletion visit or withdrawal appointment. If access to a record is restricted\nbefore abstraction, omit that record and document why. If an authorization or\nethics decision later requires removal of identifiable research data, follow\nthat decision and document the effect on analysis populations. This plan does\nnot promise that already aggregated results can be withdrawn or contact people\nto obtain retrospective withdrawal instructions. No replacement recruitment.\n",
+      "return_of_results": " or clinical alert service. This\nreview generates no validated clinical report or new clinical test. Historical\nfindings do not trigger new participant contact under this protocol. Aggregate\nresults may be made available through clinic notices after analysis; obtaining\na summary is not an additional research assessment or follow-up requirement.\n",
+      "specimens": "No new participant test, contact, specimen collection, transfer/storage, genetic testing or imaging re-reading is planned."
+    },
+    "study": {
+      "title": "Recorded Intraocular Pressure After Routine Cataract Surgery: A Retrospective Multisite Medical Record Review.",
+      "short_title": "Eye Pressure After Cataract Surgery.",
+      "timeline": "Historical care dates: as specified above; record cutoff 30 September 2026.\nPlanned first research record access: 2 November 2026, subject to the required\nethics/privacy decisions and site permissions. These are research-work dates,\nnot dates of patient treatment or recruitment appointments.\nPrimary-outcome abstraction expected complete: 29 January 2027.\nAll record abstraction and source-query verification expected complete:\n26 February 2027. This defines completion of research data collection.\nAnalysis and administrative closeout planned by 31 March 2027. Closeout includes\nquery resolution, duplicate-record reconciliation, disposition/count review,\nfinal coded dataset lock, analysis and archival access review. Administrative\ncloseout does not extend historical clinical follow-up.\nCurrent study status: Research abstraction not started. No ethics approval or\nwaiver identifier, approval date or public registration identifier is supplied.\nNo actual study approval is represented by this synopsis.\n\nSPONSOR, STUDY STAFF AND TWO SITES\nSponsor: Meridian Ophthalmic Outcomes Research, 410 Research Avenue, Suite 210,\nBaltimore, MD 21202, United States.\nSponsor contact: Morgan Lane, Research Director, +1 202-555-0180,\nmorgan.lane@example.org.\nOverall principal investigator: Dr. Avery Brooks, MD, Principal Investigator.\nOverall study coordinator: Casey Reed, CCRC, Research Data Coordinator.\nBusiness phone: +1 202-555-0181. Office phone: +1 202-555-0182.\nEmail: casey.reed@example.org. Mailing address: Site 1 below.\n\nSite 1 facility: Meridian Eye Clinic, 520 Charles Street, Suite 110,\nBaltimore, MD 21201, United States.\nSite 1 investigator: Dr. Avery Brooks, MD, Principal Investigator.\nSite 1 contact: Casey Reed, CCRC, Research Data Coordinator; business\n+1 202-555-0181, office +1 202-555-0182, casey.reed@example.org.\n\nSite 2 facility: Severn Ophthalmology Center, 630 Severn Avenue, Suite 220,\nAnnapolis, MD 21401, United States.\nSite 2 investigator: Dr. Riley Chen, MD, Site Investigator.\nSite 2 contact: Jordan Blake, CCRC, Site Data Coordinator; business\n+1 202-555-0183, office +1 202-555-0184, jordan.blake@example.org.\nThese are staff research contacts available Monday–Friday, 9 a.m.–5 p.m. local\ntime, not participant scheduling or emergency lines.\n\nIRB CONTACT\nMeridian Independent Research Review Board.\nAffiliation: Independent IRB, unaffiliated with the sponsor and clinics.\nAddress: 740 Review Road, Suite 310, Baltimore, MD 21203, United States.\nPhone: +1 202-555-0185. Email: research.rights@example.org.\nThis contact handles research-rights questions and study oversight concerns.\n",
+      "completion": "All record abstraction and source-query verification by 26 February 2027 defines research data collection completion. Analysis and administrative closeout by 31 March 2027 includes reconciliation, disposition/count review, final coded dataset lock, analysis and archival access review."
+    }
+  },
+  "source_evidence_coverage_map": {
+    "schema_version": "source-evidence-coverage-map/v1",
+    "study_type": "Retrospective",
+    "icf_template": null,
+    "entries": [
+      {
+        "source_path": "confidentiality.data_handling",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "confidentiality",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "design.arms",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.design",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "design.masking",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.design",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "design.study_design",
+        "approved_value_sha256": "cf931d5485bdb2a6c39b8ed186d9086956661c89e37971fb6d8fa69314ddf2f7",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.bias",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.design",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "endpoints.primary",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": false
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "endpoints.secondary",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "ethics",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "objectives.primary",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "objectives.secondary",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "parties.irb",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "population.eligibility_notes",
+        "approved_value_sha256": "f93d8f1698a2b19889cd504c1c9c14349bef42e03ab6043dacd7c0941715d043",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.exclusion_criteria",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "population.inclusion_criteria",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": false
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.population",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "population.maximum_age",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "population.minimum_age",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "population.sample_justification",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "sample-size",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "population.sample_size",
+        "approved_value_sha256": "fac88eb1948c30473009a816a09d6b7bddc5c35ede6e59fd67888c82f6420821",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "sample-size",
+            "required": true,
+            "approved": true
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.population",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "population.study_population",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": false
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.population",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.assessment_details",
+        "approved_value_sha256": "b2a97345bdfa30dc51e798f8403c46ebfbe98e4e81919510432bd17bac1c0895",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.assessments",
+        "approved_value_sha256": "f04b7319684875ff0e41c24ead878f363ef21ee72e25ff073dd708e9d8108301",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.completion",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.consent",
+        "approved_value_sha256": "7358cd219a5a0bd5e8026a6b849bfee9a65743428f27e5b97086b5aa88998f51",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.discontinuation",
+        "approved_value_sha256": "4591cacb725da47d998b5c676152ae32aaeee329ed4387eceae2b60cc6af5984",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.enrollment",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.methods",
+        "approved_value_sha256": "c79be9a3054f24be4efb54970679eef5a1cb895676d4a1118aff33748010a28c",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.minimum_days_before_screening_without_participation",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "subjects.eligibility",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.replacement",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.retention",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.return_of_results",
+        "approved_value_sha256": "af1dec044484737ced33b8dbedf1caa1fdb0b9c424ded38524e3cc47bacbe1e8",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.specimens",
+        "approved_value_sha256": "f55c69b3e24456bfad519bf797aa13b968bceaa89702049566c5a70aa652b009",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.staff_work_plan",
+        "approved_value_sha256": "3d46e338ee8fe66fecd3838548974692bf0830fc8c402701bf508db428194125",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.study_termination",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.termination",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.visit_schedule",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "procedures.visit_schedule_table",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.benefits",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.compensation_or_reimbursement",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.injury_handling",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "ethics",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.privacy",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "confidentiality",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "risks_benefits.risks",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "quality-safety",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "safety.roles",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "quality-safety",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.analysis_plan",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.considerations",
+            "required": true,
+            "approved": false
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.datasets",
+            "required": true,
+            "approved": false
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.methodology",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.bias_minimization",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-design.bias",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.methodology",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.methodology",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "statistics.software",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "analysis-plan.considerations",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "study.background",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "study.completion",
+        "approved_value_sha256": "c6406c1d6b7907032cce8394836cb9bed720d5109ee0083b018a6ddc585fe12e",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.hypothesis",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": false
+          },
+          {
+            "artifact": "protocol.docx",
+            "section_id": "objectives",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "study.references",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": false
+          }
+        ]
+      },
+      {
+        "source_path": "study.timeline",
+        "approved_value_sha256": "3d46e338ee8fe66fecd3838548974692bf0830fc8c402701bf508db428194125",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "study-procedure.enrollment",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.title",
+        "approved_value_sha256": "73190376e9ac63256f17c585abd2d2345791146d893906a68eedb35cdba8c2c8",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": true
+          }
+        ]
+      },
+      {
+        "source_path": "study.unmet_need",
+        "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "destinations": [
+          {
+            "artifact": "protocol.docx",
+            "section_id": "introduction",
+            "required": true,
+            "approved": false
+          }
+        ]
+      }
+    ]
+  },
+  "evidence_checklist": [
+    {
+      "section_id": "study-procedure.enrollment",
+      "required_source_paths": [
+        "procedures.consent",
+        "procedures.enrollment",
+        "procedures.methods",
+        "procedures.assessment_details",
+        "procedures.assessments",
+        "procedures.visit_schedule_table",
+        "procedures.visit_schedule",
+        "procedures.staff_work_plan",
+        "study.timeline",
+        "procedures.completion",
+        "study.completion",
+        "procedures.study_termination",
+        "procedures.termination",
+        "procedures.retention",
+        "procedures.discontinuation",
+        "procedures.replacement",
+        "procedures.specimens",
+        "procedures.return_of_results"
+      ],
+      "approved_values": {
+        "procedures.consent": "Reviewing body: Meridian Independent Research Review Board, independent of the\nsponsor and clinics. A waiver of informed consent and a waiver of individual\nprivacy authorization will be requested for this records-only review. Neither\nwaiver is granted yet. Research record access and abstraction cannot start\nuntil the required decisions and site permissions are documented. Do not\nrepresent a requested waiver as an approval or invent approval details.\nNo participant contact or re-consent is authorized by this study plan. If the\nreviewing body does not permit the requested records-only approach, revise the\nstudy plan through its normal review process before proceeding; do not add\nparticipant visits or generate an ICF as an automatic substitute.\n",
+        "procedures.enrollment": null,
+        "procedures.methods": "Research staff will access records only after required ethics/privacy decisions\nand written site permissions. Staff will verify eligibility, link duplicate\nrecords, assign study IDs and abstract the following existing information:\nage at operation, sex, eye laterality, operation date, operating site, documented\ndiabetes status, documented glaucoma diagnosis, pressure-lowering medication\nuse at baseline, pressure measurements and their dates/methods, and new\npressure-lowering medication prescriptions within 45 days after surgery.\nUse the recorded pressure value in mmHg and retain the recorded method.\nNo research pressure test, vision test, questionnaire, telephone call, clinic\nvisit, specimen collection or other new participant procedure is performed.\nNo specimens are accessed, transferred or stored. No genetic information or\nlaboratory testing is included. No imaging re-reading is planned.\nFor the baseline, choose the latest measurement strictly before surgery within\nthe specified 90-day window. In the Day 30 window, choose the measurement closest\nto postoperative Day 30; if equally distant, choose the earlier date. For the\nearly window, use all recorded pressure measurements to determine whether any\nvalue reaches the specified threshold; one eye is counted only once even if\nseveral measurements meet that threshold. For baseline and Day 30 selection, if two pressure values on the selected\ndate have different times, use the later recorded time. If time cannot resolve\nmultiple values, retain the source ambiguity as missing for that outcome\nrather than choosing a value without a documented rule.\nRetain measurements recorded before or after treatment as documented; these\nobservational summaries do not represent untreated pressure trajectories.\nThe research abstraction schedule is staff work: eligibility/query review in\nNovember 2026, abstraction through January 2027, and verification/query closure\nin February 2027. Do not turn these work phases into participant visits.\n",
+        "procedures.assessment_details": {
+          "outcome_definitions": "Primary outcome: Mean eye-level change in intraocular pressure, mmHg, from the\nselected preoperative baseline to the selected historical Day 30 value\n(postoperative Days 21–45). Change is Day 30 minus baseline; positive change\nmeans a higher recorded pressure, not clinical improvement. Use eyes with both\nselected measurements. Report the number of contributing eyes and unique people.\nSecondary outcome 1: Proportion of eyes with at least one recorded intraocular\npressure of 25 mmHg or higher on postoperative Days 1–7. Denominator: eligible\neyes with at least one pressure measurement in that window. Multiple qualifying\nmeasurements in one eye count as one eye meeting the outcome.\nSecondary outcome 2: Proportion of eyes with a newly prescribed pressure-lowering\nmedication during postoperative Days 0–45. Denominator: eligible eyes with\nmedication documentation sufficient to assess initiation in that window.\nA new medication means a drug not listed for that eye at baseline; changing the\ndose of an existing drug does not count. A prescription does not establish\nadherence. Record eye-specific prescribing; an unresolved laterality is missing\nfor this outcome rather than assigned to both eyes.\nExploratory outcome: Association of documented diabetes status with eye-level\npressure change over the primary outcome interval. Diabetes is classified as\ndocumented present, explicitly documented absent, or unknown. Unknown status\nis reported separately and is not recoded as absence.\nNo other outcomes or treatment comparisons are specified.\n"
+        },
+        "procedures.assessments": "Eligible routine-care cataract operations: 1 January 2024 through 15 August 2026,\ninclusive. Historical record window: 3 October 2023 through 30 September 2026,\ninclusive. This includes the preoperative baseline window for the earliest\neligible operation and all postoperative windows for the latest operation.\nHistorical Day 0 means the operation date for each eye, not research enrollment.\nBaseline: Last documented intraocular pressure for that eye within 90 calendar\ndays before its operation, excluding measurements on the operation date.\nEarly postoperative window: Days 1 through 7 after that eye's operation.\nDay 30 outcome window: Days 21 through 45 after that eye's operation.\nThese are historical record-selection windows, not scheduled research visits.\nAll relevant clinical care predates research record abstraction. No additional\nfollow-up is requested to obtain a missing measurement.\n",
+        "procedures.visit_schedule_table": null,
+        "procedures.visit_schedule": null,
+        "procedures.staff_work_plan": "Historical care dates: as specified above; record cutoff 30 September 2026.\nPlanned first research record access: 2 November 2026, subject to the required\nethics/privacy decisions and site permissions. These are research-work dates,\nnot dates of patient treatment or recruitment appointments.\nPrimary-outcome abstraction expected complete: 29 January 2027.\nAll record abstraction and source-query verification expected complete:\n26 February 2027. This defines completion of research data collection.\nAnalysis and administrative closeout planned by 31 March 2027. Closeout includes\nquery resolution, duplicate-record reconciliation, disposition/count review,\nfinal coded dataset lock, analysis and archival access review. Administrative\ncloseout does not extend historical clinical follow-up.\nCurrent study status: Research abstraction not started. No ethics approval or\nwaiver identifier, approval date or public registration identifier is supplied.\nNo actual study approval is represented by this synopsis.\n\nSPONSOR, STUDY STAFF AND TWO SITES\nSponsor: Meridian Ophthalmic Outcomes Research, 410 Research Avenue, Suite 210,\nBaltimore, MD 21202, United States.\nSponsor contact: Morgan Lane, Research Director, +1 202-555-0180,\nmorgan.lane@example.org.\nOverall principal investigator: Dr. Avery Brooks, MD, Principal Investigator.\nOverall study coordinator: Casey Reed, CCRC, Research Data Coordinator.\nBusiness phone: +1 202-555-0181. Office phone: +1 202-555-0182.\nEmail: casey.reed@example.org. Mailing address: Site 1 below.\n\nSite 1 facility: Meridian Eye Clinic, 520 Charles Street, Suite 110,\nBaltimore, MD 21201, United States.\nSite 1 investigator: Dr. Avery Brooks, MD, Principal Investigator.\nSite 1 contact: Casey Reed, CCRC, Research Data Coordinator; business\n+1 202-555-0181, office +1 202-555-0182, casey.reed@example.org.\n\nSite 2 facility: Severn Ophthalmology Center, 630 Severn Avenue, Suite 220,\nAnnapolis, MD 21401, United States.\nSite 2 investigator: Dr. Riley Chen, MD, Site Investigator.\nSite 2 contact: Jordan Blake, CCRC, Site Data Coordinator; business\n+1 202-555-0183, office +1 202-555-0184, jordan.blake@example.org.\nThese are staff research contacts available Monday–Friday, 9 a.m.–5 p.m. local\ntime, not participant scheduling or emergency lines.\n\nIRB CONTACT\nMeridian Independent Research Review Board.\nAffiliation: Independent IRB, unaffiliated with the sponsor and clinics.\nAddress: 740 Review Road, Suite 310, Baltimore, MD 21203, United States.\nPhone: +1 202-555-0185. Email: research.rights@example.org.\nThis contact handles research-rights questions and study oversight concerns.\n",
+        "study.timeline": "Historical care dates: as specified above; record cutoff 30 September 2026.\nPlanned first research record access: 2 November 2026, subject to the required\nethics/privacy decisions and site permissions. These are research-work dates,\nnot dates of patient treatment or recruitment appointments.\nPrimary-outcome abstraction expected complete: 29 January 2027.\nAll record abstraction and source-query verification expected complete:\n26 February 2027. This defines completion of research data collection.\nAnalysis and administrative closeout planned by 31 March 2027. Closeout includes\nquery resolution, duplicate-record reconciliation, disposition/count review,\nfinal coded dataset lock, analysis and archival access review. Administrative\ncloseout does not extend historical clinical follow-up.\nCurrent study status: Research abstraction not started. No ethics approval or\nwaiver identifier, approval date or public registration identifier is supplied.\nNo actual study approval is represented by this synopsis.\n\nSPONSOR, STUDY STAFF AND TWO SITES\nSponsor: Meridian Ophthalmic Outcomes Research, 410 Research Avenue, Suite 210,\nBaltimore, MD 21202, United States.\nSponsor contact: Morgan Lane, Research Director, +1 202-555-0180,\nmorgan.lane@example.org.\nOverall principal investigator: Dr. Avery Brooks, MD, Principal Investigator.\nOverall study coordinator: Casey Reed, CCRC, Research Data Coordinator.\nBusiness phone: +1 202-555-0181. Office phone: +1 202-555-0182.\nEmail: casey.reed@example.org. Mailing address: Site 1 below.\n\nSite 1 facility: Meridian Eye Clinic, 520 Charles Street, Suite 110,\nBaltimore, MD 21201, United States.\nSite 1 investigator: Dr. Avery Brooks, MD, Principal Investigator.\nSite 1 contact: Casey Reed, CCRC, Research Data Coordinator; business\n+1 202-555-0181, office +1 202-555-0182, casey.reed@example.org.\n\nSite 2 facility: Severn Ophthalmology Center, 630 Severn Avenue, Suite 220,\nAnnapolis, MD 21401, United States.\nSite 2 investigator: Dr. Riley Chen, MD, Site Investigator.\nSite 2 contact: Jordan Blake, CCRC, Site Data Coordinator; business\n+1 202-555-0183, office +1 202-555-0184, jordan.blake@example.org.\nThese are staff research contacts available Monday–Friday, 9 a.m.–5 p.m. local\ntime, not participant scheduling or emergency lines.\n\nIRB CONTACT\nMeridian Independent Research Review Board.\nAffiliation: Independent IRB, unaffiliated with the sponsor and clinics.\nAddress: 740 Review Road, Suite 310, Baltimore, MD 21203, United States.\nPhone: +1 202-555-0185. Email: research.rights@example.org.\nThis contact handles research-rights questions and study oversight concerns.\n",
+        "procedures.completion": null,
+        "study.completion": "All record abstraction and source-query verification by 26 February 2027 defines research data collection completion. Analysis and administrative closeout by 31 March 2027 includes reconciliation, disposition/count review, final coded dataset lock, analysis and archival access review.",
+        "procedures.study_termination": null,
+        "procedures.termination": null,
+        "procedures.retention": null,
+        "procedures.discontinuation": " there is no prospective\ncompletion visit or withdrawal appointment. If access to a record is restricted\nbefore abstraction, omit that record and document why. If an authorization or\nethics decision later requires removal of identifiable research data, follow\nthat decision and document the effect on analysis populations. This plan does\nnot promise that already aggregated results can be withdrawn or contact people\nto obtain retrospective withdrawal instructions. No replacement recruitment.\n",
+        "procedures.replacement": null,
+        "procedures.specimens": "No new participant test, contact, specimen collection, transfer/storage, genetic testing or imaging re-reading is planned.",
+        "procedures.return_of_results": " or clinical alert service. This\nreview generates no validated clinical report or new clinical test. Historical\nfindings do not trigger new participant contact under this protocol. Aggregate\nresults may be made available through clinic notices after analysis; obtaining\na summary is not an additional research assessment or follow-up requirement.\n"
+      }
+    }
+  ],
+  "section_contracts": [
+    {
+      "section_id": "study-procedure.enrollment",
+      "number": "8.1.",
+      "title": "Informed Consent / Subject Enrollment",
+      "role": "leaf",
+      "required": true,
+      "allowed_modes": [
+        "agent_draft",
+        "fixed_boilerplate"
+      ],
+      "minimum_evidence": [
+        "procedures.consent",
+        "procedures.enrollment",
+        "procedures.methods",
+        "procedures.assessment_details",
+        "procedures.assessments",
+        "procedures.visit_schedule_table",
+        "procedures.visit_schedule",
+        "procedures.staff_work_plan",
+        "study.timeline",
+        "procedures.completion",
+        "study.completion",
+        "procedures.study_termination",
+        "procedures.termination",
+        "procedures.retention",
+        "procedures.discontinuation",
+        "procedures.replacement",
+        "procedures.specimens",
+        "procedures.return_of_results"
+      ],
+      "optional_evidence": [],
+      "benefit_context": null,
+      "schedule_interpretation": null,
+      "assessment_presentation": null,
+      "table_evidence": [],
+      "fixed_boilerplate": [
+        {
+          "boilerplate_id": "retrospective-consent",
+          "text": "This retrospective study uses existing records.",
+          "sha256": "12ea7e7a93f29af8a2119703248c0aacb7345514dfda9e09a57fcf677daeed2a"
+        }
+      ],
+      "content_expectations": [
+        "Describe the approved record-review or enrollment sequence, time points, and timeline. State the supplied consent authorization, including an IRB-approved waiver when the approved source explicitly provides one. Preserve supplied retention, withdrawal, and replacement facts without implying that retrospective chart abstraction includes participant contact unless the source establishes it. Do not invent an IRB waiver or its timing.",
+        "Do not replace supplied detail with generic clinical prose.",
+        "This section owns supplied specimen handling and results-return policies. Preserve collection/coding, transfer recipients and access limits, testing purpose, specimen destruction timing and any absolute deadline, future-use/sharing/sale/commercial restrictions, and the distinction between specimen retention and derived-data retention. Distinguish individual clinical results, research/genetic results, incidental findings and aggregate summaries, including any limits, preferences, recipients and timing. Keep routine-care referral arrangements when supplied. Preserve uncertainty; absent optional policies remain absent. For records-only research, describe only the approved existing records/specimens and results policies without adding collection or participant contact.",
+        "This retrospective section owns the complete supplied record-abstraction methods and assessment details: instruments and scales, source restrictions, date anchors/windows, value selection and tie rules, ambiguous/missing values, event definitions, deduplication and evidence needed to establish zero or absence. Preserve every unique condition and exception here, with concise summaries elsewhere. Also explain supplied staff work phases, record and study completion triggers, and permission-suspension/resumption policies. These are staff tasks and historical windows, not participant visits. The retrospective template has no separate measurement section or assessment matrix; present these details as prose or lists within this section."
+      ],
+      "maximum_draft_words": 0,
+      "semantic_evidence": [],
+      "source_coverage": "all_material_items",
+      "evidence_scopes": [],
+      "approved_source_word_count": 1273,
+      "reference_detail_target_words": 0,
+      "summary_concepts": [],
+      "summary_obligations": {},
+      "concept_ownership": {
+        "owns": [
+          "endpoint-measurement-methods",
+          "record-selection-methods",
+          "staff-work-plan",
+          "study-completion",
+          "access-suspension",
+          "specimen-handling",
+          "return-of-results"
+        ],
+        "brief_reference_only": [],
+        "do_not_restate": []
+      }
+    }
+  ],
+  "protocol_writing_plan": {
+    "sections": [
+      {
+        "section_id": "title-page",
+        "number": "1.",
+        "title": "TITLE PAGE"
+      },
+      {
+        "section_id": "investigator-agreement",
+        "number": "2.",
+        "title": "INVESTIGATOR AGREEMENT"
+      },
+      {
+        "section_id": "table-of-contents",
+        "number": "3.",
+        "title": "TABLE OF CONTENTS"
+      },
+      {
+        "section_id": "introduction",
+        "number": "4.",
+        "title": "INTRODUCTION"
+      },
+      {
+        "section_id": "objectives",
+        "number": "5.",
+        "title": "OBJECTIVE(S)"
+      },
+      {
+        "section_id": "subjects",
+        "number": "6.",
+        "title": "SUBJECTS"
+      },
+      {
+        "section_id": "subjects.population",
+        "number": "6.1.",
+        "title": "Subject Population"
+      },
+      {
+        "section_id": "subjects.eligibility",
+        "number": "6.2.",
+        "title": "Inclusion/Exclusion Criteria"
+      },
+      {
+        "section_id": "study-design",
+        "number": "7.",
+        "title": "STUDY DESIGN"
+      },
+      {
+        "section_id": "study-design.design",
+        "number": "7.1.",
+        "title": "Study Design"
+      },
+      {
+        "section_id": "study-design.bias",
+        "number": "7.2.",
+        "title": "Methods Used to Minimize Bias"
+      },
+      {
+        "section_id": "study-procedure",
+        "number": "8.",
+        "title": "STUDY PROCEDURE"
+      },
+      {
+        "section_id": "study-procedure.enrollment",
+        "number": "8.1.",
+        "title": "Informed Consent / Subject Enrollment"
+      },
+      {
+        "section_id": "analysis-plan",
+        "number": "9.",
+        "title": "ANALYSIS PLAN"
+      },
+      {
+        "section_id": "analysis-plan.datasets",
+        "number": "9.1.",
+        "title": "Analysis Data Sets"
+      },
+      {
+        "section_id": "analysis-plan.methodology",
+        "number": "9.2.",
+        "title": "Statistical Methodology"
+      },
+      {
+        "section_id": "analysis-plan.considerations",
+        "number": "9.3.",
+        "title": "General Statistical Considerations"
+      },
+      {
+        "section_id": "sample-size",
+        "number": "10.",
+        "title": "SAMPLE SIZE JUSTIFICATION"
+      },
+      {
+        "section_id": "confidentiality",
+        "number": "11.",
+        "title": "CONFIDENTIALITY/PUBLICATION OF THE STUDY"
+      },
+      {
+        "section_id": "quality-safety",
+        "number": "12.",
+        "title": "QUALITY COMPLAINTS AND ADVERSE EVENTS"
+      },
+      {
+        "section_id": "ethics",
+        "number": "13.",
+        "title": "GCP, ICH AND ETHICAL CONSIDERATIONS"
+      }
+    ],
+    "methods_owner": "study-procedure.enrollment",
+    "completion_owner": "study-procedure.enrollment",
+    "assessment_table_owner": null
+  },
+  "writing_examples": [],
+  "accepted_context": [],
+  "prior_target_drafts": [],
+  "findings": [],
+  "constraints": [
+    "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+    "Use only supplied approved evidence and applicable template/Fixed Clinical Boilerplate. Align shared population, groups, quantities, timing, procedures and outcomes across the Protocol, selected ICF and PRS narratives; preserve relationships and qualifications rather than copying wording.",
+    "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+    "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
+    "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
+    "Preserve supplied numbered citations next to the Protocol claims they support and their bibliography linkage. Do not invent citations; ICF explanations use plain language.",
+    "Return exactly one result for every requested section ID.",
+    "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
+    "Return structured section content, not a whole document or document markup.",
+    "Write to each section's purpose and ownership. Explain each operational rule fully in its owning section; elsewhere give only the fact needed for that section and a brief reference to the owning heading. Preserve necessary identifiers, endpoint definitions, quantities, timing anchors/windows, conditions, exceptions, safety information and client consent language. Compress repeated explanations, not clinical meaning.",
+    "Use participant-facing language for ICF sections.",
+    "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",
+    "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+    "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+    "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
+    "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+    "Use protocol_writing_plan for the active Protocol headings and method/completion owners. General Information is a compact synopsis; Objectives states purpose; Study Design owns comparisons and endpoints; Bias explains why controls matter. Place full operational rules in the named active methods_owner and completion rules in completion_owner, even when their heading differs by branch. Statistical Methodology owns calculations/models. Cross-reference only a heading listed in the plan. When assessment_table_owner is null, describe the historical windows and activities in prose or lists rather than claiming a matrix or columns are rendered.",
+    "Satisfy every section's content_expectations and cover every material value named by minimum_evidence. If the writing plan names an assessment_table_owner, its source-derived table and notes carry that inventory and adjacent prose only introduces it. Otherwise the active methods_owner carries the full historical assessment details in prose or lists.",
+    "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
+    "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+    "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+    "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+    "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+    "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays."
+  ],
+  "response_path": "hermes/responses/local-chart.draft.protocol-operations.draft.a1.ad13890c.json",
+  "generation_only_prompts": {
+    "profile": "n8n-with-brad-corrections/v1",
+    "source": {
+      "filename": "Form Fill Fillout -_ Generate Protocol + Send Gmail.json",
+      "sha256": "15b20d12597b6f0fc8829650771302fb9161d8718a96c1c631b93d0154b55b1a"
+    },
+    "prompts": [],
+    "current_instruction_targets": [
+      "study-procedure.enrollment"
+    ],
+    "editorial_corrections": {},
+    "consent_template_comments": [],
+    "adapter_instructions": [
+      "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
+      "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
+      "A list group may contain a nonempty label alongside items. That label renders as an unbulleted paragraph immediately before the group's items; use it to separate endpoint categories without turning introductions into bullets.",
+      "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
+      "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
+      "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
+      "Use protocol_writing_plan and the current section ownership instructions to tighten the retained prompts: keep Protocol synopses brief, explain each operational rule fully in its owning section and use brief heading references elsewhere. Endpoint definitions and analysis calculations remain complete where needed; ICF explanations remain self-contained for participants. Preserve every material quantity, window, exception and safety qualification.",
+      "Write final study prose, not commentary about drafting. Translate source directions into the applicable study fact: for example, 'Day 30 ratings are descriptive only' rather than an explanation about inventing registry outcomes. Omit empty category labels when no endpoint belongs to that category.",
+      "For evaluation-procedures, inspect the supplied assessment_presentation notes against the approved table. When an edit is needed, return the existing source_text/display_text/rationale shape to retain unique information without repeating the matrix. This is part of drafting, not a separate review task.",
+      "For ICF requests also follow consent_template_comments. Assess applicability from the approved source and selected family, preserving supplied conditions and existing family-owned sections. Template comments do not establish new study facts or authorization.",
+      "Use only the approved comparator, endpoints, visits, risks, benefits, statistical methods and regulatory facts. Omit legacy defaults that invent placebo, standard-of-care comparators, extra outcomes, inferred side-effect lists, dates or significance levels.",
+      "For current_instruction_targets, draft study-specific content from the approved source and current section instructions, retaining applicable fixed client language.",
+      "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses."
+    ]
+  },
+  "request_sha256": "fcc416e9df026c31707a6654eaf99512946167183495fa3e954fa556565444c8"
+}

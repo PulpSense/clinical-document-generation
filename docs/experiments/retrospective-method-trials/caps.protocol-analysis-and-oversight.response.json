@@ -1,0 +1,98 @@
+{
+  "schema_version": "hermes-response/v2",
+  "request_id": "r-c05398eebf1d.draft.protocol-analysis-and-oversight.generation-only.a1.3df8a324",
+  "request_sha256": "78b051c43d27bad89d0831362b296ae736477275f1cfe6dc113ed5e4973fe195",
+  "revision_id": "r-c05398eebf1d",
+  "task": "section_drafting",
+  "batch_id": "protocol-analysis-and-oversight",
+  "producer": {
+    "model_id": "Codex-current-conversation-controlled-writing-trial"
+  },
+  "section_results": [
+    {
+      "section_id": "analysis-plan.datasets",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The overall cohort contains all eligible unique people, including those lacking outcome measurements. The primary analysis uses people with both selected habitual-correction logMAR values in the fixed eye; the secondary analysis uses people with a pressure record in that eye on Days 1\u20137. Report contributing people separately for each endpoint. Missing data affect only the relevant analysis, not cohort eligibility."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "analysis-plan.methodology",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Calculate primary change as selected follow-up minus baseline logMAR. Report contributing people, mean change, standard deviation, a 95% confidence interval, median and range. Negative change is better recorded acuity; positive is worse."
+        },
+        {
+          "text": "For the secondary proportion, report the number with any recorded pressure at least 25 mmHg divided by people with at least one pressure measurement in the fixed eye on Days 1\u20137. Use all recorded values in the window but count each person once. No record means missing rather than no elevation. There is no secondary pressure-change endpoint."
+        },
+        {
+          "text": "Use available observations without imputation and report missing, ambiguous and unavailable measurement types separately with explicit denominators. There is no paired-eye or adjusted subgroup model."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "analysis-plan.considerations",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Results are descriptive, without confirmatory significance claims or causal conclusions. Selection, measurement and attendance biases limit interpretation. No additional exploratory outcome is planned."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "sample-size",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "All eligible records; 150 people is a feasibility estimate, with no formal power calculation, assumed effect size or prospective attrition rate."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "confidentiality",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Authorized site research staff access identifiers only for eligibility and linkage on the clinic's encrypted access-controlled drive, storing the study-ID key separately. Analysts and sponsor receive study ID, age at index, relative-day intervals and coded clinical data without names, contacts, birth dates, exact clinical dates or keys. Exact dates remain in restricted source records. Authorized monitors, the reviewing IRB and legally authorized oversight bodies may inspect relevant originals under applicable permissions."
+        },
+        {
+          "text": "Publish aggregate results only, suppressing cells below five and complementary cells revealing suppressed counts. There is no individual public dataset, identifying case report, data sale or unrelated future research."
+        },
+        {
+          "text": "Keep research data, keys, permissions and abstraction logs securely for six years after 31 May 2027 closeout, then destroy research copies unless binding requirements require longer. Original clinical records follow the clinic's separate policy and are not destroyed by the study. Site privacy requests follow applicable permissions without a promise to reverse already deidentified aggregate findings."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "quality-safety",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The research risk is loss of confidentiality, mitigated by restricted access, separate keys and aggregate reporting. No new physical procedure or prospective adverse-event collection occurs. The PI handles suspected privacy incidents under site policy and required ethics/privacy reporting arrangements; no reporting-hour deadline is supplied."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "ethics",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Elmstead Independent Research Review Board, independent of sponsor and clinic, is the designated reviewing body. The study has not been submitted and no approval, approval number or date exists. Consent and privacy-authorization waivers will be requested, not presumed granted. Required decisions and site permission precede access. Permission withdrawal and resumption are handled as specified in Informed Consent / Subject Enrollment, without patient recontact."
+        },
+        {
+          "text": "There is no direct benefit, participant payment, reimbursement or new clinical charge. The sponsor funds staff work and analysis; no new injury-treatment or insurance promise is established. No child records are included. Research contacts are the site coordinator, Quinn Harper, at +1 202-555-0121, office +1 202-555-0122, quinn.harper@example.org, Elmstead Ophthalmology Clinic, 920 Clinic Way, Suite 100, Madison, WI 53704. Coordinator hours are Monday\u2013Friday, 9 a.m.\u20135 p.m., not an emergency service. Rights and oversight questions use Elmstead Independent Research Review Board, 610 Review Street, Suite 300, Madison, WI 53705; +1 202-555-0123; research.rights.elmstead@example.org."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

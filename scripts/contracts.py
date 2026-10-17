@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.51-prs-transport"
+CONTRACT_VERSION = "clinical-documents-v2.52-retrospective-method-ownership"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -657,7 +657,18 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("study-design.design", "7.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.arms", "design.masking"), table_evidence=("sites",)),
     _section_spec("study-design.bias", "7.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design", "statistics.bias_minimization"), "retrospective-bias"),
     _section_spec("study-procedure", "8.", "STUDY PROCEDURE", role="container"),
-    _section_spec("study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.consent", "procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "study.timeline", "procedures.retention", "procedures.discontinuation", "procedures.replacement", "procedures.specimens", "procedures.return_of_results"), "retrospective-consent"),
+    _section_spec(
+        "study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment",
+        "protocol-operations", ("procedures.consent", "procedures.enrollment", "procedures.methods", "procedures.assessment_details",
+            "procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "procedures.staff_work_plan",
+            "study.timeline", "procedures.completion", "study.completion", "procedures.study_termination", "procedures.termination",
+            "procedures.retention", "procedures.discontinuation", "procedures.replacement", "procedures.specimens", "procedures.return_of_results"),
+        "retrospective-consent",
+        owned_concepts=("endpoint-measurement-methods", "record-selection-methods", "staff-work-plan", "study-completion", "access-suspension", "specimen-handling", "return-of-results"),
+        content_expectations=(
+            *_content_expectations("study-procedure.enrollment", "Informed Consent / Subject Enrollment"), "This retrospective section owns the complete supplied record-abstraction methods and assessment details: instruments and scales, source restrictions, date anchors/windows, value selection and tie rules, ambiguous/missing values, event definitions, deduplication and evidence needed to establish zero or absence. Preserve every unique condition and exception here, with concise summaries elsewhere. Also explain supplied staff work phases, record and study completion triggers, and permission-suspension/resumption policies. These are staff tasks and historical windows, not participant visits. The retrospective template has no separate measurement section or assessment matrix; present these details as prose or lists within this section."
+        ),
+    ),
     _section_spec("analysis-plan", "9.", "ANALYSIS PLAN", role="container"),
     _section_spec("analysis-plan.datasets", "9.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan",)),
     _section_spec("analysis-plan.methodology", "9.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan"), owned_concepts=("statistical-methods",)),

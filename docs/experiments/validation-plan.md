@@ -2,11 +2,11 @@
 
 Agreed with the owner on 16 October 2026.
 Branch: `codex/generation-only-experiment`.
-Current candidate: PRS transport and concise drafting fixes (contract v2.51,
-prompt v31), implemented in `af7f4d1`.
+Current candidate: active retrospective method ownership (contract v2.52,
+prompt v32), following `796a3a3`.
 Record the installed commit from the next Hermes run receipt.
 
-**Current step: Run 7 XML fixes pass local replay; concise drafting trials reviewed; Hermes confirmation pending.**
+**Current step: retrospective method ownership fixed; RECORD/CHART local drafts reviewed and fresh CAPS local run passes; Hermes confirmation pending.**
 CHART, current-version NEAR/Advarra, COMFORT/Sterling, NEAR/Sterling and
 COMFORT/Advarra and BREAK/Sterling pass Codex review. Both template-switch tests pass review.
 The owner now operates Hermes and uploads complete run archives for review;
@@ -30,7 +30,7 @@ new input and a new template do not change at the same time.
 | 5 | Ambispective | Same COMFORT clinical facts as Run 3 | Advarra | Passes Codex review; owner acceptance pending |
 | 6 | Prospective | BREAK-27-05, approved revision r-3a7da16f6dea | Sterling | Rerun passes Codex review; owner acceptance pending |
 | 7 | Ambispective | GLIDE-27-06, fresh input | Advarra | DOCX review passes; XML local fix verified; confirmation pending |
-| 8 | Retrospective | RECORD-27-07, fresh input | Not applicable | Input prepared; Source of Truth and run pending |
+| 8 | Retrospective | RECORD-27-07, fresh input | Not applicable | Reviewed; material method omission and nonexistent section references |
 
 Runs 2–3 repeat the existing studies after the retrospective branch is settled.
 Runs 4–5 change only the selected consent family, preserving the studies'
@@ -756,3 +756,92 @@ versus original-record retention, and staff work phases versus clinical visits.
 No specimen, genetic, assigned-treatment or prospective recruitment activity is
 specified. The pending GLIDE Hermes confirmation remains a separate item; Run 8
 does not verify the XML fixes because retrospective delivery contains no XML.
+
+
+### Run 8 RECORD review — 17 October 2026
+
+Archive: `/Users/juanpabloleoni/Downloads/Recorded-Symptoms-and-Care-Changes-After-Routine-Dry-Eye-Management__Retrospective__2026-10-17.zip`.
+Archive SHA-256: `5698f41340f379fff70816102e87d63de677fa987c20b32c79fbe368da0eef4a`.
+Input matches the retained RECORD input. Installation evidence records exact
+activation of `796a3a3629ca4aab604388b8741554efa2377d4a` and successful retirement
+of 16 previous targets with active skill and runtime configuration preserved.
+All three drafting requests match six current runtime hashes, contract v2.51,
+prompt v31 and approved-source Markdown hash
+`33b51d637fb1032a92680bb9d5c90f652b827f597b8dcdf66362b15eb8a8056a`.
+Revision: `r-584659fe3efe`. The protocol receipt hash verifies. Delivery contains
+only protocol.docx, as requested. Generation time: 2 minutes 17.73 seconds.
+One native protocol field refresh passed; no automated content/visual reviews
+or repair loop ran.
+
+Rendered and visually reviewed all nine pages. Opening table borders, headings,
+site/contact table, lists and page flow are clean. All 21 TOC references match.
+No new physical procedures or participant contacts are invented, and waiver
+requests are distinguished from granted approval. Cohort and endpoint units,
+change direction, threshold, statistical model, privacy protections, retention
+and future staff phases mostly remain faithful.
+
+Material finding: detailed record-selection and event-counting methods are
+omitted, while several sections refer to a nonexistent 'Study Methods and
+Measurements' section. The retrospective template has only section 8.1 under
+Study Procedure; it has no separate measurement section. Approved
+`procedures.methods` and `procedures.assessment_details` retain all rules and
+are present in the operations drafting request, but they are missing from the
+accepted enrollment draft and final protocol. Its minimum_evidence omits those
+paths, and the new general ownership guidance directs detail to a section that
+is inactive on this branch. This is a drafting/section-contract defect, not a
+missing-input or DOCX-formatting issue.
+
+Examples lost: latest eligible baseline within Days -14–0; explicit pre-care
+qualification for Day 0 values; closest-to-Day-60 follow-up with earlier-date
+ties and time/ambiguity rules; exact question and prohibition on converting
+other scales; care-change definition, refill exclusions, coordinated same-day
+counting, deduplication and requirement for explicit evidence before coding zero.
+The supplied access-suspension/resumption policy and explicit record/study
+completion trigger also lack full narrative coverage. A description of four
+historical 'columns' appears although no corresponding matrix is rendered.
+Minor residual repetition in waiver/privacy wording is not a separate blocker.
+
+Required general correction: assign method and completion/permission coverage
+to actual active retrospective sections; constrain cross-references to actual
+headings; retain all supplied clinical selection/exception rules while compressing
+only repeated explanation. Exercise RECORD and CHART section-only drafts before
+assembling a confirmation document. Existing prospective/ambispective ownership
+must remain intact. No production code, prompts, approved source or delivered
+artifacts were changed during this review. Run 8 does not pass yet; GLIDE's final
+Hermes confirmation is also still pending.
+
+
+### Retrospective method correction and fresh CAPS local test — 17 October 2026
+
+Issue #117. Contract v2.52 and prompt v32 route methods, assessment details,
+record/study completion, staff phases and permission stopping/resumption into
+actual retrospective section 8.1. Every batch sees the active protocol headings
+and branch-specific method/completion owners; references must use those headings.
+The retrospective workflow has no matrix, so historical detail is prose/lists.
+Prospective/ambispective owners and the retained template remain intact.
+
+Public handoff regressions cover the missing nested evidence and active heading/
+owner mapping across all three protocol batches in all study branches. Focused
+handoff, retrospective assembly and generation-only tests pass; full suite was
+not run under the focused-only instruction. No new code quality gate was added.
+
+Revised RECORD and CHART operations sections retain complete unique method rules
+and completion/access policies; requests, responses and source provenance are in
+`retrospective-method-trials/`. CHART is explicitly a scoped development extraction
+from its retained input, not a complete approved old-run source. No actual approved
+source or supplied output was changed.
+
+A fresh input, `inputs/CAPS-27-08-study-input.txt`, tests a one-eye-per-person
+retrospective laser cohort with different measurement/window rules. Owner-transfer
+copy: `/Users/juanpabloleoni/Downloads/CAPS-27-08-study-input.txt`.
+Expected future Hermes path: `/opt/data/CAPS-27-08-study-input.txt`, not verified.
+The local structured source passed the source contract. The full local workflow
+used explicitly controlled-test approval, actual Codex-authored drafts for all
+14 sections, native assembly and one native field refresh. It delivered only
+protocol.docx. Seven pages pass visual/content review and all 21 TOC references
+match. The latest render is pixel-identical to the inspected render.
+Reviewed local copy: `/Users/juanpabloleoni/Downloads/CAPS-27-08-local-protocol.docx`.
+
+This meets the requested local test, not a Hermes model validation or real owner
+approval. Do not mark the incomplete RECORD run accepted; a final Hermes
+confirmation remains pending, as does GLIDE's complete XML/drafting confirmation.

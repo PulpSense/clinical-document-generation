@@ -1,0 +1,39 @@
+{
+  "source_preparation": "awaiting_approval",
+  "approval_identity": "controlled-local-test-only-not-client-approval",
+  "draft_producer": "Codex current conversation; no Hermes or separate API generation",
+  "section_count": 14,
+  "result": {
+    "mode": "generation_only",
+    "workspace": "/Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/caps-local-run-v2/revisions/r-c05398eebf1d/generation-only/386aafeacbe0b33b",
+    "revision_id": "r-c05398eebf1d",
+    "client_outputs": [],
+    "status": "unreviewed",
+    "stage": "generation_only_complete",
+    "experimental_outputs": [
+      {
+        "absolute_path": "/Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/caps-local-run-v2/output/protocol.docx",
+        "path": "output/protocol.docx",
+        "sha256": "d26269c533da6f553713cc26d204b5c5f0979b4092d7d01b8945ff38f418fdf2",
+        "link": "[protocol.docx](</Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/caps-local-run-v2/output/protocol.docx>)"
+      }
+    ],
+    "notice": "/Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/caps-local-run-v2/revisions/r-c05398eebf1d/generation-only/386aafeacbe0b33b/README.txt",
+    "delivery_message": "Here are the documents:\n\n- [protocol.docx](</Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/caps-local-run-v2/output/protocol.docx>)\n\nGeneration time: 0 minutes 3.40 seconds.",
+    "manifest": "/Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/caps-local-run-v2/revisions/r-c05398eebf1d/generation-only/386aafeacbe0b33b/experiment-manifest.json",
+    "governing_sha256": "386aafeacbe0b33b8e07d23e78e4d26737fcf36098a2c25ca333cb12f6fc62c8",
+    "elapsed_seconds": 3.400873,
+    "assessments": {
+      "content": "not_run",
+      "visual": "not_run"
+    },
+    "office_field_refresh": {
+      "status": "passed",
+      "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+      "page_count": 7,
+      "source_sha256": "d7992686020f8fb5fd7a70839252d2ba4232c597d2d01d34c0a984b7a3f4130e",
+      "pagination_pdf_sha256": "791c8a02d43edb4a6aab29d12e764ee111d2c89807214c8d22f469acea0fe021",
+      "output_sha256": "d26269c533da6f553713cc26d204b5c5f0979b4092d7d01b8945ff38f418fdf2"
+    }
+  }
+}
