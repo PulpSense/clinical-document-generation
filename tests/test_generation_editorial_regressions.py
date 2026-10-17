@@ -64,11 +64,11 @@ def test_withdrawal_fixed_sentences_have_one_owner_and_keep_added_policies(famil
     source = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text())
     source["meta"]["icf_template"] = family
     fixed = rendering._boilerplate(ROOT, rendering.contracted_template_bundle(ROOT, source), source)["icf-withdrawal"]
-    opening = " ".join(fixed.split(". ")[:2]) + "."
+    opening = ". ".join(fixed.split(". ")[:2]) + "."
     details = "Tell or write to your enrolling site's coordinator. Follow-up is optional."
     payment = "Earned payments remain due if you withdraw."
     model = {"protocol": [], "prs": {}, "icf": {"icf.withdrawal": {
-        "paragraphs": [{"text": opening + " " + details}, {"text": payment}], "lists": []}}}
+        "paragraphs": [{"text": fixed + " " + details}, {"text": payment}], "lists": []}}}
     rendering.render_documents(ROOT, tmp_path, source, model, artifact_names={"icf"}, audit_output=False)
     visible = "\n".join(p.text for p in Document(tmp_path / "candidate/icf.docx").paragraphs)
     assert visible.count(opening) == 1
@@ -130,6 +130,9 @@ def test_risk_note_edits_remove_only_covered_prose_and_keep_unique_timing(tmp_pa
     section["assessment_presentation"] = {"notes": [
         {"source_text": repeated, "display_text": "", "rationale": "Covered by the safety and risks sections."},
         {"source_text": mixed, "display_text": unique, "rationale": "Retain the unique questionnaire timing; safety sections own the general policy."}]}
+    # The caller authors the table introduction; assembly no longer replaces it.
+    section["paragraphs"] = [{"text": "Scheduled activities appear in the table."}]
+    section["lists"] = []
     accepted = drafting._generation_only_response(request, response)
     rendering.render_documents(ROOT, tmp_path, source, {"protocol": accepted["drafts"], "icf": {}, "prs": {}},
                                artifact_names={"protocol"}, audit_output=False)
@@ -176,13 +179,6 @@ def test_xml_still_adds_interval_when_no_same_period_is_supplied(existing, tmp_p
         assert existing in text
 
 
-def test_withdrawal_fixed_only_fallback_is_retained_once():
-    fixed = 'Participation is voluntary. You may leave without penalty.'
-    model = {'icf': {'icf.withdrawal': {'paragraphs': [{'text': fixed}], 'lists': []}}}
-    assert rendering._icf_withdrawal_blocks(model, {'icf-withdrawal': fixed}) == [(fixed, False)]
-    assert rendering._icf_withdrawal_blocks({'icf': {}}, {'icf-withdrawal': fixed}) == [(fixed, False)]
-
-
 def test_current_prompts_assign_endpoint_note_and_withdrawal_ownership():
     source = json.loads((ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text())
     payload = drafting.generation_only_prompt_payload(ROOT, source, [
@@ -190,7 +186,7 @@ def test_current_prompts_assign_endpoint_note_and_withdrawal_ownership():
     corrections = payload['editorial_corrections']
     assert "label 'Exploratory endpoint'" in ' '.join(corrections['study-design.design'])
     assert 'related_source' in ' '.join(corrections['evaluation-procedures'])
-    assert 'Assembly supplies the exact authorized' in ' '.join(corrections['icf.withdrawal'])
+    assert 'Draft the complete withdrawal section' in ' '.join(corrections['icf.withdrawal'])
 
 
 @pytest.mark.parametrize('family', ['Advarra', 'Sterling'])

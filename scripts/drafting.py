@@ -62,7 +62,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v34-canonical-section-references"
+PROMPT_VERSION = "section-drafting-v35-ai-owned-section-prose"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "rendering.py", "workflow.py", "output_recovery.py")
 
@@ -138,6 +138,7 @@ def _request_constraints() -> list[str]:
         "Return exactly one result for every requested section ID.",
         "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
         "Return structured section content, not a whole document or document markup.",
+        "You own the complete prose and lists for every requested section. Include all material approved evidence and applicable supplied fixed clinical boilerplate in that response, once. Assembly inserts accepted text as authored; it does not complete, rewrite or deduplicate your prose. Draft the full duration/enrollment and withdrawal sections, the brief assessment-table introduction and the full retrospective eligibility/enrollment rules where requested. Template-owned headings, fixed retained clauses, contact-field mappings, source-derived tables/notes and the final bibliography are assembled separately; do not repeat them in section prose.",
         "Write to each section's purpose and ownership. Explain each operational rule fully in its owning section; elsewhere give only the fact needed for that section and a brief reference to the owning heading. Preserve necessary identifiers, endpoint definitions, quantities, timing anchors/windows, conditions, exceptions, safety information and client consent language. Compress repeated explanations, not clinical meaning.",
         "Use participant-facing language for ICF sections.",
         "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",

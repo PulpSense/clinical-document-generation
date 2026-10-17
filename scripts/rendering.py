@@ -33,7 +33,7 @@ from pypdf.errors import PyPdfError
 from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, facility_projection, get_path, meaningful, explicitly_true, participant_visit_count, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
 from output_recovery import DOCX_SOURCE_FIELDS
-from contracts import bibliographic_citation_spans, protocol_bibliography
+from contracts import protocol_bibliography
 from contracts import document_table_reference, participant_registry_disclosure
 
 
@@ -144,40 +144,6 @@ def _overview_and_detail(text: str) -> tuple[str, str]:
 
 def _icf_procedure_parts(model: Mapping[str, Any]) -> tuple[str, str]:
     return _overview_and_detail(_icf_text(model, "icf.procedures"))
-
-
-def _icf_duration_text(reference: Mapping[str, Any], model: Mapping[str, Any]) -> str:
-    """Keep the Advarra duration and expected-enrollment heading complete."""
-    duration = _icf_text(model, "icf.duration")
-    if str(get_path(reference, "meta.icf_template", "Advarra")).casefold() != "advarra":
-        return duration
-    enrollment = sample_size_display(get_path(reference, "population.sample_size"))
-    if not enrollment:
-        return duration
-    expected_numbers = set(re.findall(r"\b\d+\b", enrollment))
-    count_context = all(
-        re.search(rf"\b{re.escape(number)}\b[^.!?]{{0,60}}\b(?:participants?|patients?|subjects?|people)\b", duration, re.I)
-        for number in expected_numbers
-    ) if expected_numbers else False
-    if enrollment.casefold() in duration.casefold() or count_context:
-        return duration
-    sentence = f"The study plans to enroll {enrollment}."
-    return " ".join(part for part in (duration, sentence) if part)
-
-
-def _icf_summary_parts(model: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
-    """Return the five independently drafted KEY INFORMATION concept blocks."""
-    draft = model.get("icf", {}).get("icf.key-information-summary", {})
-    values = [
-        str(item.get("text") or "").strip()
-        for item in draft.get("paragraphs", [])
-        if isinstance(item, Mapping) and str(item.get("text") or "").strip()
-    ]
-    for group in draft.get("lists", []):
-        if isinstance(group, Mapping):
-            values.extend(item for item in _list(group.get("items")) if item)
-    values = values[:5] + [""] * max(0, 5 - len(values))
-    return values[0], values[1], values[2], values[3], values[4]
 
 
 def _first_site(reference: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -382,7 +348,6 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
     second_intervention = _text(interventions[1].get("name") or interventions[1].get("intervention_name")) if len(interventions) > 1 else ""
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     icf_visits_overview, icf_visit_details = _icf_procedure_parts(model)
-    key_purpose, key_participation, key_risks, key_benefits, key_alternatives = _icf_summary_parts(model)
     protocol_visits_overview, protocol_visit_details = _overview_and_detail(_draft_text(model, "study-procedure.visits"))
     screening_interval = screening_interval_requirement(reference)
     values = {
@@ -415,13 +380,13 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "objective": "; ".join(_list(get_path(reference, "objectives.primary", []))),
         "studyDesignShort": study_design_display(reference), "sitesNumber": _text(get_path(reference, "design.number_of_sites")),
         "sampleSize": sample_size_display(get_path(reference, "population.sample_size")),
-        "sampleSizeJustification": _draft_text(model, "sample-size") or _text(get_path(reference, "population.sample_justification")),
+        "sampleSizeJustification": _draft_text(model, "sample-size"),
         "interventionName": _text(get_path(reference, "design.intervention_name")),
         "daysBeforeScreening": screening_interval.days if screening_interval else "",
         "inclusionCriteria": "\n".join(f"• {item}" for item in inclusion), "totalVisits": str(participant_visit_count(visits)) if visits else "",
         "AI_duration": _protocol_followup_summary(reference), "AI_populationShort": _text(get_path(reference, "population.study_population")) or "; ".join(inclusion),
         "AI_populationLong": _draft_text(model, "subjects.population"), "AI_introduction": _draft_text(model, "introduction"),
-        "AI_inclusionCriteria": _draft_text(model, "subjects.inclusion", bullets=True) or "\n".join(f"• {item}" for item in inclusion),
+        "AI_inclusionCriteria": _draft_text(model, "subjects.inclusion", bullets=True),
         "AI_exclusionCriteria": _draft_text(model, "subjects.exclusion", bullets=True) or _draft_text(model, "subjects.eligibility", bullets=True),
         "AI_studyDesignLong": _draft_text(model, "study-design.design"), "AI_methods": _draft_text(model, "study-design.bias"),
         "AI_visitSchedule": protocol_visits_overview, "AI_visitScheduleDetails": protocol_visit_details,
@@ -430,16 +395,16 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "AI_analysisDataSets": _draft_text(model, "analysis-plan.datasets"), "AI_analysisDataSetsBullets": "",
         "AI_statisticalMethodology": _draft_text(model, "analysis-plan.methodology"),
         "AI_statisticalConsiderations": _draft_text(model, "analysis-plan.considerations"),
-        "AI_risks": _draft_text(model, "risks-benefits.risks") or _text(get_path(reference, "risks_benefits.risks")),
-        "AI_benefits": _icf_text(model, "icf.benefits") or _draft_text(model, "risks-benefits.benefits"),
+        "AI_risks": _draft_text(model, "risks-benefits.risks"),
+        "AI_benefits": _draft_text(model, "risks-benefits.benefits"),
         "AI_masked": _text(get_path(reference, "design.masking")), "AI_variables": _endpoint_synopsis(reference),
         "AI_objectivesIntro": _draft_text(model, "objectives"), "AI_primaryOutcome": _endpoint_text(reference, ("primary",)),
-        "AI_secondaryOutcomes": _endpoint_text(reference, ("secondary",)), "AI_exploratoryOutcomes": _endpoint_text(reference, ("other",)) or "Not applicable; no exploratory outcomes were specified in the approved source.",
+        "AI_secondaryOutcomes": _endpoint_text(reference, ("secondary",)), "AI_exploratoryOutcomes": _endpoint_text(reference, ("other",)),
         "AI_studyProcedure": _draft_text(model, "study-procedure.enrollment"), "AI_studyProcedureBullets": "",
-        "AI_keyPurpose": key_purpose, "AI_keyParticipation": key_participation,
-        "AI_keyRisks": key_risks, "AI_keyBenefits": key_benefits, "AI_keyAlternatives": key_alternatives,
+        "AI_keyPurpose": "", "AI_keyParticipation": "",
+        "AI_keyRisks": "", "AI_keyBenefits": "", "AI_keyAlternatives": "",
         "AI_studyPurpose": _icf_text(model, "icf.study-purpose"), "AI_icfVisitsOverview": icf_visits_overview,
-        "AI_visitsDetails": icf_visit_details, "AI_visitsAndLength": _icf_duration_text(reference, model),
+        "AI_visitsDetails": icf_visit_details, "AI_visitsAndLength": _icf_text(model, "icf.duration"),
         "AI_interventionPossibleSideEffects": _icf_text(model, "icf.risks"), "AI_payment": _icf_text(model, "icf.payment"),
         "AI_costs": _icf_text(model, "icf.costs"), "AI_alternatives": _icf_text(model, "icf.alternatives"),
         "AI_privacy": _icf_text(model, "icf.privacy"), "AI_injuryCompensation": _icf_text(model, "icf.injury"),
@@ -1026,6 +991,14 @@ def _normalize_source_bound_shell(document: Document, reference: Mapping[str, An
                 paragraph._element.getparent().remove(paragraph._element)
         elif not icf and normalized.casefold() == "an investigator-initiated clinical trial":
             _set_paragraph_text(paragraph, _study_descriptor(reference))
+        elif icf and normalized.casefold().startswith((
+            "this clinical trial may be registered on publicly accessible databases",
+            "this research study may be registered on publicly accessible databases",
+            "a description of this clinical trial will be available on http://www.clinicaltrials.gov",
+            "a description of this research study will be available on http://www.clinicaltrials.gov",
+        )):
+            # Template examples only: this runs before any AI-authored prose.
+            paragraph._element.getparent().remove(paragraph._element)
         elif icf and normalized.upper() == "NOT TO BE USED FOR PARTICIPANT ENROLLMENT":
             paragraph._element.getparent().remove(paragraph._element)
         elif icf:
@@ -1119,38 +1092,6 @@ def _draft_blocks(section: Mapping[str, Any]) -> list[tuple[str, bool]]:
         if label := str(group.get("label") or "").strip():
             blocks.append((label, False))
         blocks.extend((item, True) for item in _list(group.get("items")))
-    return blocks
-
-
-def _retrospective_eligibility_blocks(
-    reference: Mapping[str, Any],
-) -> list[tuple[str, bool]]:
-    """Render approved retrospective criteria verbatim instead of paraphrasing them."""
-    blocks: list[tuple[str, bool]] = []
-    age_limits = [
-        str(get_path(reference, path, "") or "").strip()
-        for path in ("population.minimum_age", "population.maximum_age")
-    ]
-    for label, path in (
-        ("Inclusion criteria:", "population.inclusion_criteria"),
-        ("Exclusion criteria:", "population.exclusion_criteria"),
-    ):
-        items = _list(get_path(reference, path, []))
-        if not items and not (path == "population.inclusion_criteria" and any(age_limits)):
-            continue
-        blocks.append((label, False))
-        blocks.extend((item, True) for item in items)
-        if path == "population.inclusion_criteria" and any(age_limits):
-            existing = " ".join(items).casefold()
-            if not all(age.casefold() in existing for age in age_limits if age):
-                lower, upper = age_limits
-                if lower and upper:
-                    blocks.append((f"Eligible age range: {lower} to {upper}.", True))
-                elif lower:
-                    blocks.append((f"Minimum eligible age: {lower}.", True))
-                else:
-                    blocks.append((f"Maximum eligible age: {upper}.", True))
-    blocks.extend((note, False) for note in _list(get_path(reference, "population.eligibility_notes", [])))
     return blocks
 
 
@@ -1270,6 +1211,10 @@ def _replace_protocol_leaf_bodies(
         drafts.get("evaluation-procedures", {}).get("assessment_presentation"),
     )["schedule-of-assessments"]
     assessment_notes = assessment_table["supplemental_notes"]
+    contract_headings = {
+        _protocol_heading_key(f"{section.number} {section.title}")
+        for section in protocol_contract(branch)
+    }
     table_sections = {"study-procedure.visits", "quality-safety.reporting", "evaluation-procedures"}
     table_caption_keys = {
         "study-procedure.visits": {_layout_target_key("Table 9.2-1. Visit Schedule")},
@@ -1290,20 +1235,6 @@ def _replace_protocol_leaf_bodies(
                 block for block in blocks
                 if _layout_target_key(block[0]) not in caption_keys
             ]
-        if section.section_id == "evaluation-procedures":
-            # The source-derived matrix and notes own the activity and timing
-            # detail. A neutral introduction cannot misdescribe table columns.
-            introduction = ("The scheduled visits and study activities are shown in Table 15.1."
-                            if assessment_table["rows"] else "Study assessments are described below.")
-            blocks = [(introduction, False)]
-        if branch == "Retrospective" and section.section_id == "subjects.eligibility" and not blocks:
-            blocks = _retrospective_eligibility_blocks(reference)
-        if branch == "Retrospective" and section.section_id == "study-procedure.enrollment":
-            withdrawal = str(get_path(reference, "procedures.discontinuation", "") or "").strip()
-            if withdrawal and withdrawal.casefold().rstrip(".") not in " ".join(
-                text.casefold() for text, _is_list in blocks
-            ):
-                blocks.append((withdrawal, False))
         # Accepted study-completion prose owns its source-grounded summary;
         # copying the entire raw timeline here discarded that drafting work.
         if not blocks:
@@ -1330,7 +1261,9 @@ def _replace_protocol_leaf_bodies(
             if element.tag == qn("w:p"):
                 paragraph = Paragraph(element, document)
                 next_level = _heading_level(paragraph)
-                if next_level is not None and next_level <= level:
+                if next_level is not None and (
+                    next_level <= level or _protocol_heading_key(paragraph.text) in contract_headings
+                ):
                     break
                 if (
                     not paragraph.text.strip()
@@ -1395,9 +1328,11 @@ _ADVARRA_ICF_HEADINGS = {
     "icf.alternatives": "ALTERNATIVES TO PARTICIPATION",
     "icf.privacy": "RELEASE OF MEDICAL RECORDS AND PRIVACY",
     "icf.injury": "IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY",
+    "icf.withdrawal": "LEAVING THE STUDY",
 }
 _STERLING_ICF_HEADINGS = {
     "icf.background": "BACKGROUND",
+    "icf.key-information-summary": "KEY INFORMATION",
     "icf.study-purpose": "PURPOSE",
     "icf.procedures": "PROCEDURES",
     "icf.duration": "DURATION",
@@ -1408,6 +1343,7 @@ _STERLING_ICF_HEADINGS = {
     "icf.alternatives": "ALTERNATIVE TREATMENTS",
     "icf.privacy": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
     "icf.injury": "STUDY COMPLICATIONS COMPENSATION",
+    "icf.withdrawal": "VOLUNTARY PARTICIPATION/WITHDRAWAL",
 }
 _ADVARRA_RETAINED_HEADINGS = {
     "INTRODUCTION", "LEGAL RIGHTS", "NEW FINDINGS", "WHOM TO CONTACT ABOUT THIS STUDY",
@@ -1927,40 +1863,6 @@ def _ensure_protocol_references(document: Document, authority: Document, referen
         _copy_run_design(run, source_run)
 
 
-def _normalize_icf_source_displays(document: Document, reference: Mapping[str, Any]) -> None:
-    """Normalize exact source encodings even when repeated inside AI drafts."""
-    replacements = []
-    bibliography = _supplied_protocol_references(reference)
-    available_citations = set(re.findall(r"(?m)^\s*(\d+)[.)]\s", bibliography))
-    raw_count = _text(get_path(reference, "population.sample_size")).rstrip(". ")
-    display_count = sample_size_display(raw_count)
-    # A naked number can also be a pressure, duration or endpoint value. Only
-    # replace the complete legacy encoding here; scalar displays are populated
-    # at their own template destination, never by global numeric substitution.
-    if raw_count and display_count != raw_count and not re.fullmatch(r"\d[\d,]*(?:\.0+)?", raw_count):
-        replacements.append((re.compile(re.escape(raw_count)), display_count))
-    for paragraph in document.paragraphs:
-        matches = sorted(
-            [(match.start(), match.end(), replacement)
-             for pattern, replacement in replacements for match in pattern.finditer(paragraph.text)]
-            + [(start, end, "") for start, end in bibliographic_citation_spans(paragraph.text, available_citations)],
-            reverse=True,
-        )
-        if not matches:
-            continue
-        spans = []
-        offset = 0
-        for run in paragraph.runs:
-            spans.append((offset, offset + len(run.text), run))
-            offset += len(run.text)
-        for match_start, match_end, replacement in matches:
-            for start, end, run in reversed(spans):
-                if start < match_end and end > match_start:
-                    left, right = max(0, match_start - start), min(end - start, match_end - start)
-                    inserted = replacement if start <= match_start < end else ""
-                    run.text = run.text[:left] + inserted + run.text[right:]
-
-
 def _plain_blank(paragraph: Paragraph) -> bool:
     return not paragraph.text.strip() and not any(
         marker in paragraph._p.xml for marker in ("<w:br", "<w:sectPr", "<w:pBdr", "<w:tab")
@@ -2136,7 +2038,7 @@ def _icf_section_elements(document: Document, heading: Paragraph, heading_texts:
 
 
 def _populate_icf_sections(
-    document: Document, model: Mapping[str, Any], reference: Mapping[str, Any], *, sterling: bool,
+    document: Document, model: Mapping[str, Any], *, sterling: bool,
 ) -> None:
     """Keep the client shell while ensuring every accepted ICF section is visible."""
     headings = _STERLING_ICF_HEADINGS if sterling else _ADVARRA_ICF_HEADINGS
@@ -2148,40 +2050,13 @@ def _populate_icf_sections(
         for section_id, title in headings.items()
     }
 
-    # These sections contain example-study prose in the client authorities.
-    # Their accepted source-bound drafts are the body; the heading design is retained.
-    source_bound_sections = (
-        *(("icf.background",) if sterling else ()),
-        "icf.study-purpose", "icf.procedures", "icf.costs", "icf.alternatives", "icf.risks",
-    )
-    for section_id in source_bound_sections:
-        heading = heading_by_id.get(section_id)
-        blocks = _icf_blocks(model, section_id)
-        # Accepted procedure drafts own the visit and missed-contact prose.
-        # Exact-string comparisons cannot recognize a faithful paraphrase.
+    for section_id, heading in heading_by_id.items():
         if heading is None:
             continue
         elements, exemplar = _icf_section_elements(document, heading, heading_texts)
         for element in elements:
             element.getparent().remove(element)
-        if not blocks:
-            continue
-        _insert_icf_blocks(document, heading._p, blocks, exemplar)
-
-    # Privacy and injury retain the client's heading design, but their body is
-    # entirely source-bound. The authority documents contain example-study
-    # regulators, jurisdictions, payment terms, and cross-border claims.
-    for section_id in ("icf.privacy", "icf.injury"):
-        blocks = _icf_blocks(model, section_id)
-        if not blocks:
-            continue
-        heading = heading_by_id.get(section_id)
-        if heading is None:
-            continue
-        elements, exemplar = _icf_section_elements(document, heading, heading_texts)
-        for element in elements:
-            element.getparent().remove(element)
-        _insert_icf_blocks(document, heading._p, blocks, exemplar)
+        _insert_icf_blocks(document, heading._p, _icf_blocks(model, section_id), exemplar)
 
 
 def _remove_advarra_example_study_prose(document: Document) -> None:
@@ -2203,12 +2078,10 @@ def _remove_advarra_example_study_prose(document: Document) -> None:
 def _restore_advarra_injury_section(
     document: Document,
     authority: Document,
-    reference: Mapping[str, Any],
     model: Mapping[str, Any],
-    boilerplate: Mapping[str, str],
 ) -> None:
-    """Restore the authority-derived injury section before Legal Rights."""
-    blocks = _icf_blocks(model, "icf.injury") or [(boilerplate["injury"], False)]
+    """Place the authored injury section before Legal Rights using authority design."""
+    blocks = _icf_blocks(model, "icf.injury")
     legal_heading = next((
         paragraph for paragraph in document.paragraphs
         if _icf_heading_key(paragraph.text) == _icf_heading_key("LEGAL RIGHTS")
@@ -2268,28 +2141,6 @@ def _restore_advarra_injury_section(
         blocks,
         authority_body or authority_exemplar,
     )
-
-
-def _normalize_icf_withdrawal(document: Document, boilerplate: Mapping[str, str]) -> None:
-    paragraphs = list(document.paragraphs)
-    start = next((
-        index for index, paragraph in enumerate(paragraphs)
-        if paragraph.text.strip().casefold().startswith("your part in this study may be stopped")
-    ), None)
-    if start is None:
-        return
-    end = next((
-        index for index in range(start + 1, len(paragraphs))
-        if paragraphs[index].text.strip().casefold().startswith("check your preference below")
-        or paragraphs[index].text.strip().upper() in {"AGREEMENT TO BE IN THE STUDY", "PARTICIPANT STATEMENT AUTHORIZATION"}
-    ), len(paragraphs))
-    first = paragraphs[start]
-    replacement = document.add_paragraph()
-    _copy_paragraph_design(replacement, first)
-    replacement.add_run(boilerplate["icf-withdrawal"])
-    first._p.addprevious(replacement._p)
-    for paragraph in paragraphs[start:end]:
-        paragraph._element.getparent().remove(paragraph._element)
 
 
 def _replace_sterling_section_body(document: Document, heading_title: str, blocks: list[tuple[str, bool]]) -> None:
@@ -2427,24 +2278,6 @@ def _study_doctor_contact(reference: Mapping[str, Any]) -> str:
     return f"For medical concerns, contact {doctor} at {phone}."
 
 
-def _icf_withdrawal_blocks(model: Mapping[str, Any], boilerplate: Mapping[str, str]) -> list[tuple[str, bool]]:
-    fixed = boilerplate["icf-withdrawal"]
-    # Assembly owns the fixed paragraph. Drafting supplies additional policies.
-    # Remove exact fixed sentences even when a response combines them with new
-    # details; never discard the remaining study-specific conditions.
-    def sentences(text: str) -> list[str]:
-        return re.split(r"(?<=[.!?])\s+", text.strip())
-    def key(text: str) -> str:
-        return re.sub(r"\s+", " ", text).strip().casefold()
-    fixed_sentences = {key(text) for text in sentences(fixed)}
-    blocks = [(fixed, False)]
-    for text, is_list in _icf_blocks(model, "icf.withdrawal"):
-        remaining = " ".join(part for part in sentences(text) if key(part) not in fixed_sentences)
-        if remaining:
-            blocks.append((remaining, is_list))
-    return blocks
-
-
 def _shared_site_contact_blocks(reference: Mapping[str, Any]) -> list[tuple[str, bool]]:
     sites = [site for site in reference.get("sites", []) if isinstance(site, Mapping)]
     if len(sites) < 2:
@@ -2476,7 +2309,7 @@ def _shared_site_contact_blocks(reference: Mapping[str, Any]) -> list[tuple[str,
     return blocks
 
 
-def _normalize_advarra_contact_sections(document: Document, reference: Mapping[str, Any], boilerplate: Mapping[str, str], model: Mapping[str, Any]) -> None:
+def _normalize_advarra_contact_sections(document: Document, reference: Mapping[str, Any], boilerplate: Mapping[str, str]) -> None:
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
     irb = get_path(reference, "parties.irb", {}) or {}
     coordinator_phone = _text(coordinator.get("business_phone") or coordinator.get("phone"))
@@ -2497,12 +2330,6 @@ def _normalize_advarra_contact_sections(document: Document, reference: Mapping[s
         "WHOM TO CONTACT ABOUT THIS STUDY",
         [(text, False) for text in (contact, doctor_contact) if text]
         + _shared_site_contact_blocks(reference) + [(rights, False)],
-        sterling=False,
-    )
-    _replace_icf_section_body(
-        document,
-        "LEAVING THE STUDY",
-        _icf_withdrawal_blocks(model, boilerplate),
         sterling=False,
     )
 
@@ -2551,18 +2378,11 @@ def _align_sterling_study_site_continuations(
 def _normalize_sterling_retained_sections(
     document: Document,
     reference: Mapping[str, Any],
-    boilerplate: Mapping[str, str],
-    model: Mapping[str, Any],
 ) -> None:
     _replace_sterling_section_body(
         document,
         "INFORMATION",
         [(sterling_clause_text("sterling.information.new-findings"), False)],
-    )
-    _replace_sterling_section_body(
-        document,
-        "VOLUNTARY PARTICIPATION/WITHDRAWAL",
-        _icf_withdrawal_blocks(model, boilerplate),
     )
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
     investigator = get_path(reference, "parties.principal_investigator", {}) or {}
@@ -2676,15 +2496,6 @@ def _preserve_sterling_registry_statement(
     reference: Mapping[str, Any],
 ) -> None:
     """Use the exact reviewed template statement only when the source authorizes it."""
-    for paragraph in list(document.paragraphs):
-        lowered = paragraph.text.strip().casefold()
-        if lowered.startswith((
-            "this clinical trial may be registered on publicly accessible databases",
-            "this research study may be registered on publicly accessible databases",
-            "a description of this clinical trial will be available on http://www.clinicaltrials.gov",
-            "a description of this research study will be available on http://www.clinicaltrials.gov",
-        )):
-            paragraph._p.getparent().remove(paragraph._p)
     if participant_registry_disclosure(reference) is not True:
         return
     exact = sterling_clause_text("sterling.privacy.registry-disclosure")
@@ -3903,6 +3714,10 @@ def _template_document(
     authority = Document(authority_path)
     _apply_authority_styles(document, authority)
     _apply_authority_bullet_numbering(document, authority)
+    # Clean only the retained shell, before any authored section is inserted.
+    _normalize_source_bound_shell(document, reference, icf=icf)
+    if icf and not sterling:
+        _remove_advarra_example_study_prose(document)
     fields = render_fields(reference, model)
     if sterling:
         # Sterling IRB's open template comment reserves these merge fields for
@@ -3962,22 +3777,17 @@ def _template_document(
     if icf:
         if sterling:
             _repair_sterling_footer_page_fields(document)
-        _populate_icf_sections(document, model, reference, sterling=sterling)
-        _normalize_icf_source_displays(document, reference)
-        if not sterling:
-            _remove_advarra_example_study_prose(document)
+        _populate_icf_sections(document, model, sterling=sterling)
         if sterling:
-            _normalize_sterling_retained_sections(document, reference, boilerplate, model)
+            _normalize_sterling_retained_sections(document, reference)
             _insert_sterling_conditional_clauses(document, reference)
             repair_sterling_clause_placement(document, reference)
         else:
-            _normalize_icf_withdrawal(document, boilerplate)
-            _normalize_advarra_contact_sections(document, reference, boilerplate, model)
+            _normalize_advarra_contact_sections(document, reference, boilerplate)
         _normalize_icf_front_matter(document, reference)
         # Sterling's front-matter telephone fields belong to the IRB merge.
-        _normalize_source_bound_shell(document, reference, icf=True)
         if not sterling:
-            _restore_advarra_injury_section(document, authority, reference, model, boilerplate)
+            _restore_advarra_injury_section(document, authority, model)
         _apply_icf_authority_layout(document, authority, model, sterling=sterling)
         if sterling:
             _normalize_sterling_generated_section_spacing(document)
@@ -4006,7 +3816,6 @@ def _template_document(
 
     else:
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
-        _normalize_source_bound_shell(document, reference, icf=False)
         _replace_protocol_investigator_agreement(document, boilerplate, branch, authority)
         _replace_protocol_signature_table(document, authority)
         _populate_protocol_signature_values(document, reference)

@@ -1,0 +1,324 @@
+[
+  {
+    "case": "near-advarra",
+    "branch": "Prospective",
+    "family": "Advarra",
+    "source_unchanged": true,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "locally_authored_sections": [
+      "icf.withdrawal",
+      "evaluation-procedures"
+    ],
+    "authored_blocks_preserved": 122,
+    "artifacts": [
+      {
+        "name": "protocol.docx",
+        "sha256": "a1ab21b33a3743c8c8fbb0c650ea566b7a4efbd47c7c75d8e61023b70b17d115",
+        "refresh": {
+          "status": "passed",
+          "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+          "page_count": 15,
+          "source_sha256": "99c4b1891242812eca30ae1b8bbae8643093bfa6157d13e6549fc6d963207848",
+          "pagination_pdf_sha256": "a36bb79dab9b5d7773e00124120675d1a389f1eb375100a8ab37c9ce748f3135",
+          "output_sha256": "a1ab21b33a3743c8c8fbb0c650ea566b7a4efbd47c7c75d8e61023b70b17d115"
+        }
+      },
+      {
+        "name": "icf.docx",
+        "sha256": "bad33a9fe6758c163540840d543f2c3991c83e76c133003563b8e4721d5c15b6",
+        "refresh": null
+      }
+    ],
+    "xml_findings": []
+  },
+  {
+    "case": "near-sterling",
+    "branch": "Prospective",
+    "family": "Sterling",
+    "source_unchanged": true,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "locally_authored_sections": [
+      "icf.withdrawal",
+      "evaluation-procedures"
+    ],
+    "authored_blocks_preserved": 126,
+    "artifacts": [
+      {
+        "name": "protocol.docx",
+        "sha256": "4185045b76f8d2139ef48640a9d59b1239741b180eefa1102b14ab47fb5325c2",
+        "refresh": {
+          "status": "passed",
+          "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+          "page_count": 15,
+          "source_sha256": "1b03b78dec6be942d79d274764ecc2a3342a8931a1406a2004fe4d6f79251059",
+          "pagination_pdf_sha256": "f89d9ef4081f2dd3acb345b0a6b752d811078963c557d33c6cbbaefdfed577ca",
+          "output_sha256": "4185045b76f8d2139ef48640a9d59b1239741b180eefa1102b14ab47fb5325c2"
+        }
+      },
+      {
+        "name": "icf.docx",
+        "sha256": "56a3c659416b8fff0fff383385a3468b2c4a3adc9cec01c35f8e53b9916b6a70",
+        "refresh": null
+      }
+    ],
+    "xml_findings": []
+  },
+  {
+    "case": "comfort-sterling",
+    "branch": "Ambispective",
+    "family": "Sterling",
+    "source_unchanged": true,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "locally_authored_sections": [
+      "icf.withdrawal",
+      "evaluation-procedures"
+    ],
+    "authored_blocks_preserved": 123,
+    "artifacts": [
+      {
+        "name": "protocol.docx",
+        "sha256": "b31ab5bf17ec47dbf51b0e9cd8909a3e0557eb50563a6b1d24ec2b04183b6f06",
+        "refresh": {
+          "status": "passed",
+          "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+          "page_count": 19,
+          "source_sha256": "503b4e0cc6a6e34fd8a02158a87d50acbf774b85fa4dd4983e0feedfd494ba8b",
+          "pagination_pdf_sha256": "f7292e78ae3c3a9b5bcfb4119180b4321b2c16f37a9d12c984aa3ae0cac272b5",
+          "output_sha256": "b31ab5bf17ec47dbf51b0e9cd8909a3e0557eb50563a6b1d24ec2b04183b6f06"
+        }
+      },
+      {
+        "name": "icf.docx",
+        "sha256": "3b6a23e442df2e3fb371fd8765e20eba03d02b3721d8defd5f93cd93223a63b0",
+        "refresh": null
+      }
+    ],
+    "xml_findings": []
+  },
+  {
+    "case": "comfort-advarra",
+    "branch": "Ambispective",
+    "family": "Advarra",
+    "source_unchanged": true,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "locally_authored_sections": [
+      "icf.withdrawal",
+      "evaluation-procedures"
+    ],
+    "authored_blocks_preserved": 110,
+    "artifacts": [
+      {
+        "name": "protocol.docx",
+        "sha256": "be80b369eea4b056d01d56e1622c42e96a51f54fc47fbca4cdbc6c9a2de31428",
+        "refresh": {
+          "status": "passed",
+          "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+          "page_count": 19,
+          "source_sha256": "b1c2ad82ff4b96c8c404e5dabcacd7c61a5f82739e449ac5bb47793984effd58",
+          "pagination_pdf_sha256": "868b17b5cffb52e9c8315907023c456728e949009d22e8ab0ae494ab1eeba5dd",
+          "output_sha256": "be80b369eea4b056d01d56e1622c42e96a51f54fc47fbca4cdbc6c9a2de31428"
+        }
+      },
+      {
+        "name": "icf.docx",
+        "sha256": "5c0e702223dbdf1aec1c6372a73e9c4424dab79a09635a0285256183b2241630",
+        "refresh": null
+      }
+    ],
+    "xml_findings": []
+  },
+  {
+    "case": "break-sterling",
+    "branch": "Prospective",
+    "family": "Sterling",
+    "source_unchanged": true,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "locally_authored_sections": [
+      "icf.withdrawal",
+      "evaluation-procedures"
+    ],
+    "authored_blocks_preserved": 106,
+    "artifacts": [
+      {
+        "name": "protocol.docx",
+        "sha256": "f7fcdb9d854880cc6aded9ad113d46c794c717bea17b0184390e3b8815044ecd",
+        "refresh": {
+          "status": "passed",
+          "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+          "page_count": 17,
+          "source_sha256": "83e0e20c271f275ea85fe1ee2fdb741d65da5fdb7ae1c0a78494c041d11f5071",
+          "pagination_pdf_sha256": "3657af337ed91188cb160b85618c8917e0da00966d44e0c856e9e645d16d2f53",
+          "output_sha256": "f7fcdb9d854880cc6aded9ad113d46c794c717bea17b0184390e3b8815044ecd"
+        }
+      },
+      {
+        "name": "icf.docx",
+        "sha256": "40052832ba041dbc319b6683e2d2ccfbf72ee483b3846736c4cd6d425f9b767d",
+        "refresh": null
+      }
+    ],
+    "xml_findings": []
+  },
+  {
+    "case": "glide-advarra",
+    "branch": "Ambispective",
+    "family": "Advarra",
+    "source_unchanged": true,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "locally_authored_sections": [
+      "icf.withdrawal",
+      "evaluation-procedures"
+    ],
+    "authored_blocks_preserved": 135,
+    "artifacts": [
+      {
+        "name": "protocol.docx",
+        "sha256": "3f56f002b7ebea18cbba6ac2d83114631ed8826720fdab6ba0fa83d24c22f877",
+        "refresh": {
+          "status": "passed",
+          "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+          "page_count": 21,
+          "source_sha256": "fcb9039ddd49180d118187bef87afd92c9cf19e82e5aa1cf2d7d843455dcd91d",
+          "pagination_pdf_sha256": "7f26bb40c47e89791ed02bf70383cb0d545ee9bd7122db703513f394ab333426",
+          "output_sha256": "3f56f002b7ebea18cbba6ac2d83114631ed8826720fdab6ba0fa83d24c22f877"
+        }
+      },
+      {
+        "name": "icf.docx",
+        "sha256": "3e7a49858f3f74ce243f9d738a791f8111e0a85cc4e847e6177b53b891c15b74",
+        "refresh": null
+      }
+    ],
+    "xml_findings": []
+  },
+  {
+    "case": "record-retrospective",
+    "branch": "Retrospective",
+    "family": null,
+    "source_unchanged": true,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight"
+    ],
+    "locally_authored_sections": [],
+    "authored_blocks_preserved": 49,
+    "artifacts": [
+      {
+        "name": "protocol.docx",
+        "sha256": "a22902622e4420757624d165bdbe01a6d9927538969608cb0bf0c4616bbca8dd",
+        "refresh": {
+          "status": "passed",
+          "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+          "page_count": 9,
+          "source_sha256": "d8600cf9dad7b32e7d1302cdeed51aa82d1a87046f202e4d6d18158d3c3fe35b",
+          "pagination_pdf_sha256": "8eac7a13ae0f93243c9c81ff07027983bad74edf4da39a3ae2203d146856ebdb",
+          "output_sha256": "a22902622e4420757624d165bdbe01a6d9927538969608cb0bf0c4616bbca8dd"
+        }
+      }
+    ],
+    "xml_findings": []
+  },
+  {
+    "case": "puresee",
+    "branch": "Prospective",
+    "family": "Advarra",
+    "source_unchanged": true,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight",
+      "icf-narrative",
+      "prs-narrative"
+    ],
+    "locally_authored_sections": [
+      "icf.withdrawal",
+      "evaluation-procedures"
+    ],
+    "authored_blocks_preserved": 72,
+    "artifacts": [
+      {
+        "name": "protocol.docx",
+        "sha256": "e9f30e69f59a858f60970add214bc609b418c9a4f28a5cba5135fc4fa220f422",
+        "refresh": {
+          "status": "passed",
+          "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+          "page_count": 12,
+          "source_sha256": "1bb08ead11ffe5b3f040d6406c4c5b9d9d1873f07d8331f63c6b94b0b89925e3",
+          "pagination_pdf_sha256": "08455ec9b153f5aaa1499518992e46e08b43a1ed653255926aa3c953e96d86ad",
+          "output_sha256": "e9f30e69f59a858f60970add214bc609b418c9a4f28a5cba5135fc4fa220f422"
+        }
+      },
+      {
+        "name": "icf.docx",
+        "sha256": "6f30bcf6bb88bcabb70a2bc765d372644473958e27c112da2efa2ad3d18176d3",
+        "refresh": null
+      }
+    ],
+    "xml_findings": []
+  },
+  {
+    "case": "caps-retrospective",
+    "branch": "Retrospective",
+    "family": null,
+    "source_unchanged": true,
+    "request_batches": [
+      "protocol-foundations",
+      "protocol-operations",
+      "protocol-analysis-and-oversight"
+    ],
+    "locally_authored_sections": [],
+    "authored_blocks_preserved": 36,
+    "artifacts": [
+      {
+        "name": "protocol.docx",
+        "sha256": "b3a4dab9c2fa6f93a2a1d6a49623d83318b38755ca047166897db1f183926492",
+        "refresh": {
+          "status": "passed",
+          "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+          "page_count": 7,
+          "source_sha256": "a6a659d35044436f3e2bdb30ad6e1e2a6f4a189fa87529008cd800895b52112e",
+          "pagination_pdf_sha256": "b5d7189b064545ea63d00e794aeb9525efcbcf9cc1e4753963dd7f179cc5c9a8",
+          "output_sha256": "b3a4dab9c2fa6f93a2a1d6a49623d83318b38755ca047166897db1f183926492"
+        }
+      }
+    ],
+    "xml_findings": []
+  }
+]

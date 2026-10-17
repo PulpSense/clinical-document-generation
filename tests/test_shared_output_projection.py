@@ -218,24 +218,8 @@ def test_presentation_cleanup_keeps_meaningful_negative_and_unrecognized_counts(
     assert rendering.sample_size_display('48 subjects (treatment); control: 24') == '48 participants in the treatment group and 24 in the control group'
 
 
-def test_citation_cleanup_preserves_split_run_formatting_and_clinical_qualification():
-    source = source_for('Prospective', 'Sterling')
-    document = Document()
-    paragraph = document.add_paragraph('Prior findings suggested an effect ')
-    paragraph.add_run('(references ')
-    paragraph.add_run('1 and 2)').italic = True
-    paragraph.add_run('; superiority remains unproven.').bold = True
-    rendering._normalize_icf_source_displays(document, source)
-    assert paragraph.text == 'Prior findings suggested an effect; superiority remains unproven.'
-    assert paragraph.runs[-1].bold
-
-
-@pytest.mark.parametrize('source', [{'study': {}}, source_for('Prospective', 'Sterling')])
-def test_citation_cleanup_does_not_hide_missing_bibliographic_sources(source):
-    document = Document()
-    paragraph = document.add_paragraph('Prior findings suggested an effect (reference 7).')
-    rendering._normalize_icf_source_displays(document, source)
-    assert paragraph.text == 'Prior findings suggested an effect (reference 7).'
+# Authored citation text preservation is exercised at the public rendering seam
+# in test_ai_prose_ownership.py; assembly no longer edits narrative citations.
 
 
 @pytest.mark.parametrize('branch', ['Retrospective', 'Prospective', 'Ambispective'])

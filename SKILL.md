@@ -45,7 +45,10 @@ Prospective/Ambispective use the approved Advarra or Sterling selection and
 Retrospective uses [retrospective-required-inputs.md](references/retrospective-required-inputs.md).
 Keep source facts distinct from template examples. Use retained n8n prompts plus
 Brad's corrections for matching sections; draft additional sections from supplied
-study facts. Current templates own fixed language, headings and formatting.
+study facts. AI owns each complete requested section, including applicable supplied
+boilerplate; assembly preserves accepted prose and lists without completing or
+rewriting them. Current templates own retained fixed clauses, source-field
+mappings, headings and formatting.
 
 ## Run directory policy
 

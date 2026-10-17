@@ -54,8 +54,10 @@ for every returned `requests` and `handoffs` path. For each request:
    every additional condition, measurement, timing rule and safety fact.
    Compare safety notes with the supplied `related_source` context too: general
    risks belong in the safety/risks sections; retain unique assessment instructions.
-   For `icf.withdrawal`, draft additional study-specific policies; assembly owns
-   the fixed voluntary-participation paragraph and retains it once.
+   Draft each complete section; assembly preserves accepted prose without
+   adding, rewriting or deduplicating sentences. For `icf.withdrawal`, include
+   the applicable fixed voluntary-participation paragraph once plus all supplied
+   study-specific policies. Include expected enrollment once in `icf.duration`.
    For PRS return `narrative.brief_summary` and `narrative.detailed_description`,
    each as an object with `text`. Return only the requested targets.
 5. Run the same command again. It schedules remaining drafting prerequisites,

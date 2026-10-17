@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.53-consecutive-subsections"
+CONTRACT_VERSION = "clinical-documents-v2.54-ai-owned-section-prose"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -426,7 +426,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "analysis-plan.datasets": "Identify which observations enter each source-supported analysis population or data set. Do not reproduce the endpoint inventory owned by Objectives.",
         "analysis-plan.methodology": "Explain the approved analysis method for each endpoint group. State shared methods once per outcome group. Cite the supplied primary and secondary endpoint paths in evidence_refs without adding Study Design cross-references to the prose. Do not repeat Section 10.1's analysis-population or earlier-visit eligibility rule. Section 10.3 owns the approved interpretation qualification, such as no planned inferential test.",
         "analysis-plan.considerations": "Give one concise, source-supported qualification for interpreting the results. When the approved plan supports only descriptive analysis, say that interpretation is descriptive without repeating endpoint methods or the paired-summary method. Do not repeat Section 10.1's data-set eligibility or Section 10.2's paired-summary details. If the source supplies no further limitation, use the descriptive scope of the approved analysis rather than a self-referential statement about summaries. Do not assert that hypothesis tests are absent unless the source says so.",
-        "icf.duration": "Describe approved participation timing; Purpose and Key Information own enrollment and control-group counts.",
+        "icf.duration": "State expected enrollment once using the approved count and unit, then describe approved participant timing and the final follow-up anchor; leave the visit itinerary in Procedures.",
         "icf.payment": "State the complete approved compensation and reimbursement fact once in patient-readable language; do not add a duplicate formal source sentence.",
         "sample-size": "State the approved sample size once and explain its approved justification. When a sample-size evidence table follows, let the table carry the evidence row and source label; do not narrate the row again or insert internal source labels into the prose.",
         "confidentiality": "Explain source-supported operational detail for handling identifiable data, access, storage or retention, and disclosures where supplied. A general commitment to confidential storage does not establish an identifier plan, access controls, or disclosure recipients.",
@@ -454,7 +454,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement.",
         "icf.payment": "State the approved payment or reimbursement terms exactly enough for participant use.",
         "icf.privacy": "Explain the approved privacy and confidentiality handling in participant-facing language.",
-        "icf.withdrawal": "Assembly inserts the authorized voluntary-participation paragraph once. Draft only additional supplied withdrawal instructions, optional follow-up, investigator discontinuation and earned-payment conditions in participant-facing language. If no additional facts exist, return the exact fixed paragraph as fixed_boilerplate; assembly retains it once.",
+        "icf.withdrawal": "Draft the complete withdrawal section: include the applicable authorized voluntary-participation and prior-data-use paragraph once, followed by supplied withdrawal instructions, optional follow-up, investigator discontinuation and earned-payment conditions. Preserve every condition in participant-facing language. If only the fixed paragraph applies, return that exact paragraph as fixed_boilerplate. Assembly inserts your response verbatim and adds no withdrawal prose.",
     }
     eligibility = (
         "Preserve the approved unit of eligibility and each criterion's scope, conditions and exceptions. "

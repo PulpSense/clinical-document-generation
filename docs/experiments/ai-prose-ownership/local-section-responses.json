@@ -1,0 +1,485 @@
+[
+  {
+    "case": "near-advarra",
+    "request_sha256": "1c5dd3b81d7dd53b47a1686044226e3e2532d6bbafa41f93c4853f4eba4ab963",
+    "response": {
+      "request_id": "ownership-near-advarra.draft.protocol-operations.local-section-trial.a1.bf7e2115",
+      "request_sha256": "1c5dd3b81d7dd53b47a1686044226e3e2532d6bbafa41f93c4853f4eba4ab963",
+      "revision_id": "ownership-near-advarra",
+      "task": "section_drafting",
+      "batch_id": "protocol-operations",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "evaluation-procedures",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "The scheduled study activities are shown in Table 15.1.",
+              "evidence_refs": [
+                "procedures.assessments"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "near-advarra",
+    "request_sha256": "4e31ae4c0163cbbf935fdb2e6662d4950f05e8ffec233f36ce55a884931af7f3",
+    "response": {
+      "request_id": "ownership-near-advarra.draft.icf-narrative.local-section-trial.a1.4844f52b",
+      "request_sha256": "4e31ae4c0163cbbf935fdb2e6662d4950f05e8ffec233f36ce55a884931af7f3",
+      "revision_id": "ownership-near-advarra",
+      "task": "section_drafting",
+      "batch_id": "icf-narrative",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "icf.withdrawal",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.",
+              "evidence_refs": [],
+              "boilerplate_refs": [
+                "icf-withdrawal"
+              ]
+            },
+            {
+              "text": "To stop participating, tell or write to your enrolling site coordinator. Staff offer an optional discussion of symptoms and ordinary-care needs. You do not have to have a final research examination, extra tests or further data collection after withdrawal. The investigator may end participation at your request, if you cannot complete assessments, if you have additional eye surgery or if the study stops; staff record the reason when available. Earned payments and eligible travel expenses already incurred remain due under the payment terms in this form.",
+              "evidence_refs": [
+                "risks_benefits.compensation_or_reimbursement"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "near-sterling",
+    "request_sha256": "611e0a4a24620b4109a7882be99d4307459296975f6a30a1a9c35105e4237073",
+    "response": {
+      "request_id": "ownership-near-sterling.draft.protocol-operations.local-section-trial.a1.1544fd22",
+      "request_sha256": "611e0a4a24620b4109a7882be99d4307459296975f6a30a1a9c35105e4237073",
+      "revision_id": "ownership-near-sterling",
+      "task": "section_drafting",
+      "batch_id": "protocol-operations",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "evaluation-procedures",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "The scheduled study activities are shown in Table 15.1.",
+              "evidence_refs": [
+                "procedures.assessments"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "near-sterling",
+    "request_sha256": "1cf00ae70c0b0e25aa6f86a8a03cdfced4a69a796d65d9e5a7edc5a38a6de150",
+    "response": {
+      "request_id": "ownership-near-sterling.draft.icf-narrative.local-section-trial.a1.24f6f437",
+      "request_sha256": "1cf00ae70c0b0e25aa6f86a8a03cdfced4a69a796d65d9e5a7edc5a38a6de150",
+      "revision_id": "ownership-near-sterling",
+      "task": "section_drafting",
+      "batch_id": "icf-narrative",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "icf.withdrawal",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.",
+              "evidence_refs": [],
+              "boilerplate_refs": [
+                "icf-withdrawal"
+              ]
+            },
+            {
+              "text": "To leave, tell or write to your enrolling site coordinator. Staff offer an optional discussion of symptoms and ordinary-care needs; no final research examination, extra testing or further data collection is required after withdrawal. The investigator may stop participation at your request, if you cannot complete assessments, if you have additional eye surgery or if the study stops; staff record the reason when available. You keep the $30 earned for each attended visit. Eligible parking or public-transit expenses with receipts remain reimbursable up to $20 per attended visit, separately from compensation. These payments do not depend on study completion.",
+              "evidence_refs": [
+                "risks_benefits.compensation_or_reimbursement"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "comfort-sterling",
+    "request_sha256": "0c5a356c048c30d24d80d1f58c608863818cedd86194f37d3d09de17944cce27",
+    "response": {
+      "request_id": "ownership-comfort-sterling.draft.protocol-operations.local-section-trial.a1.49ac766b",
+      "request_sha256": "0c5a356c048c30d24d80d1f58c608863818cedd86194f37d3d09de17944cce27",
+      "revision_id": "ownership-comfort-sterling",
+      "task": "section_drafting",
+      "batch_id": "protocol-operations",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "evaluation-procedures",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "The scheduled study activities are shown in Table 15.1.",
+              "evidence_refs": [
+                "procedures.assessments"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "comfort-sterling",
+    "request_sha256": "15a1f103aa3dbf9ecafd23fe04ec20dd44666cfe7eb8b62e994dc07a4cbdeff2",
+    "response": {
+      "request_id": "ownership-comfort-sterling.draft.icf-narrative.local-section-trial.a1.852f9956",
+      "request_sha256": "15a1f103aa3dbf9ecafd23fe04ec20dd44666cfe7eb8b62e994dc07a4cbdeff2",
+      "revision_id": "ownership-comfort-sterling",
+      "task": "section_drafting",
+      "batch_id": "icf-narrative",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "icf.withdrawal",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.",
+              "evidence_refs": [],
+              "boilerplate_refs": [
+                "icf-withdrawal"
+              ]
+            },
+            {
+              "text": "Tell or write to your enrolling site coordinator to leave. A final discussion of symptoms and ordinary-care needs is offered but optional; no final research visit, saliva collection or examination is required after withdrawal. Routine care continues. The investigator may end participation at your request, if you cannot complete assessments, if you have additional eye surgery or if the study closes; staff record the reason when available. You retain payments already earned for attended Day 0 and Day 90 visits and a completed Day 30 telephone contact, as applicable. There is no completion bonus. Earned checks remain payable within 30 days of each completed contact.",
+              "evidence_refs": [
+                "risks_benefits.compensation_or_reimbursement"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "comfort-advarra",
+    "request_sha256": "20382f53ed2f2a355047cd2cec80af51e921e6c9e531b8c4876f870fb21e69b3",
+    "response": {
+      "request_id": "ownership-comfort-advarra.draft.protocol-operations.local-section-trial.a1.0a0b3e77",
+      "request_sha256": "20382f53ed2f2a355047cd2cec80af51e921e6c9e531b8c4876f870fb21e69b3",
+      "revision_id": "ownership-comfort-advarra",
+      "task": "section_drafting",
+      "batch_id": "protocol-operations",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "evaluation-procedures",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "The scheduled study activities are shown in Table 15.1.",
+              "evidence_refs": [
+                "procedures.assessments"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "comfort-advarra",
+    "request_sha256": "3d5a256aa81ef35684aea9e84c5a06a90f026547879660f5d81dcec9d2da207d",
+    "response": {
+      "request_id": "ownership-comfort-advarra.draft.icf-narrative.local-section-trial.a1.80f96d46",
+      "request_sha256": "3d5a256aa81ef35684aea9e84c5a06a90f026547879660f5d81dcec9d2da207d",
+      "revision_id": "ownership-comfort-advarra",
+      "task": "section_drafting",
+      "batch_id": "icf-narrative",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "icf.withdrawal",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.",
+              "evidence_refs": [],
+              "boilerplate_refs": [
+                "icf-withdrawal"
+              ]
+            },
+            {
+              "text": "You may tell or write to your enrolling site coordinator to leave. The offered final discussion of symptoms and ordinary-care needs is optional. You do not have to attend a final research visit, give saliva or undergo an examination after withdrawal. Leaving research does not stop routine care. The investigator may stop participation at your request, if you cannot complete assessments, if you have additional eye surgery or if the study closes; staff record the reason when available. Payments already earned remain payable by check within 30 days of each completed contact, without a completion bonus.",
+              "evidence_refs": [
+                "risks_benefits.compensation_or_reimbursement"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "break-sterling",
+    "request_sha256": "b09a3053928db6b283aa4503861a2728f9a932d13206408e631fb492c2849a45",
+    "response": {
+      "request_id": "ownership-break-sterling.draft.protocol-operations.local-section-trial.a1.77c30d1b",
+      "request_sha256": "b09a3053928db6b283aa4503861a2728f9a932d13206408e631fb492c2849a45",
+      "revision_id": "ownership-break-sterling",
+      "task": "section_drafting",
+      "batch_id": "protocol-operations",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "evaluation-procedures",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "The scheduled study activities are shown in Table 15.1.",
+              "evidence_refs": [
+                "procedures.assessments"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "break-sterling",
+    "request_sha256": "12ec495264f76b12a629d3dd2a29cf8c5e4ed7d06c99cdc3828dd54535f532c0",
+    "response": {
+      "request_id": "ownership-break-sterling.draft.icf-narrative.local-section-trial.a1.da02835c",
+      "request_sha256": "12ec495264f76b12a629d3dd2a29cf8c5e4ed7d06c99cdc3828dd54535f532c0",
+      "revision_id": "ownership-break-sterling",
+      "task": "section_drafting",
+      "batch_id": "icf-narrative",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "icf.withdrawal",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.",
+              "evidence_refs": [],
+              "boilerplate_refs": [
+                "icf-withdrawal"
+              ]
+            },
+            {
+              "text": "Tell or write to your enrolling site coordinator to stop. A final discussion of symptoms and ordinary care is optional. No final research test, diary submission or extra data collection is required after withdrawal. The investigator may end participation at your request, if assessments cannot be completed or if the study closes; staff record the reason when available. Eligible parking or public-transit expenses already incurred remain reimbursable within the receipt and per-visit limits in the payment section. You do not have to finish the study or diary to retain eligible reimbursement.",
+              "evidence_refs": [
+                "risks_benefits.compensation_or_reimbursement"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "glide-advarra",
+    "request_sha256": "22aab8aea3812682156113ede860b231278fa9a5d9cdb6732ae316d13bdcec25",
+    "response": {
+      "request_id": "ownership-glide-advarra.draft.protocol-operations.local-section-trial.a1.68c33953",
+      "request_sha256": "22aab8aea3812682156113ede860b231278fa9a5d9cdb6732ae316d13bdcec25",
+      "revision_id": "ownership-glide-advarra",
+      "task": "section_drafting",
+      "batch_id": "protocol-operations",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "evaluation-procedures",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "The scheduled study activities are shown in Table 15.1.",
+              "evidence_refs": [
+                "procedures.assessments"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "glide-advarra",
+    "request_sha256": "f3e1787a6b0c6dce77b56f428b72d8be1c3d8da2982ca267a94608dc5b343c33",
+    "response": {
+      "request_id": "ownership-glide-advarra.draft.icf-narrative.local-section-trial.a1.50c1115a",
+      "request_sha256": "f3e1787a6b0c6dce77b56f428b72d8be1c3d8da2982ca267a94608dc5b343c33",
+      "revision_id": "ownership-glide-advarra",
+      "task": "section_drafting",
+      "batch_id": "icf-narrative",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "icf.withdrawal",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.",
+              "evidence_refs": [],
+              "boilerplate_refs": [
+                "icf-withdrawal"
+              ]
+            },
+            {
+              "text": "Tell or write to your enrolling site coordinator using the contact section to stop participation. A final clinical discussion is optional; no final research measurement or extra contact is required. The investigator may end participation at your request, if assessments cannot be completed or if the study closes. Staff record reasons when available. A later change in usual glaucoma medicines alone is not a reason to stop participation. You retain payment already earned without finishing every contact, and there is no completion bonus. A started but unfinished contact earns half its payment. If you leave after the telephone contact, the clinic offers payment pickup within 14 days without another research visit. Amounts and collection arrangements are in the payment section.",
+              "evidence_refs": [
+                "risks_benefits.compensation_or_reimbursement"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "puresee",
+    "request_sha256": "77c9149afa41bf37e0443799a6f68fd2ac191c58a057f67d7800cafd3aa959aa",
+    "response": {
+      "request_id": "ownership-puresee.draft.protocol-operations.local-section-trial.a1.1a57a24f",
+      "request_sha256": "77c9149afa41bf37e0443799a6f68fd2ac191c58a057f67d7800cafd3aa959aa",
+      "revision_id": "ownership-puresee",
+      "task": "section_drafting",
+      "batch_id": "protocol-operations",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "evaluation-procedures",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "The scheduled study activities are shown in Table 15.1.",
+              "evidence_refs": [
+                "procedures.assessments"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "puresee",
+    "request_sha256": "77af8377c31434bc973f93f0a33678f3f63344b0904d156191e0e6e94ea42633",
+    "response": {
+      "request_id": "ownership-puresee.draft.icf-narrative.local-section-trial.a1.767fb9ff",
+      "request_sha256": "77af8377c31434bc973f93f0a33678f3f63344b0904d156191e0e6e94ea42633",
+      "revision_id": "ownership-puresee",
+      "task": "section_drafting",
+      "batch_id": "icf-narrative",
+      "schema_version": "hermes-response/v2",
+      "producer": {
+        "model_id": "Codex-current-conversation-controlled-local-section-trial"
+      },
+      "section_results": [
+        {
+          "section_id": "icf.withdrawal",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.",
+              "evidence_refs": [],
+              "boilerplate_refs": [
+                "icf-withdrawal"
+              ]
+            },
+            {
+              "text": "There is no participant compensation, travel reimbursement or other payment, whether you complete the study or leave early.",
+              "evidence_refs": [
+                "risks_benefits.compensation_or_reimbursement"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  }
+]
