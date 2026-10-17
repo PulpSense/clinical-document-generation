@@ -1,0 +1,568 @@
+{
+  "tested_commit": "dbe4228659abe4f34b394b52f5b6a07fa185cdb1",
+  "date": "2026-10-17",
+  "provenance": "Local native assembly replay of retained prior drafts and approved references, current public drafting requests, reused reviewed Codex section trials, plus current RECORD section revisions. Not fresh Hermes inference or client approval.",
+  "focused_tests": {
+    "passed": 57,
+    "seconds": 51.22,
+    "files": [
+      "test_retrospective_method_handoff.py",
+      "test_retrospective_followup.py",
+      "test_generation_only.py",
+      "test_prs_transport_values.py",
+      "test_registry_disclosure_mapping.py"
+    ],
+    "full_suite_run": false
+  },
+  "runtime_sha256": {
+    "contracts.py": "4a201d151f770d2f8a7a803d3ad2b63ce163530e9a575adb53ac251836c93be7",
+    "drafting.py": "9c4e3477a7a73441f70a24dfc83de89454c92acb9159e611c4e3aed19b51cb5b",
+    "output_recovery.py": "c7e46b9885bb3a8c117af4afda77e2e126f0b12a45c6e58ab4037a84173b0b41",
+    "prs_xml.py": "1aad04586410b2f177bc616d7747431b5145795fb014a330827cb560c01adc03",
+    "rendering.py": "b436a871e87abefa0d5bfda0555996bf15e9fe02c8d6a57a28ec5c0fea7502b9",
+    "workflow.py": "eef4c882a96780e481fa7d90fc3b6e0fd51a2cf4da23c6152cf0d4184842e09c"
+  },
+  "original_n8n_sha256": "2114b96a474b288208b62e0031a8c2b665387969e6be89af0f8c355493419181",
+  "saved_run_replays": [
+    {
+      "case": "near-advarra",
+      "study_type": "Prospective",
+      "family": "Advarra",
+      "request_checks": [
+        {
+          "batch": "protocol-foundations",
+          "section_count": 7,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-operations",
+          "section_count": 9,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-analysis-and-oversight",
+          "section_count": 16,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "icf-narrative",
+          "section_count": 11,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "prs-narrative",
+          "section_count": 2,
+          "methods_owner": "study-procedure.measurements"
+        }
+      ],
+      "docx_comparisons": [
+        {
+          "artifact": "protocol.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "18cbf4b4c5cc44d8e5350f6fcfe0a96674122560d5d98d2caf0b18b2c914c0ab"
+        },
+        {
+          "artifact": "icf.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "9b43c33fa466af28498a778baa1ac2ef18cf24272a9773c2e3740cf720c7e730"
+        }
+      ],
+      "xml_changes": [],
+      "saved_drafts_replay": true,
+      "source_unchanged": true,
+      "xml_test": "passed",
+      "xml_sha256": "abbd7c369eba945a1e1f1f7fbaaa0ce1ae8027075e30186e023c454b284bffc4",
+      "xml_other_leaves_and_order_unchanged": true,
+      "baseline_matches_original_zip_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "original_archive_sha256": "892596f2d57c31f18c5908caf03ebf55d0c0a8541a28a868af6e9d7282a931de"
+    },
+    {
+      "case": "near-sterling",
+      "study_type": "Prospective",
+      "family": "Sterling",
+      "request_checks": [
+        {
+          "batch": "protocol-foundations",
+          "section_count": 7,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-operations",
+          "section_count": 9,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-analysis-and-oversight",
+          "section_count": 16,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "icf-narrative",
+          "section_count": 13,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "prs-narrative",
+          "section_count": 2,
+          "methods_owner": "study-procedure.measurements"
+        }
+      ],
+      "docx_comparisons": [
+        {
+          "artifact": "protocol.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "6b0a9641042aa736eaef1f4a371e8aaf2f6eeecdc166d3e33d1b5fd41693e260"
+        },
+        {
+          "artifact": "icf.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "53749509a198036a52c73bf81fca144f5cb44109266b3f7c50d5c856a201c0f5"
+        }
+      ],
+      "xml_changes": [],
+      "saved_drafts_replay": true,
+      "source_unchanged": true,
+      "xml_test": "passed",
+      "xml_sha256": "02ab98d79a5be1e5629bc830e96f58d1b21800172fc939313a2f1f5727908620",
+      "xml_other_leaves_and_order_unchanged": true,
+      "baseline_matches_original_zip_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "original_archive_sha256": "1afe8824856c6d4c320a124edeb901fb0cea9018214fade979f58eab181d0808"
+    },
+    {
+      "case": "comfort-sterling",
+      "study_type": "Ambispective",
+      "family": "Sterling",
+      "request_checks": [
+        {
+          "batch": "protocol-foundations",
+          "section_count": 7,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-operations",
+          "section_count": 9,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-analysis-and-oversight",
+          "section_count": 16,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "icf-narrative",
+          "section_count": 13,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "prs-narrative",
+          "section_count": 2,
+          "methods_owner": "study-procedure.measurements"
+        }
+      ],
+      "docx_comparisons": [
+        {
+          "artifact": "protocol.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "b8f4a9c0470d78338b2c783dc6d81c63bbcf499c6e0876c7fc6e2ff2461a4227"
+        },
+        {
+          "artifact": "icf.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "ccda0afca6debb3c69349c08fe503a2533aeeea0cfbe2f797bc6e9247072fa01"
+        }
+      ],
+      "xml_changes": [],
+      "saved_drafts_replay": true,
+      "source_unchanged": true,
+      "xml_test": "passed",
+      "xml_sha256": "ab19fc7913d3f13b415c0076cbc7e7cef725349a80e14da7254aef6170e9dcf6",
+      "xml_other_leaves_and_order_unchanged": true,
+      "baseline_matches_original_zip_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "original_archive_sha256": "46aacc5be198bab79f35b52cc507114069457ced09e2eabc256724a0bf610105"
+    },
+    {
+      "case": "comfort-advarra",
+      "study_type": "Ambispective",
+      "family": "Advarra",
+      "request_checks": [
+        {
+          "batch": "protocol-foundations",
+          "section_count": 7,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-operations",
+          "section_count": 9,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-analysis-and-oversight",
+          "section_count": 16,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "icf-narrative",
+          "section_count": 11,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "prs-narrative",
+          "section_count": 2,
+          "methods_owner": "study-procedure.measurements"
+        }
+      ],
+      "docx_comparisons": [
+        {
+          "artifact": "protocol.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "5ad6919fdbf1a8c8ce2bdffacb16c27f5dd2532c5329aa829adb364b85472658"
+        },
+        {
+          "artifact": "icf.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "a503937aa4249fc60d95ed803d8b557ec815b0d60252addeaeac73bd0127fbc7"
+        }
+      ],
+      "xml_changes": [],
+      "saved_drafts_replay": true,
+      "source_unchanged": true,
+      "xml_test": "passed",
+      "xml_sha256": "b887ae577509e0e31669fd14ad3fb5f6ea3879cfd038f3e34e3d2433306223d2",
+      "xml_other_leaves_and_order_unchanged": true,
+      "baseline_matches_original_zip_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "original_archive_sha256": "632a852b853d091d2c48bc3f0426f054586f8f3a9ff5402d4d7d16e18442260e"
+    },
+    {
+      "case": "break-sterling",
+      "study_type": "Prospective",
+      "family": "Sterling",
+      "request_checks": [
+        {
+          "batch": "protocol-foundations",
+          "section_count": 7,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-operations",
+          "section_count": 9,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-analysis-and-oversight",
+          "section_count": 16,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "icf-narrative",
+          "section_count": 13,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "prs-narrative",
+          "section_count": 2,
+          "methods_owner": "study-procedure.measurements"
+        }
+      ],
+      "docx_comparisons": [
+        {
+          "artifact": "protocol.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "0621ad5836660f50d05102912202375f7550317e8864687b9048f2e1c10ad6d3"
+        },
+        {
+          "artifact": "icf.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "4601979002a24f5d4d5d6f1b078e02a81c7870669ea655fcc787f44f79b236e6"
+        }
+      ],
+      "xml_changes": [],
+      "saved_drafts_replay": true,
+      "source_unchanged": true,
+      "xml_test": "passed",
+      "xml_sha256": "37043081117968e1e25316a665dfc52fa6a3020f3e220f25b6fef0b9f7dcd148",
+      "xml_other_leaves_and_order_unchanged": true,
+      "baseline_matches_original_zip_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "original_archive_sha256": "c79be775ce8c57cedce6d9a665100bfcb1a8565865e74abad0d7a0281a79da79"
+    },
+    {
+      "case": "glide-advarra",
+      "study_type": "Ambispective",
+      "family": "Advarra",
+      "request_checks": [
+        {
+          "batch": "protocol-foundations",
+          "section_count": 7,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-operations",
+          "section_count": 9,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "protocol-analysis-and-oversight",
+          "section_count": 16,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "icf-narrative",
+          "section_count": 11,
+          "methods_owner": "study-procedure.measurements"
+        },
+        {
+          "batch": "prs-narrative",
+          "section_count": 2,
+          "methods_owner": "study-procedure.measurements"
+        }
+      ],
+      "docx_comparisons": [
+        {
+          "artifact": "protocol.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "02afab5386a8cc2648c63de3feeac0be3d8d2c1d33793d0f62debc0cba44aac1"
+        },
+        {
+          "artifact": "icf.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "95a9b3f869288e531488bef877c19cc0451503b4b7002a8471ea17fe3d11f091"
+        }
+      ],
+      "xml_changes": [
+        {
+          "path": "/clinical_study[0]/oversight_info[0]/fda_regulated_drug[0]",
+          "before": "False",
+          "after": "No"
+        },
+        {
+          "path": "/clinical_study[0]/oversight_info[0]/fda_regulated_device[0]",
+          "before": "False",
+          "after": "No"
+        },
+        {
+          "path": "/clinical_study[0]/eligibility[0]/healthy_volunteers[0]",
+          "before": "False",
+          "after": "No"
+        },
+        {
+          "path": "/clinical_study[0]/arm_group[0]/arm_type[0]",
+          "before": "Observational exposure group",
+          "after": ""
+        },
+        {
+          "path": "/clinical_study[0]/arm_group[1]/arm_type[0]",
+          "before": "Observational exposure group",
+          "after": ""
+        }
+      ],
+      "saved_drafts_replay": true,
+      "source_unchanged": true,
+      "xml_test": "passed",
+      "xml_sha256": "5e692ad4ca7accb5134a6e8d81bdce87a1d58fe42ea95128e1694283a206a4d5",
+      "xml_other_leaves_and_order_unchanged": true,
+      "baseline_matches_original_zip_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "original_archive_sha256": "65eb8e5788fbe5b2000709a27e122175c9c0550898801e3297c7838ac69a777b"
+    },
+    {
+      "case": "record-retrospective",
+      "study_type": "Retrospective",
+      "family": "Advarra",
+      "request_checks": [
+        {
+          "batch": "protocol-foundations",
+          "section_count": 6,
+          "methods_owner": "study-procedure.enrollment"
+        },
+        {
+          "batch": "protocol-operations",
+          "section_count": 1,
+          "methods_owner": "study-procedure.enrollment"
+        },
+        {
+          "batch": "protocol-analysis-and-oversight",
+          "section_count": 7,
+          "methods_owner": "study-procedure.enrollment"
+        }
+      ],
+      "docx_comparisons": [
+        {
+          "artifact": "protocol.docx",
+          "changed_word_parts_excluding_toc": [],
+          "sha256": "e8692165ec522a65a05b6d790dd245cd85d26c842a4d8b57b7cf89c518e24b2d"
+        }
+      ],
+      "xml_changes": [],
+      "saved_drafts_replay": true,
+      "source_unchanged": true,
+      "xml_test": "not applicable",
+      "baseline_matches_original_zip_outputs": [
+        "protocol.docx"
+      ],
+      "original_archive_sha256": "5698f41340f379fff70816102e87d63de677fa987c20b32c79fbe368da0eef4a"
+    }
+  ],
+  "controlled_draft_rebuilds": [
+    {
+      "provenance": "Saved RECORD source and draft replay; four local Codex sections revised against the current active-section writing plan. Not new Hermes inference.",
+      "changed_sections": [
+        "study-procedure.enrollment",
+        "analysis-plan.methodology",
+        "study-design.design",
+        "study-design.bias"
+      ],
+      "refresh": {
+        "status": "passed",
+        "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+        "page_count": 9,
+        "source_sha256": "8896a025a593d4f6638bd0aa036766ea92fa442f743e7c0f4c0e6a75f7208bba",
+        "pagination_pdf_sha256": "d0b51936fab5cac874a57fa131addaaac8a3eebf16463b503c6c55abbbb30de8",
+        "output_sha256": "fb16dc8932923b1abb1cc53c60e010bbe8b5a5aba910ecb002cd024a9b95ca71"
+      },
+      "case": "record-corrected",
+      "protocol_path": "/Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/latest-version-regression/record-corrected/candidate/protocol.docx"
+    },
+    {
+      "provenance": "Current public requests, previously reviewed Codex section trials reused after checking current contracts, remaining accepted saved drafts unchanged. No new Hermes inference.",
+      "changed_sections": [
+        "study-design.bias",
+        "study-procedure.visits",
+        "study-procedure.measurements"
+      ],
+      "refresh": {
+        "status": "passed",
+        "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+        "page_count": 19,
+        "source_sha256": "b7e71846eabd0171acc2b333fc4da318f6871f1ce186ef055b991953aacd9770",
+        "pagination_pdf_sha256": "c106a59125e694bf1b54e133d84169befb9367b8f598a565ec62292a0663066a",
+        "output_sha256": "1384b4760b47443ac0ce47ef7681fa1528aa581de7adf7c2336f6eaceacef2f4"
+      },
+      "case": "glide-concise",
+      "protocol_path": "/Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/latest-version-regression/glide-concise/candidate/protocol.docx"
+    },
+    {
+      "provenance": "Current public requests, previously reviewed Codex section trials reused after checking current contracts, remaining accepted saved drafts unchanged. No new Hermes inference.",
+      "changed_sections": [
+        "study-design.bias",
+        "study-procedure.visits",
+        "study-procedure.measurements"
+      ],
+      "refresh": {
+        "status": "passed",
+        "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+        "page_count": 17,
+        "source_sha256": "195dba879e8e345a099a05a3b012f194b537e14ea0974f54d1e89181294885b6",
+        "pagination_pdf_sha256": "a466b5e63686a0c5c0a6db2c554daf9116b84879062878ee389ec69b49f7e481",
+        "output_sha256": "b70eb49e8363ca933558efe944fb48ff756230d3f335e85c87cb1153c17b2f13"
+      },
+      "case": "break-concise",
+      "protocol_path": "/Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/latest-version-regression/break-concise/candidate/protocol.docx"
+    },
+    {
+      "provenance": "Current public requests, previously reviewed Codex section trials reused after checking current contracts, remaining accepted saved drafts unchanged. No new Hermes inference.",
+      "changed_sections": [
+        "study-design.bias",
+        "study-procedure.visits",
+        "study-procedure.measurements"
+      ],
+      "refresh": {
+        "status": "passed",
+        "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+        "page_count": 18,
+        "source_sha256": "f8aaf9d03262cb0e141e22ede393e97cecdec4a7faf9a147d6d6f1d879b6a850",
+        "pagination_pdf_sha256": "df38c248f150499cbc41e31e1dee624399efa5f2e64d39e15d2b28b4188d8242",
+        "output_sha256": "5c83ef81145fb8b1cc953c621deb33e66575669785bc7aa6fe8735a44e5eb6cd"
+      },
+      "case": "comfort-concise",
+      "protocol_path": "/Users/juanpabloleoni/.codex/worktrees/generation-only-experiment/clinical-document-generation/.scratch/latest-version-regression/comfort-concise/candidate/protocol.docx"
+    }
+  ],
+  "page_review": [
+    {
+      "case": "record-corrected",
+      "pages": 9,
+      "toc_count": 21,
+      "toc_mismatches": [],
+      "all_pages_visually_inspected": true,
+      "material_layout_findings": []
+    },
+    {
+      "case": "glide-concise",
+      "pages": 19,
+      "toc_count": 43,
+      "toc_mismatches": [],
+      "all_pages_visually_inspected": true,
+      "material_layout_findings": []
+    },
+    {
+      "case": "break-concise",
+      "pages": 17,
+      "toc_count": 43,
+      "toc_mismatches": [],
+      "all_pages_visually_inspected": true,
+      "material_layout_findings": []
+    },
+    {
+      "case": "comfort-concise",
+      "pages": 18,
+      "toc_count": 43,
+      "toc_mismatches": [],
+      "all_pages_visually_inspected": true,
+      "material_layout_findings": []
+    }
+  ],
+  "chart": {
+    "scope": "Current requests and reviewed operations draft only. Scoped development source from original input; complete old approved reference unavailable. No full current CHART replay claim.",
+    "current_request_checks": [
+      {
+        "batch": "protocol-foundations",
+        "methods_owner": "study-procedure.enrollment"
+      },
+      {
+        "batch": "protocol-operations",
+        "methods_owner": "study-procedure.enrollment"
+      },
+      {
+        "batch": "protocol-analysis-and-oversight",
+        "methods_owner": "study-procedure.enrollment"
+      }
+    ]
+  },
+  "caps": {
+    "scope": "Complete fresh controlled local run already completed on this code version; all 14 Codex-authored sections.",
+    "visual_receipt": {
+      "pages": 7,
+      "all_pages_visually_reviewed": true,
+      "latest_images_equal_reviewed_images": true,
+      "toc_matches": 21,
+      "toc_total": 21,
+      "protocol_sha256": "d26269c533da6f553713cc26d204b5c5f0979b4092d7d01b8945ff38f418fdf2",
+      "review_scope": "Local controlled Codex draft, complete native workflow and bundled LibreOffice page review; no Hermes model result or client approval claim."
+    },
+    "client_approved": false
+  },
+  "production_changes_during_regression": false,
+  "pending": "Fresh Hermes model generation and uploaded entire-run ZIP review."
+}

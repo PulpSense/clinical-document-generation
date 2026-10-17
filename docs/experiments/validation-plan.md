@@ -845,3 +845,21 @@ Reviewed local copy: `/Users/juanpabloleoni/Downloads/CAPS-27-08-local-protocol.
 This meets the requested local test, not a Hermes model validation or real owner
 approval. Do not mark the incomplete RECORD run accepted; a final Hermes
 confirmation remains pending, as does GLIDE's complete XML/drafting confirmation.
+
+### Previous-input regression on v2.52 / v32 — 17 October 2026
+
+Results: `latest-version-regression/README.md` and `results.json`. Seven retained
+study/family combinations reassembled 13 DOCX and six XML outputs using current
+code, current public requests and unchanged saved sources/drafts. Original ZIP
+output identity was verified. DOCX content/format is unchanged on replay; only
+GLIDE's five intended XML leaves change. NEAR and COMFORT cover both families.
+
+Four full protocol rebuilds exercise concise GLIDE/BREAK/COMFORT drafts and
+corrected RECORD sections. All 63 pages were visually reviewed and all 150 TOC
+entries match. The earlier fresh full CAPS controlled test remains passing.
+CHART coverage is section-only because its complete old approved source is
+unavailable. All 57 focused tests pass; no full suite or production review gates
+were added. These are controlled local regression results, not fresh Hermes
+inference or new approval of old incomplete runs. Final Hermes confirmation
+and review of its entire-run ZIP remain pending. GLIDE exercises a full
+DOCX/ICF/XML package; CAPS specifically confirms retrospective method ownership.

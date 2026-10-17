@@ -1,0 +1,100 @@
+{
+  "provenance": "Saved RECORD source and draft replay; four local Codex sections revised against the current active-section writing plan. Not new Hermes inference.",
+  "sections": [
+    {
+      "section_id": "study-design.design",
+      "paragraphs": [
+        {
+          "text": "This single-site United States retrospective observational study reviews existing routine-care records in one cohort of all eligible unique adults. Day 0 is each person's first qualifying ordinary-care dry eye management encounter in the index period, not research enrollment. No treatment, product, procedure or care schedule is assigned or changed for research. There are no assigned arms, comparison product, placebo, investigational product, randomization or masking, and no prospective enrollment or participant contact. Ordinary-care choices are recorded characteristics, not research assignments or evidence of efficacy."
+        },
+        {
+          "text": "Index encounters span 1 January 2024 through 30 September 2025 inclusive; accessible historical records span 18 December 2023 through 31 December 2025 inclusive. All clinical data predate research abstraction. The endpoint windows select existing records, not scheduled visits; no new care or contact will be arranged to fill gaps. Detailed selection and event-counting rules are given in Informed Consent / Subject Enrollment."
+        },
+        {
+          "text": "The exploratory hypothesis is that explicitly documented contact-lens wearers will have a smaller recorded symptom reduction than explicitly documented nonwearers. This is an association hypothesis, not an established effect or a causal claim about lenses or treatment."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-design.bias",
+      "paragraphs": [
+        {
+          "text": "Consecutive inclusion of all eligible persons in the fixed index period limits discretionary case selection. Person-level deduplication and predefined symptom-selection and care-change counting rules support consistent abstraction; apply the rules in Informed Consent / Subject Enrollment. Keep missing, ambiguous and explicitly absent information distinct, and report endpoint-specific availability and reasons for missingness without imputation."
+        },
+        {
+          "text": "The exploratory model adjusts for baseline symptom score and age as specified in Statistical Methodology. These measures do not eliminate selection, attendance or documentation bias or residual confounding. Recorded change neither estimates an untreated symptom trajectory nor establishes treatment efficacy, lens-related harm or any other causal effect."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.enrollment",
+      "paragraphs": [
+        {
+          "text": "This records-only review has no prospective enrollment, screening, participant contact or signature process. Consent and privacy-authorization waivers are requested, not granted. Obtain the required ethics/privacy decisions and site permission before access. If the records-only approach is not permitted, obtain an authorized revised plan before proceeding; patient contact is not an automatic substitute."
+        },
+        {
+          "text": "Verify eligibility, identify each person's first qualifying ordinary-care dry eye encounter from 1 January 2024 through 30 September 2025, deduplicate clinic patient identifiers and assign study IDs. Abstract age at index, sex, index date, documented contact-lens status, the ordinary-care plan, symptom ratings with dates and subsequent clinician-directed care changes. Original clinical records remain at the clinic. Use only accessible records dated 18 December 2023 through 31 December 2025. Historical Day 0 is the index care encounter, not enrollment."
+        },
+        {
+          "text": "Use only the clinic's recorded question, 'Over the past seven days, how severe were your dry eye symptoms overall?', scored from 0, no symptoms, to 100, worst imaginable symptoms. Higher is worse. The scale is not presented as validated. Do not convert other questionnaires, infer ratings from narrative notes or replace absent scores with zero."
+        },
+        {
+          "text": "Select baseline as the latest eligible score in Days -14 through 0. A Day 0 score is eligible only when explicitly recorded before the index care decision. If several scores occur on the selected date, use the latest time-stamped eligible score; unresolved ordering makes baseline ambiguous and missing. Select follow-up closest to Day 60 within Days 45 through 90. Ties between dates use the earlier date; multiple values on that date use the last time-stamped score. Unresolved multiple values are ambiguous and missing. Keep care context as documented; do not widen windows or obtain new measurements. Missing scores affect only the applicable analysis, not overall eligibility."
+        },
+        {
+          "text": "Classify contact-lens status as explicitly documented wearer, explicitly documented nonwearer or unknown/not documented. A prescription does not establish wear, and unknown is not nonwearer."
+        },
+        {
+          "text": "During Days 1 through 90, a care change is a clinician-directed medication start, stop or dose-frequency change, or start/stop of a non-drug dry eye measure. Refills alone, appointment booking and administrative notes are not changes. Count one coordinated same-day adjustment as one event even if several measures change. Deduplicate by person, date and clinical event; uncertain events remain uncertain. Zero changes requires explicit unchanged-care documentation covering the interval; an absent later record alone means unknown. These windows identify records, not visits or matrix columns."
+        },
+        {
+          "text": "Staff obtain permissions, verify eligibility and deduplicate in November 2026, abstract and verify from December 2026 through February 2027, resolve permitted queries and lock the data in March, and analyze/report in April\u2013May. Administrative closeout and archiving finish by 30 June 2027. A record is complete when extraction and permitted queries are resolved, including missing/ambiguous codes; study completion requires dataset lock and completion of planned analyses and reporting. These tasks do not extend the historical period or require participant contact."
+        },
+        {
+          "text": "Suspend access if a required permission is withdrawn or a privacy incident requires suspension under site policy. Preserve legally required records and resume only after required authorization. Report unavailable source data rather than contacting patients or arranging new tests. There is no new examination, pressure/vision test, questionnaire, telephone call, clinic visit, specimen collection, genetic test or imaging re-reading, and no specimen transfer, storage or future use."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "analysis-plan.methodology",
+      "paragraphs": [
+        {
+          "text": "Calculate each person\u2019s recorded symptom-score change as follow-up minus baseline on the 0\u2013100 scale, using the selected baseline score from Days \u221214 through 0 and historical follow-up score from Days 45\u201390 after index. Report the contributing number of people, mean change, standard deviation, 95% confidence interval for the mean change, median and range. Negative change denotes symptom reduction; positive change denotes worsening.",
+          "evidence_refs": [
+            "statistics.analysis_plan",
+            "endpoints.primary"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": [
+        {
+          "label": "Secondary analyses",
+          "items": [
+            "Calculate the proportion with a change \u2264 \u221220 as the number with at least a 20-point decrease divided by the number with both selected scores. This is a descriptive threshold, not a validated responder definition or a guarantee of meaningful clinical benefit.",
+            "Report documented clinician-directed dry eye care-change counts per person during Days 1\u201390 after index, applying the event and deduplication rules in Informed Consent / Subject Enrollment. Explicitly report the denominator with sufficient care documentation, supported zero counts and unknown care-change status separately."
+          ],
+          "evidence_refs": [
+            "statistics.analysis_plan",
+            "endpoints.secondary"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "label": "Exploratory analysis",
+          "items": [
+            "Model paired symptom-score change using a linear model comparing documented index contact-lens wearers with documented nonwearers, adjusted for baseline symptom score and age. Report the wearer-minus-nonwearer adjusted difference and its 95% confidence interval. A positive difference indicates less symptom reduction or more worsening among documented wearers, not proof of harm from lenses."
+          ],
+          "evidence_refs": [
+            "statistics.methodology",
+            "statistics.analysis_plan"
+          ],
+          "boilerplate_refs": []
+        }
+      ]
+    }
+  ]
+}
