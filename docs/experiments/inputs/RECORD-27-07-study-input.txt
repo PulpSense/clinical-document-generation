@@ -1,0 +1,241 @@
+RECORD-27-07 STUDY SYNOPSIS AND OPERATIONAL SUPPLEMENT
+Version 1.0 | 17 October 2026
+
+DOCUMENT REQUEST AND STATUS
+Prepare only a retrospective protocol DOCX using the current retrospective
+Protocol template. No participant consent document or study XML is requested.
+Prepare a fresh Source of Truth for owner approval before generation.
+The study has not been submitted to the IRB. No approval, consent waiver,
+privacy-authorization waiver, approval number or approval date has been obtained.
+The study will request waivers of consent and privacy authorization for this
+records-only review. These are requests, not granted permissions. Research
+access begins only after the required ethics/privacy decisions and site permission.
+
+IDENTIFICATION AND DESIGN
+Protocol number: RECORD-27-07.
+Full title: Recorded Symptoms and Care Changes After Routine Dry Eye Management.
+Short title: Symptoms After Dry Eye Care.
+Study type: Retrospective. Classification: Observational cohort.
+Time perspective: Retrospective. Number of sites: 1, in the United States.
+Condition: Clinician-documented dry eye disease.
+The study reviews existing routine-care records. It assigns no treatment,
+product, procedure or care schedule. There is no randomization, masking,
+placebo, investigational product, prospective enrollment or participant contact.
+One records-based cohort; no assigned arms or comparison product.
+The index event is the person's first qualifying routine-care dry eye management
+encounter in the index period. Different ordinary-care choices are recorded
+characteristics, not research assignments or evidence of treatment efficacy.
+
+BACKGROUND AND OBJECTIVES
+Existing records may describe symptoms and subsequent care, but clinic attendance,
+questionnaire completeness and prescribing documentation vary. The clinic lacks
+a combined account that separates recorded symptom change from missing follow-up
+and undocumented care changes. No bibliography, published effect size or validated
+instrument reference is supplied.
+Primary objective: Describe change in the recorded dry eye symptom rating from
+the index-care baseline to the historical Day 60 selection window.
+Secondary objectives: Describe the proportion with a recorded decrease of at
+least 20 points and the frequency of documented clinician-directed care changes.
+Exploratory objective: Describe symptom change by whether a contact-lens wearer
+was explicitly documented at the index encounter.
+Hypothesis: People explicitly documented as contact-lens wearers will have a
+smaller recorded symptom reduction than people explicitly documented as nonwearers.
+This is an exploratory association hypothesis, not an established effect or a
+claim that contact lenses or any treatment caused the observed changes.
+
+HISTORICAL PERIODS AND UNITS
+Index encounters: 1 January 2024 through 30 September 2025 inclusive.
+Accessible historical record period: 18 December 2023 through 31 December 2025
+inclusive. This covers the baseline and follow-up windows for all index dates.
+Historical Day 0 is the index ordinary-care encounter, not research enrollment.
+Baseline selection window: Days -14 through 0 relative to that encounter.
+Historical Day 60 outcome selection window: Days 45 through 90 after index.
+Care-change observation window: Days 1 through 90 after index.
+These are record-selection windows, not scheduled visits or a requirement for
+people to attend at those times. All clinical data predate research abstraction.
+Staff will not contact people or arrange new care to fill gaps.
+
+POPULATION, ELIGIBILITY AND SAMPLE
+Include all eligible records; anticipate 180 unique adults at the single site.
+The person is the enrollment and analysis unit. The symptom rating concerns both
+eyes together; no eye-level cohort, separate-eye outcome or paired-eye model is
+specified. Multiple encounters for one person do not create new participants.
+Age: 18 through 85 years inclusive at the index encounter. All sexes eligible.
+Healthy volunteers: No. Sampling: Consecutive eligible records in the fixed period.
+Inclusion criteria:
+- Age 18 through 85 at index.
+- Clinician-documented dry eye disease.
+- A routine-care encounter during the index period documenting a dry eye care
+  plan, including an explicitly documented decision to continue existing care.
+- Accessible records identifying the person and index date reliably.
+- Access authorized by the site and required ethics/privacy decisions.
+Use only the first qualifying index encounter per person. Deduplicate records
+using the clinic's patient identifier before assigning a study ID.
+Exclusion criteria:
+- The person or index date cannot be reliably established after source verification.
+- The putative index encounter was part of an interventional research protocol,
+  rather than ordinary clinical care.
+Missing symptom scores, uncertain contact-lens status and incomplete subsequent
+care documentation do not exclude an otherwise eligible person. They affect
+only the relevant analysis denominator. Prior surgery, medication use and
+ordinary-care changes are recorded characteristics, not automatic exclusions.
+There is no research screening, nonparticipation interval, washout or restriction
+on other research participation. Pregnancy status is not collected and creates
+no eligibility restriction. No child records are included.
+Sample justification: All eligible records in the fixed index period constitute
+the sample; 180 people is a feasibility estimate. Report actual counts and
+exclusions. There is no formal power calculation, assumed effect size, recruitment
+quota or prospective loss-to-follow-up allowance.
+
+ABSTRACTION AND SELECTION RULES
+After the required permissions, staff verify eligibility, deduplicate records,
+assign study IDs and abstract age at index, sex, index date, documented contact-lens
+status, the ordinary-care plan, recorded symptom ratings with dates, and subsequent
+clinician-directed care changes. Original records remain at the clinic.
+The clinic's existing symptom field asks: 'Over the past seven days, how severe
+were your dry eye symptoms overall?' It uses 0, no symptoms, through 100, worst
+imaginable symptoms. Higher is worse. No validation claim is supplied. Use only
+that recorded scale; do not convert other questionnaires, infer a rating from
+narrative notes or treat absent scores as zero.
+For baseline, use the latest eligible score in Days -14 through 0. A Day 0 score
+must be explicitly recorded before the index care decision; otherwise it is not
+an eligible baseline. If multiple scores occur on the selected date, use the
+latest time-stamped eligible score. If ordering cannot be resolved, mark the
+baseline as ambiguous and missing rather than choosing arbitrarily.
+For follow-up, select the eligible score closest to historical Day 60 within
+Days 45 through 90; ties between dates use the earlier date. If multiple scores
+occur on that date, use the last time-stamped score. If times cannot resolve
+multiple values, mark that outcome value ambiguous and missing.
+Retain the care received as documented. Recorded change does not estimate an
+untreated symptom trajectory or prove that index care was effective.
+Contact-lens status has three categories: explicitly documented wearer,
+explicitly documented nonwearer, and unknown/not documented. Do not infer wear
+from a prescription or collapse unknown into nonwearer.
+A care change is a clinician-directed start, stop or dose-frequency change of
+dry eye medication or a clinician-directed start/stop of a non-drug dry eye care
+measure. A refill alone, appointment booking or administrative note is not a
+care change. Count one coordinated adjustment on the same date as one event,
+even when several measures change. Deduplicate reports by patient, date and
+clinical event; retain an uncertain event as uncertain, not a definite change.
+A zero-change count requires explicit documentation that care remained unchanged
+covering the interval. Absence of a subsequent record alone is unknown, not zero.
+No new examination, pressure or vision test, questionnaire, telephone call,
+clinic visit, specimen collection, genetic test or imaging re-reading is performed.
+There is no specimen transfer, storage, banking or future specimen use.
+
+OUTCOMES AND ANALYSIS
+Primary outcome: Recorded symptom-score change, follow-up minus baseline, on
+0–100, using the selected baseline and Days 45–90 score. Negative change means
+symptom reduction; positive change means worsening. Include people with both
+selected scores. Report the contributing number of people, mean change, standard
+deviation, 95% confidence interval, median and range.
+Secondary outcome 1: Proportion with at least a 20-point decrease in the same
+score. Denominator: people with both selected scores; numerator: change <= -20.
+This is a supplied descriptive threshold, not a validated responder definition
+or a guarantee of meaningful clinical benefit.
+Secondary outcome 2: Number of documented clinician-directed dry eye care changes
+per person on Days 1–90 after index. Report counts using the stated event rules.
+Report separately those with a supported zero count and those whose care-change
+status is unknown. Use people with sufficient care documentation as the analysis
+denominator; report that denominator explicitly.
+Exploratory outcome: Association of index contact-lens status with paired symptom
+change. Compare documented wearers and documented nonwearers using a linear model
+adjusted for baseline symptom score and age. Report the wearer-minus-nonwearer
+adjusted difference with a 95% confidence interval. A positive difference means
+less symptom reduction or more worsening among documented wearers, not proof of
+harm from lenses. Unknown status remains in cohort summaries but is excluded
+from this comparison; report its count and reason.
+Use available observed values. Do not impute symptoms, contact-lens status or
+care changes. Distinguish missing, ambiguous and explicitly absent information.
+Describe availability and reasons for missingness for each endpoint. Missing
+scores do not remove a person from the overall cohort or unrelated summaries.
+There are no prospective safety endpoints, confirmatory significance claims,
+additional exploratory outcomes or causal conclusions. Selection, documentation,
+attendance and confounding limit interpretation.
+
+RISKS, BENEFITS, PAYMENT AND CARE
+Research risk is loss of confidentiality from record access and linkage. The
+research performs no new physical intervention or assessment. Secure access,
+separate keys and aggregate reporting mitigate privacy risk. No direct benefit
+to people whose records are reviewed is expected; findings may inform future
+research and documentation practices. Ordinary care is unaffected.
+There is no recruitment, consent appointment, participant payment, compensation,
+travel reimbursement, new clinical charge or research treatment. The sponsor
+pays staff abstraction and analysis costs. No new research-injury treatment
+program or insurance promise is established for this records-only project.
+The investigator handles suspected privacy incidents under site policy and
+applicable ethics/privacy reporting requirements; no study-specific reporting
+hour count has been supplied. Do not invent physical adverse-event collection,
+follow-up examinations or new contact obligations.
+
+ETHICS, PRIVACY AND RECORDS
+Requested review body: Northfield Independent Research Ethics Board.
+Request waivers of informed consent and privacy authorization for the records-only
+review. The application will describe privacy protections and the burden and
+selection bias of recontacting former clinic patients. No waiver or approval
+is currently granted. If permissions are not granted, the investigator must
+obtain an authorized revised study plan before research access; this document
+does not authorize a switch to contacting patients.
+Authorized site research staff access identifying source records and perform
+linkage within the clinic's encrypted access-controlled environment. The identity
+key is stored separately from the coded dataset. Signed access agreements and
+abstraction logs remain at the clinic. Analysts and sponsor receive coded data
+only, with age at index and relative-day intervals rather than names, contact
+details, birth dates or exact clinical dates. Exact dates remain in restricted
+site records for eligibility and window verification. No Social Security numbers
+or genetic information are abstracted.
+Authorized monitors, the reviewing IRB and legally authorized oversight bodies
+may inspect relevant original records for oversight. Reports contain aggregate
+results; suppress public cells with fewer than five people and complementary
+cells that would reveal the suppressed count. Do not publish individual-level
+data or identifying case descriptions.
+Retain the coded study dataset, identity key, access approvals and abstraction
+logs securely for five years after administrative closeout on 30 June 2027,
+then destroy research copies unless a binding requirement requires longer.
+Original clinical records follow the clinic's separate ordinary retention policy;
+the study does not order their destruction. No sale, public individual-data
+sharing, unrelated future research, commercial specimens or banking is planned.
+Because this protocol requests a waiver and has no direct participation, there
+is no participant signature process or prospective withdrawal visit. Any site
+privacy request is handled through the site and applicable permissions, without
+promising that previously deidentified aggregate analyses can be reversed.
+
+STAFF WORK PLAN AND COMPLETION
+November 2026: Obtain required approvals and site access permission, verify record
+availability and eligibility, and deduplicate the cohort.
+December 2026 through February 2027: Abstract and verify historical records.
+March 2027: Resolve permitted source queries and lock the coded dataset.
+April through May 2027: Analyze and prepare aggregate findings.
+Administrative closeout: 30 June 2027, with reconciliation and secure archiving.
+These are future staff tasks, not new clinical data collection, enrollment,
+follow-up visits or recruitment dates. Do not extend the historical record period.
+A record's abstraction is complete when required extraction and permitted queries
+are resolved, including explicit missing/ambiguous codes. Study completion occurs
+when the coded dataset is locked and planned analyses/reporting are complete;
+administrative archiving ends by 30 June 2027. Unavailable source data are reported,
+not replaced with participant recontact or new tests.
+The investigator may suspend research access if a required permission is withdrawn
+or a privacy incident requires suspension under site policy. Preserve legally
+required records and obtain the required authorization before resuming. Do not
+add participant-level clinical stopping criteria to this records-only review.
+
+PARTIES AND CONTACTS
+Sponsor: Northfield Clinical Outcomes Foundation, 1250 Research Parkway,
+Suite 220, Columbus, OH 43215, United States.
+Sponsor contact: Alex Mercer, Research Director, +1 202-555-0160,
+alex.mercer@example.org.
+Principal investigator: Dr. Cameron Wells, MD, Principal Investigator.
+Study coordinator: Jamie Foster, CCRC, Records Research Coordinator.
+Business phone: +1 202-555-0161. Office phone: +1 202-555-0162.
+Email: jamie.foster@example.org.
+Site: Northfield Ocular Surface Clinic, 880 Clinic Square, Suite 150,
+Columbus, OH 43216, United States.
+Site investigator: Dr. Cameron Wells, MD, Principal Investigator.
+The coordinator's mailing address is the site address above. Coordinator hours:
+Monday through Friday, 9 a.m. to 5 p.m. local time; not an emergency service.
+IRB: Northfield Independent Research Ethics Board.
+Affiliation: Independent, unaffiliated with sponsor and clinic.
+Address: 410 Review Avenue, Suite 300, Columbus, OH 43217, United States.
+Phone: +1 202-555-0163. Email: research.rights.northfield@example.org.
+This contact supports rights/privacy questions and oversight; no patient contact
+campaign or prospective enrollment process is authorized.

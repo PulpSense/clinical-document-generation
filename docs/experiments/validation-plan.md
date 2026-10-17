@@ -2,8 +2,8 @@
 
 Agreed with the owner on 16 October 2026.
 Branch: `codex/generation-only-experiment`.
-Current candidate: registry disclosure mapping fix (contract v2.50, prompt v30),
-built on retrospective coverage commit `8d48c22`.
+Current candidate: PRS transport and concise drafting fixes (contract v2.51,
+prompt v31), implemented in `af7f4d1`.
 Record the installed commit from the next Hermes run receipt.
 
 **Current step: Run 7 XML fixes pass local replay; concise drafting trials reviewed; Hermes confirmation pending.**
@@ -30,7 +30,7 @@ new input and a new template do not change at the same time.
 | 5 | Ambispective | Same COMFORT clinical facts as Run 3 | Advarra | Passes Codex review; owner acceptance pending |
 | 6 | Prospective | BREAK-27-05, approved revision r-3a7da16f6dea | Sterling | Rerun passes Codex review; owner acceptance pending |
 | 7 | Ambispective | GLIDE-27-06, fresh input | Advarra | DOCX review passes; XML local fix verified; confirmation pending |
-| 8 | Retrospective | New clinical input, to be prepared | Not applicable | Pending |
+| 8 | Retrospective | RECORD-27-07, fresh input | Not applicable | Input prepared; Source of Truth and run pending |
 
 Runs 2–3 repeat the existing studies after the retrospective branch is settled.
 Runs 4–5 change only the selected consent family, preserving the studies'
@@ -734,3 +734,25 @@ The full suite was not run under the owner's focused-only constraint.
 
 One complete GLIDE Hermes confirmation remains pending, followed by retrospective
 Run 8. The local replay does not mark the original complete Run 7 accepted.
+
+
+### Run 8 RECORD input prepared — 17 October 2026
+
+The owner requested moving to the next input after pushing the fixes.
+Input: `inputs/RECORD-27-07-study-input.txt`.
+Owner-transfer copy: `/Users/juanpabloleoni/Downloads/RECORD-27-07-study-input.txt`.
+Expected Hermes path: `/opt/data/RECORD-27-07-study-input.txt` after owner transfer;
+transfer is not verified locally. Runtime changes are in `af7f4d1`; this later
+documentation/input commit includes the same runtime. Request only protocol DOCX
+and the entire run ZIP after fresh Source-of-Truth approval.
+
+This fresh single-site, person-level retrospective dry eye records study tests
+fixed index/baseline/follow-up periods, tie/ambiguity rules, no invented contacts,
+negative symptom change as improvement, observed denominators, unknown versus
+supported zero care-change counts, documented versus unknown contact-lens status,
+requested waivers versus granted approval, exact dates retained at the site versus
+relative intervals for analysts, suppression of small public cells, research-copy
+versus original-record retention, and staff work phases versus clinical visits.
+No specimen, genetic, assigned-treatment or prospective recruitment activity is
+specified. The pending GLIDE Hermes confirmation remains a separate item; Run 8
+does not verify the XML fixes because retrospective delivery contains no XML.
