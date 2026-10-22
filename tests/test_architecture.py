@@ -44,21 +44,101 @@ def test_workflow_is_only_cli_entrypoint():
         assert ("argparse" in text) == (path.name == "workflow.py")
 
 
-def test_real_hermes_adapter_uses_the_production_desktop_operation():
-    source = (ROOT / "tests/hermes_e2e.py").read_text(encoding="utf-8")
-    assert "def run_release_certification_operation(" in source
-    assert "desktop_operation(" in source
-    assert "_certified_release(release_root)" in source
-    assert 'parser.add_argument("--release-root", type=Path, required=True)' in source
-    assert 'parser.add_argument("--timeout"' not in source
-    assert "class OperationBudget" not in source
-    assert "hermes-operation.json" not in source
+def test_shipped_workflow_owns_the_real_hermes_desktop_adapter():
+    production = (ROOT / "scripts/workflow.py").read_text(encoding="utf-8")
+    certification = (ROOT / "tests/hermes_e2e.py").read_text(encoding="utf-8")
+
+    assert "def run_production_desktop_operation(" in production
+    assert 'str(managed_python), str(hermes_launcher), "chat", "-q"' in production
+    assert '"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"' in production
+    assert 'Path("/usr/bin/sandbox-exec")' in production
+    assert 'pwd.getpwuid(os.getuid()).pw_dir' in production
+    assert "_production_read_boundaries()" in production
+    assert '"managed_hermes_identity": managed_hermes_identity' in production
+    assert "expected_managed_hermes_identity=managed_hermes_identity" in production
+    assert "Path(tempfile.gettempdir())" in production
+    assert 'f"(deny file-read* (subpath ' in production
+    assert 'f"(allow file-read* (subpath ' in production
+    assert '"--safe-mode"' in production
+    assert 'command.extend(("--skills", str(configuration["skill"])))' in production
+    assert 'str(_production_authentication_path())' in production
+    assert 'deny file-write* (literal' in production
+    assert "(deny file-write* (require-not (require-any " in production
+    assert '(literal \\"/dev/null\\")' in production
+    assert 'parser.add_argument("--desktop-operation"' in production
+    assert "certified_workflow.run_production_desktop_operation(" in certification
+    assert "final_result = desktop_operation(" not in certification[
+        certification.index("def run_release_certification_operation("):
+        certification.index("def _case_artifact_findings(")
+    ]
+
+
+def test_certification_uses_the_shipped_skill_identity() -> None:
+    skill_name = next(
+        line.split(":", 1)[1].strip()
+        for line in (ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
+        if line.startswith("name:")
+    )
+    for path in (ROOT / "scripts/workflow.py", ROOT / "tests/hermes_e2e.py"):
+        assert f'"skill": "{skill_name}"' in path.read_text(encoding="utf-8")
 
 
 def test_skill_requires_source_truth_as_file_not_inline_chat():
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     assert "review_delivery" in instructions
     assert "Do not paste the Source-of-Truth contents into chat" in instructions
+
+
+def test_unsigned_linux_drop_in_is_provisioned_and_smoke_tested_before_generation():
+    instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    public_interface = instructions.index("## Public interface")
+    provision = instructions.index(
+        '"$CLINICAL_PYTHON" scripts/workflow.py --provision-candidate',
+        public_interface,
+    )
+    smoke = instructions.index(
+        '"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation',
+        provision,
+    )
+    manual_generation = instructions.index(
+        '"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review',
+        public_interface,
+    )
+
+    assert provision < smoke < manual_generation
+    normalized = " ".join(instructions.split())
+    assert "Do not use `--install-release` for this unsigned drop-in path." in normalized
+    assert (
+        "promoted release fingerprint, or the candidate manifest fingerprint for "
+        "`manual_pre_release`" in normalized
+    )
+    for authority_path in (
+        ROOT / "CONTEXT.md",
+        ROOT / "docs/adr/0018-own-render-assurance-capabilities.md",
+        ROOT / "docs/specs/render-assurance-fallbacks.md",
+    ):
+        authority = authority_path.read_text(encoding="utf-8")
+        assert "manual_pre_release" in authority
+        assert "does not confer promotion or certification" in authority
+
+
+def test_skill_keeps_each_study_in_a_named_collision_safe_run_directory():
+    instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    policy = instructions[instructions.index("## Run directory policy"):]
+
+    assert "/opt/data/clinical-document-runs/" in policy
+    assert (
+        "<filesystem-safe-approved-study-title>__<study-type>__<YYYY-MM-DD>"
+        in policy
+    )
+    assert all(
+        f"`{study_type}`" in policy
+        for study_type in ("Prospective", "Ambispective", "Retrospective")
+    )
+    assert "first unused suffix" in policy
+    assert "every workflow command's `--run-dir`" in policy
+    assert "final deliverables only in `<run-folder>/output/`" in policy
+    assert "`client_outputs` is the workflow result field" in policy
 
 
 def test_skill_keeps_hermes_orchestration_context_path_only_and_bounded():

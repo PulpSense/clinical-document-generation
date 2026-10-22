@@ -1,30 +1,66 @@
 [
   {
-    "fixture_id": "prospective-sparse-complete",
+    "fixture_id": "prospective-advarra-sparse-complete",
     "study_type": "Prospective",
+    "icf_template": "Advarra",
     "profile": "sparse-complete",
-    "path": "tests/fixtures/branch-acceptance-corpus/prospective-sparse-complete.json",
+    "path": "tests/fixtures/branch-acceptance-corpus/prospective-advarra-sparse-complete.json",
     "source_fixture": "references/conformance-fixtures/prospective-acceptance-source.json"
   },
   {
-    "fixture_id": "prospective-rich-complete",
+    "fixture_id": "prospective-advarra-rich-complete",
     "study_type": "Prospective",
+    "icf_template": "Advarra",
     "profile": "rich-complete",
-    "path": "tests/fixtures/branch-acceptance-corpus/prospective-rich-complete.json",
+    "path": "tests/fixtures/branch-acceptance-corpus/prospective-advarra-rich-complete.json",
     "source_fixture": "references/conformance-fixtures/prospective-acceptance-source.json"
   },
   {
-    "fixture_id": "ambispective-sparse-complete",
+    "fixture_id": "ambispective-sterling-sparse-complete",
     "study_type": "Ambispective",
+    "icf_template": "Sterling",
     "profile": "sparse-complete",
-    "path": "tests/fixtures/branch-acceptance-corpus/ambispective-sparse-complete.json",
+    "path": "tests/fixtures/branch-acceptance-corpus/ambispective-sterling-sparse-complete.json",
     "source_fixture": "references/conformance-fixtures/ambispective-acceptance-source.json"
   },
   {
-    "fixture_id": "ambispective-rich-complete",
+    "fixture_id": "ambispective-sterling-rich-complete",
     "study_type": "Ambispective",
+    "icf_template": "Sterling",
     "profile": "rich-complete",
-    "path": "tests/fixtures/branch-acceptance-corpus/ambispective-rich-complete.json",
+    "path": "tests/fixtures/branch-acceptance-corpus/ambispective-sterling-rich-complete.json",
+    "source_fixture": "references/conformance-fixtures/ambispective-acceptance-source.json"
+  },
+  {
+    "fixture_id": "prospective-sterling-sparse-complete",
+    "study_type": "Prospective",
+    "icf_template": "Sterling",
+    "profile": "sparse-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/prospective-sterling-sparse-complete.json",
+    "source_fixture": "references/conformance-fixtures/prospective-acceptance-source.json"
+  },
+  {
+    "fixture_id": "prospective-sterling-rich-complete",
+    "study_type": "Prospective",
+    "icf_template": "Sterling",
+    "profile": "rich-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/prospective-sterling-rich-complete.json",
+    "source_fixture": "references/conformance-fixtures/prospective-acceptance-source.json"
+  },
+  {
+    "fixture_id": "ambispective-advarra-sparse-complete",
+    "study_type": "Ambispective",
+    "icf_template": "Advarra",
+    "profile": "sparse-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/ambispective-advarra-sparse-complete.json",
+    "source_fixture": "references/conformance-fixtures/ambispective-acceptance-source.json"
+  },
+  {
+    "fixture_id": "ambispective-advarra-rich-complete",
+    "study_type": "Ambispective",
+    "icf_template": "Advarra",
+    "profile": "rich-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/ambispective-advarra-rich-complete.json",
     "source_fixture": "references/conformance-fixtures/ambispective-acceptance-source.json"
   },
   {

@@ -29,6 +29,7 @@ Generate an ambispective clinical study document set: protocol DOCX, ICF DOCX, a
 | Minimum days before screening without another study | 30 days                                                                                                                                                                                           |
 | Sample size                                         | 60 participants                                                                                                                                                                                   |
 | Sample justification                                | The sample allows descriptive estimation across two sites while accounting for expected attrition and available historical records.                                                               |
+| Sample-size evidence                                 | Planned sample: 60 participants (Approved synthetic source).                                                                                                                                       |
 | Compensation or reimbursement                       | None                                                                                                                                                                                              |
 | Statistical analysis plan                           | Descriptive summaries for historical and prospective measures; paired summaries for participants with both baseline and Month 3 data.                                                             |
 | Study timeline                                      | Historical record review plus prospective baseline through Month 3 follow-up, with prospective participation lasting approximately 14 weeks.                                                      |
@@ -113,5 +114,4 @@ Generate an ambispective clinical study document set: protocol DOCX, ICF DOCX, a
 | Overall status        | Recruiting                |
 | IRB approval status   | Approved                  |
 | Study UID             | AS-SP-001-UID             |
-
 

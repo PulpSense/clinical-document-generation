@@ -1,0 +1,12 @@
+{
+  "schema_version": "branch-acceptance-regressions/v1",
+  "provenance": "repository-owned synthetic/minimized reproductions; no client or patient data",
+  "negative_outputs_are_golden": false,
+  "cases": [
+    {"id": "glucolumen-complete-exclusion", "defects": ["complete exclusion evidence", "optional Section 8.3", "safety mitigations", "costs", "contact availability", "research-only device language", "ICF placement", "eligibility qualifiers", "reviewer binding"]},
+    {"id": "novastep-section-3-continuation", "defects": ["table continuation", "table-label cohesion", "artificial pagination", "class-based repair", "fresh rendering", "final exact-artifact review"]},
+    {"id": "timeline-grammar-connectors", "defects": ["ordinary grammatical connectors", "milestone and time-value preservation"]},
+    {"id": "malformed-review-envelope", "defects": ["workflow-owned request identity", "nested finding", "semantic finding recovery routing"]},
+    {"id": "deterministic-structured-reconstruction", "defects": ["structured table reconstruction", "PRS XML mapping correction"]}
+  ]
+}

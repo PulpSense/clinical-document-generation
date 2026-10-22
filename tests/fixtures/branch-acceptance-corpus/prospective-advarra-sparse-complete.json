@@ -1,0 +1,8 @@
+{
+  "fixture_id": "prospective-advarra-sparse-complete",
+  "study_type": "Prospective",
+  "icf_template": "Advarra",
+  "profile": "sparse-complete",
+  "evidence_density": "minimum substantive evidence",
+  "source_fixture": "tests/fixtures/prospective-acceptance-source.json"
+}
